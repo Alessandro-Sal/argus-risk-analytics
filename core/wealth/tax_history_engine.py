@@ -328,9 +328,9 @@ def record_declaration(engine: Engine, data: Dict[str, Any]) -> int:
                     "source_filename": source_filename,
                 },
             )
-            # In SQLite / MySQL lastrowid
+            # In SQLite / MySQL lastrowid, in PostgreSQL psycopg2 lastrowid == 0
             new_id = getattr(res, "lastrowid", None)
-            if new_id is None:
+            if not new_id:
                 # Query fallback
                 r = conn.execute(
                     sqlt("SELECT MAX(id) FROM tax_declarations WHERE profile_id = :profile_id"),
@@ -429,7 +429,7 @@ def record_tax_loss(engine: Engine, data: Dict[str, Any]) -> int:
             },
         )
         new_id = getattr(res, "lastrowid", None)
-        if new_id is None:
+        if not new_id:
             r = conn.execute(
                 sqlt("SELECT MAX(id) FROM tax_loss_carryforward WHERE profile_id = :profile_id"),
                 {"profile_id": profile_id},
@@ -670,7 +670,7 @@ def record_verification_document(engine: Engine, data: Dict[str, Any]) -> int:
                 },
             )
             new_id = getattr(res, "lastrowid", None)
-            if new_id is None:
+            if not new_id:
                 r = conn.execute(
                     sqlt("SELECT MAX(id) FROM tax_verification_documents WHERE profile_id = :profile_id"),
                     {"profile_id": profile_id},

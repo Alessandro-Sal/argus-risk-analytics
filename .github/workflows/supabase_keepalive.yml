@@ -1,0 +1,56 @@
+name: Supabase Free Tier Keep-Alive (Anti-Pause)
+
+on:
+  schedule:
+    # Runs every 3 days at 06:15 UTC so Supabase Free Tier never pauses after 7 days of inactivity
+    - cron: "15 6 */3 * *"
+  workflow_dispatch:
+
+jobs:
+  keepalive-ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Minimal Database Driver
+        run: |
+          python -m pip install --upgrade pip
+          pip install sqlalchemy psycopg2-binary pandas
+
+      - name: Execute Supabase Heartbeat Ping
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          python - << 'EOF'
+          import os
+          import sys
+          from core.supabase_cloud import create_supabase_engine, record_cloud_heartbeat, test_supabase_connection
+
+          db_url = os.getenv("SUPABASE_DB_URL", "").strip()
+          if not db_url:
+              print("INFO: Secret SUPABASE_DB_URL non configurato su GitHub Actions. Keep-alive saltato.")
+              sys.exit(0)
+
+          diag = test_supabase_connection(db_url)
+          if not diag.get("ok"):
+              print(f"ERROR: Connessione Supabase fallita: {diag.get('error')}")
+              sys.exit(1)
+
+          eng = create_supabase_engine(db_url)
+          try:
+              ok = record_cloud_heartbeat(
+                  eng,
+                  source="github_actions_keepalive",
+                  details=f"Scheduled anti-pause ping ({diag.get('latency_ms')} ms)",
+              )
+              print(f"SUCCESS: Heartbeat registrato su {diag.get('current_db')} ({diag.get('latency_ms')} ms). ok={ok}")
+          finally:
+              eng.dispose()
+          EOF

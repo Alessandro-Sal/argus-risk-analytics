@@ -133,57 +133,76 @@ def get_engine(
         except Exception:
             pass
     else:
-        # Corretta gerarchia di precedenza: se il parametro fornito è personalizzato, ha precedenza
-        # rispetto a variabili d'ambiente (altrimenti usa env var o fallback default).
-        if not user or user == "root":
-            user = os.getenv("MYSQL_USER") or os.getenv("STREAMLIT_DB_USER") or user or "root"
-        if not password or password == "root":
-            password = os.getenv("MYSQL_PASSWORD") or os.getenv("STREAMLIT_DB_PASS") or password or "root"
-        if not host or host == "localhost":
-            host = os.getenv("MYSQL_HOST") or os.getenv("STREAMLIT_DB_HOST") or host or "localhost"
-        if not port or port == 3306:
-            port_env = os.getenv("MYSQL_PORT") or os.getenv("STREAMLIT_DB_PORT")
-            port = int(port_env) if port_env else 3306
-        if database is not None:
-            db = database
-        elif db and db != "investment_risk_bi":
-            db = db
-        else:
-            db = os.getenv("MYSQL_DATABASE") or os.getenv("STREAMLIT_DB_NAME") or db
-
-        try:
-            import pymysql
-
-            sys_url = f"mysql+pymysql://{user}:{password}@{host}:{port}/"
-            sys_engine = create_engine(sys_url, connect_args={"connect_timeout": 3})
+        # 1. Priorità Cloud: se è configurato SUPABASE_DB_URL (o DATABASE_URL postgres://)
+        # e non è stato forzato un host MySQL custom diverso da localhost, usa Supabase PostgreSQL.
+        engine = None
+        custom_mysql_requested = (host and host not in ("localhost", "127.0.0.1")) or (user and user != "root")
+        if not custom_mysql_requested:
             try:
-                with sys_engine.begin() as conn:
-                    conn.execute(
-                        text(f"CREATE DATABASE IF NOT EXISTS {db} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
-                    )
-            finally:
+                from core.supabase_cloud import create_supabase_engine, get_supabase_config
+
+                supa_cfg = get_supabase_config()
+                if supa_cfg.get("is_configured"):
+                    supa_eng = create_supabase_engine(supa_cfg["db_url"])
+                    with supa_eng.connect() as test_conn:
+                        test_conn.execute(text("SELECT 1"))
+                    engine = supa_eng
+            except Exception as supa_ex:
+                logger.warning("Connessione Supabase non riuscita, fallback a MySQL/SQLite: %s", supa_ex)
+                engine = None
+
+        if engine is None:
+            # Corretta gerarchia di precedenza: se il parametro fornito è personalizzato, ha precedenza
+            # rispetto a variabili d'ambiente (altrimenti usa env var o fallback default).
+            if not user or user == "root":
+                user = os.getenv("MYSQL_USER") or os.getenv("STREAMLIT_DB_USER") or user or "root"
+            if not password or password == "root":
+                password = os.getenv("MYSQL_PASSWORD") or os.getenv("STREAMLIT_DB_PASS") or password or "root"
+            if not host or host == "localhost":
+                host = os.getenv("MYSQL_HOST") or os.getenv("STREAMLIT_DB_HOST") or host or "localhost"
+            if not port or port == 3306:
+                port_env = os.getenv("MYSQL_PORT") or os.getenv("STREAMLIT_DB_PORT")
+                port = int(port_env) if port_env else 3306
+            if database is not None:
+                db = database
+            elif db and db != "investment_risk_bi":
+                db = db
+            else:
+                db = os.getenv("MYSQL_DATABASE") or os.getenv("STREAMLIT_DB_NAME") or db
+
+            try:
+                import pymysql
+
+                sys_url = f"mysql+pymysql://{user}:{password}@{host}:{port}/"
+                sys_engine = create_engine(sys_url, connect_args={"connect_timeout": 3})
                 try:
-                    sys_engine.dispose()
+                    with sys_engine.begin() as conn:
+                        conn.execute(
+                            text(f"CREATE DATABASE IF NOT EXISTS {db} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
+                        )
+                finally:
+                    try:
+                        sys_engine.dispose()
+                    except Exception:
+                        pass
+
+                url = f"mysql+pymysql://{user}:{password}@{host}:{port}/{db}"
+                engine = create_engine(
+                    url,
+                    echo=False,
+                    pool_pre_ping=True,
+                    pool_recycle=3600,
+                    pool_timeout=15,
+                    connect_args={"connect_timeout": 5},
+                )
+            except Exception:
+                os.makedirs("data", exist_ok=True)
+                sqlite_url = f"sqlite:///{sqlite_path.replace(chr(92), '/')}"
+                engine = create_engine(sqlite_url, echo=False, connect_args={"timeout": 15})
+                try:
+                    event.listen(engine, "connect", _set_sqlite_pragmas)
                 except Exception:
                     pass
-
-            url = f"mysql+pymysql://{user}:{password}@{host}:{port}/{db}"
-            engine = create_engine(
-                url,
-                echo=False,
-                pool_pre_ping=True,
-                pool_recycle=3600,
-                pool_timeout=15,
-                connect_args={"connect_timeout": 5},
-            )
-        except Exception:
-            os.makedirs("data", exist_ok=True)
-            sqlite_url = f"sqlite:///{sqlite_path.replace(chr(92), '/')}"
-            engine = create_engine(sqlite_url, echo=False, connect_args={"timeout": 15})
-            try:
-                event.listen(engine, "connect", _set_sqlite_pragmas)
-            except Exception:
-                pass
 
     if engine.dialect.name == "sqlite":
         try:
@@ -201,46 +220,45 @@ def get_engine(
 
     Base.metadata.create_all(engine)
 
-    with engine.begin() as conn:
-        try:
-            conn.execute(text("ALTER TABLE assets ADD COLUMN trailing_pe DECIMAL(10,2)"))
-            conn.execute(text("ALTER TABLE assets ADD COLUMN forward_pe DECIMAL(10,2)"))
-            conn.execute(text("ALTER TABLE assets ADD COLUMN price_to_book DECIMAL(10,2)"))
-            conn.execute(text("ALTER TABLE assets ADD COLUMN dividend_yield DECIMAL(10,4)"))
-            conn.execute(text("ALTER TABLE assets ADD COLUMN roe DECIMAL(10,4)"))
-        except Exception:
-            pass
+    is_postgres = engine.dialect.name == "postgresql"
+    legacy_cols = [
+        "trailing_pe DECIMAL(10,2)",
+        "forward_pe DECIMAL(10,2)",
+        "price_to_book DECIMAL(10,2)",
+        "dividend_yield DECIMAL(10,4)",
+        "roe DECIMAL(10,4)",
+        "target_mean_price DECIMAL(18,6)",
+        "peg_ratio DECIMAL(10,2)",
+        "industry VARCHAR(100)",
+        "exchange VARCHAR(50)",
+        "recommendation_key VARCHAR(50)",
+        "market_cap BIGINT",
+        "beta_5y DECIMAL(10,4)",
+        "fifty_two_week_high DECIMAL(18,6)",
+        "fifty_two_week_low DECIMAL(18,6)",
+        "fifty_day_average DECIMAL(18,6)",
+        "two_hundred_day_average DECIMAL(18,6)",
+        "profit_margins DECIMAL(10,4)",
+        "gross_margins DECIMAL(10,4)",
+        "operating_margins DECIMAL(10,4)",
+        "total_revenue BIGINT",
+        "ebitda BIGINT",
+        "debt_to_equity DECIMAL(10,4)",
+        "revenue_growth DECIMAL(10,4)",
+        "earnings_growth DECIMAL(10,4)",
+    ]
 
-        try:
-            conn.execute(text("ALTER TABLE assets ADD COLUMN target_mean_price DECIMAL(18,6)"))
-            conn.execute(text("ALTER TABLE assets ADD COLUMN peg_ratio DECIMAL(10,2)"))
-        except Exception:
-            pass
-
-        new_cols = [
-            "industry VARCHAR(100)",
-            "exchange VARCHAR(50)",
-            "recommendation_key VARCHAR(50)",
-            "market_cap BIGINT",
-            "beta_5y DECIMAL(10,4)",
-            "fifty_two_week_high DECIMAL(18,6)",
-            "fifty_two_week_low DECIMAL(18,6)",
-            "fifty_day_average DECIMAL(18,6)",
-            "two_hundred_day_average DECIMAL(18,6)",
-            "profit_margins DECIMAL(10,4)",
-            "gross_margins DECIMAL(10,4)",
-            "operating_margins DECIMAL(10,4)",
-            "total_revenue BIGINT",
-            "ebitda BIGINT",
-            "debt_to_equity DECIMAL(10,4)",
-            "revenue_growth DECIMAL(10,4)",
-            "earnings_growth DECIMAL(10,4)",
-        ]
-        for col_def in new_cols:
-            try:
-                conn.execute(text(f"ALTER TABLE assets ADD COLUMN {col_def}"))
-            except Exception:
-                pass
+    if is_postgres:
+        with engine.begin() as conn:
+            for col_def in legacy_cols:
+                conn.execute(text(f"ALTER TABLE assets ADD COLUMN IF NOT EXISTS {col_def}"))
+    else:
+        with engine.begin() as conn:
+            for col_def in legacy_cols:
+                try:
+                    conn.execute(text(f"ALTER TABLE assets ADD COLUMN {col_def}"))
+                except Exception:
+                    pass
 
     return engine
 
@@ -551,9 +569,11 @@ def _upsert_asset(ticker: str, yf_ticker, df_clean: pd.DataFrame, engine, info: 
             "earnings_growth": earnings_growth,
         }
 
-    is_sqlite = getattr(engine, "dialect", None) is not None and engine.dialect.name == "sqlite"
+    dialect_name = getattr(getattr(engine, "dialect", None), "name", "")
+    is_sqlite = dialect_name == "sqlite"
+    is_postgres = dialect_name == "postgresql"
 
-    if is_sqlite:
+    if is_sqlite or is_postgres:
         sql = text("""
             INSERT INTO assets
                 (ticker, name, asset_class, currency, gics_sector, country, 
@@ -695,8 +715,8 @@ def _upsert_asset(ticker: str, yf_ticker, df_clean: pd.DataFrame, engine, info: 
 def _store_prices(hist: pd.DataFrame, asset_id: int, engine, ticker: str = None):
     """
     Scrive i prezzi storici su market_prices.
-    Usa INSERT IGNORE (MySQL) o INSERT OR IGNORE (SQLite) per non duplicare righe già presenti
-    (grazie a UNIQUE KEY uq_asset_date).
+    Usa INSERT IGNORE (MySQL), INSERT OR IGNORE (SQLite) o ON CONFLICT DO NOTHING (PostgreSQL)
+    per non duplicare righe già presenti (grazie a UNIQUE KEY uq_asset_date).
     """
     records = []
     for date, row in hist.iterrows():
@@ -728,13 +748,21 @@ def _store_prices(hist: pd.DataFrame, asset_id: int, engine, ticker: str = None)
         df_p["ticker"] = ticker
         return df_p[["ticker", "price_date", "close", "volume"]]
 
-    is_sqlite = getattr(engine, "dialect", None) is not None and engine.dialect.name == "sqlite"
-    if is_sqlite:
+    dialect_name = getattr(getattr(engine, "dialect", None), "name", "")
+    if dialect_name == "sqlite":
         sql = text("""
             INSERT OR IGNORE INTO market_prices
                 (asset_id, price_date, close, volume, source)
             VALUES
                 (:asset_id, :price_date, :close, :volume, :source)
+        """)
+    elif dialect_name == "postgresql":
+        sql = text("""
+            INSERT INTO market_prices
+                (asset_id, price_date, close, volume, source)
+            VALUES
+                (:asset_id, :price_date, :close, :volume, :source)
+            ON CONFLICT (asset_id, price_date) DO NOTHING
         """)
     else:
         sql = text("""
@@ -775,8 +803,8 @@ def _store_isin_price(ticker: str, df_clean: pd.DataFrame, engine, report: dict)
         report["skipped"].append(f"{ticker}: {len(precords)} prezzi da CSV (ISIN, no yfinance)")
         return adict, pd.DataFrame(precords)
 
-    is_sqlite = getattr(engine, "dialect", None) is not None and engine.dialect.name == "sqlite"
-    if is_sqlite:
+    dialect_name = getattr(getattr(engine, "dialect", None), "name", "")
+    if dialect_name in ("sqlite", "postgresql"):
         sql_asset = text("""
             INSERT INTO assets (ticker, name, asset_class, currency, gics_sector, country)
             VALUES (:ticker, :name, :asset_class, :currency, NULL, NULL)
@@ -785,12 +813,21 @@ def _store_isin_price(ticker: str, df_clean: pd.DataFrame, engine, report: dict)
                 asset_class = excluded.asset_class,
                 currency    = excluded.currency
         """)
-        sql_price = text("""
-            INSERT OR IGNORE INTO market_prices
-                (asset_id, price_date, close, volume, source)
-            VALUES
-                (:asset_id, :price_date, :close, NULL, 'csv_manual')
-        """)
+        if dialect_name == "sqlite":
+            sql_price = text("""
+                INSERT OR IGNORE INTO market_prices
+                    (asset_id, price_date, close, volume, source)
+                VALUES
+                    (:asset_id, :price_date, :close, NULL, 'csv_manual')
+            """)
+        else:
+            sql_price = text("""
+                INSERT INTO market_prices
+                    (asset_id, price_date, close, volume, source)
+                VALUES
+                    (:asset_id, :price_date, :close, NULL, 'csv_manual')
+                ON CONFLICT (asset_id, price_date) DO NOTHING
+            """)
     else:
         sql_asset = text("""
             INSERT INTO assets (ticker, name, asset_class, currency, gics_sector, country)

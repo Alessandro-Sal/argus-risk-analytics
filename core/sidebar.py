@@ -1031,7 +1031,13 @@ def render_settings_dialog(current_module: str = "risk") -> None:
 
     # ── TAB 3: DATABASE & RETE ────────────────────────────────
     with tab_conn:
-        env_opts = ["Auto (Ibrido)", "Live Yahoo Finance", "DuckDB Veloce", "Local SQLite"]
+        env_opts = [
+            "Auto (Ibrido)",
+            "Supabase Cloud (PostgreSQL)",
+            "Live Yahoo Finance",
+            "DuckDB Veloce",
+            "Local SQLite",
+        ]
         curr_env = st.session_state.get("data_environment", "Auto (Ibrido)")
         env_idx = env_opts.index(curr_env) if curr_env in env_opts else 0
         sel_env = st.selectbox("Sorgente Dati", env_opts, index=env_idx, key="sb_data_environment")
@@ -1039,7 +1045,7 @@ def render_settings_dialog(current_module: str = "risk") -> None:
 
         off_lbl = "Modalità Offline (SQLite Locale)" if is_wealth else "Modalità Offline (RAM)"
         off_hlp = (
-            "Usa il database locale embedded SQLite senza dipendere da MySQL."
+            "Usa il database locale embedded SQLite senza dipendere da Supabase/MySQL."
             if is_wealth
             else "Simulazione in memoria RAM con dataset sintetici senza dipendenze esterne."
         )
@@ -1056,9 +1062,21 @@ def render_settings_dialog(current_module: str = "risk") -> None:
         else:
             st.session_state.offline_mode = sel_off
 
+        # Pannello Cloud Supabase (€0/mese)
+        try:
+            from core.supabase_cloud import is_supabase_configured, render_supabase_cloud_panel
+
+            with st.expander(
+                "☁️ Cloud Supabase & Deploy Online (€0/mese)",
+                expanded=is_supabase_configured() or sel_env == "Supabase Cloud (PostgreSQL)",
+            ):
+                render_supabase_cloud_panel(engine=st.session_state.get("engine"))
+        except Exception as supa_ui_ex:
+            st.caption(f"Modulo Cloud Supabase non disponibile: {supa_ui_ex}")
+
         # Gestione Connessione MySQL (se non in modalità offline)
         if not st.session_state.offline_mode:
-            with st.expander("🔌 Connessione & Schema Database", expanded=False):
+            with st.expander("🔌 Connessione & Schema Database (MySQL / Local)", expanded=False):
                 col_h, col_p = st.columns([2, 1.2])
                 with col_h:
                     st.session_state.db_host = st.text_input("Host", value=st.session_state.db_host, key="sb_db_host")
@@ -1224,6 +1242,10 @@ def _execute_full_session_reset(is_wealth_mode: bool = False) -> None:
         "accounting_notation",
         "data_environment",
         "offline_mode",
+        "supabase_db_url",
+        "argus_auth_verified",
+        "argus_auth_role",
+        "argus_auth_user",
         "db_host",
         "db_port",
         "db_user",
@@ -1815,13 +1837,23 @@ def render_sidebar():
         st.session_state["_prev_active_db"] = curr_active_db
         st.session_state["_prev_offline_mode"] = curr_offline
 
+        from core.supabase_cloud import is_supabase_configured, render_cloud_auth_gate
         from core.ui_utils import get_display_portfolio_name
+
+        if not render_cloud_auth_gate():
+            st.stop()
 
         port_label, has_port = get_display_portfolio_name()
         port_text_style = (
             "color:#ffffff; font-weight:700;" if has_port else "color:#e3b341; font-style:italic; font-weight:600;"
         )
         active_port_label = port_label if len(port_label) <= 26 else f"{port_label[:24]}..."
+        active_eng = st.session_state.get("engine")
+        is_pg_engine = (
+            active_eng is not None
+            and getattr(getattr(active_eng, "dialect", None), "name", "") == "postgresql"
+        )
+        is_supa_cloud = (not st.session_state.offline_mode) and (is_pg_engine or is_supabase_configured())
 
         if is_wealth_mode:
             w_needs = int(st.session_state.get("wealth_budget_needs_pct", 50))
@@ -1829,12 +1861,15 @@ def render_sidebar():
             w_savings = int(st.session_state.get("wealth_budget_savings_pct", 20))
             w_rule_label = f"{w_needs}/{w_wants}/{w_savings}"
             is_offline = st.session_state.offline_mode
-            w_status_badge = (
-                '<span style="font-size:10px; font-weight:800; color:#ff9900; background:rgba(255, 153, 0, 0.15); padding: 2px 7px; border-radius:12px; letter-spacing:0.5px;">🟡 OFFLINE</span>'
-                if is_offline
-                else '<span style="font-size:10px; font-weight:800; color:#34d399; background:rgba(16, 185, 129, 0.20); padding: 2px 7px; border-radius:12px; letter-spacing:0.5px;">🟢 LIVE DB</span>'
-            )
-            w_db_label = "SQLite Locale" if is_offline else f"{st.session_state.db_name}"
+            if is_offline:
+                w_status_badge = '<span style="font-size:10px; font-weight:800; color:#ff9900; background:rgba(255, 153, 0, 0.15); padding: 2px 7px; border-radius:12px; letter-spacing:0.5px;">🟡 OFFLINE</span>'
+                w_db_label = "SQLite Locale"
+            elif is_supa_cloud:
+                w_status_badge = '<span style="font-size:10px; font-weight:800; color:#38bdf8; background:rgba(56, 189, 248, 0.20); padding: 2px 7px; border-radius:12px; letter-spacing:0.5px;">☁️ SUPABASE</span>'
+                w_db_label = "Supabase Cloud"
+            else:
+                w_status_badge = '<span style="font-size:10px; font-weight:800; color:#34d399; background:rgba(16, 185, 129, 0.20); padding: 2px 7px; border-radius:12px; letter-spacing:0.5px;">🟢 LIVE DB</span>'
+                w_db_label = f"{st.session_state.db_name}"
 
             st.markdown(
                 f"""
@@ -1962,11 +1997,19 @@ def render_sidebar():
             is_offline = st.session_state.offline_mode
             status_bg = "rgba(255, 153, 0, 0.08)" if is_offline else "rgba(35, 134, 54, 0.10)"
             status_border = "rgba(255, 153, 0, 0.35)" if is_offline else "rgba(46, 160, 67, 0.35)"
-            status_badge_bg = "rgba(255, 153, 0, 0.15)" if is_offline else "rgba(46, 160, 67, 0.20)"
-            status_badge_color = "#ff9900" if is_offline else "#3fb950"
-            status_text = "OFFLINE" if is_offline else "LIVE DB"
-            status_icon = "🟡" if is_offline else "🟢"
-            active_db_label = "In-Memory" if is_offline else f"{st.session_state.db_name}"
+            status_badge_bg = (
+                "rgba(255, 153, 0, 0.15)"
+                if is_offline
+                else ("rgba(56, 189, 248, 0.20)" if is_supa_cloud else "rgba(46, 160, 67, 0.20)")
+            )
+            status_badge_color = "#ff9900" if is_offline else ("#38bdf8" if is_supa_cloud else "#3fb950")
+            status_text = "OFFLINE" if is_offline else ("SUPABASE" if is_supa_cloud else "LIVE DB")
+            status_icon = "🟡" if is_offline else ("☁️" if is_supa_cloud else "🟢")
+            active_db_label = (
+                "In-Memory"
+                if is_offline
+                else ("Supabase Cloud" if is_supa_cloud else f"{st.session_state.db_name}")
+            )
 
             st.markdown(
                 f"""

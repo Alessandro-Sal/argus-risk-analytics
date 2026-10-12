@@ -184,8 +184,10 @@ DEFAULT_SYSTEM_CATEGORIES = [
 
 
 def init_wealth_db(engine: Engine) -> None:
-    """Inizializza automaticamente le tabelle del Wealth Management se non presenti."""
-    is_sqlite = getattr(engine, "dialect", None) is not None and engine.dialect.name == "sqlite"
+    """Inizializza automaticamente le tabelle del Wealth Management se non presenti (SQLite, PostgreSQL, MySQL)."""
+    dialect_name = getattr(getattr(engine, "dialect", None), "name", "")
+    is_sqlite = dialect_name == "sqlite"
+    is_postgres = dialect_name == "postgresql"
 
     if is_sqlite:
         try:
@@ -438,6 +440,247 @@ def init_wealth_db(engine: Engine) -> None:
                     notes TEXT,
                     source_filename TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            )
+
+        elif is_postgres:
+            # PostgreSQL / Supabase DDL
+            conn.execute(
+                sqlt("""
+                CREATE TABLE IF NOT EXISTS wealth_profiles (
+                    profile_id SERIAL PRIMARY KEY,
+                    name VARCHAR(150) NOT NULL,
+                    description TEXT,
+                    owner VARCHAR(100) NOT NULL DEFAULT 'user',
+                    base_currency VARCHAR(10) NOT NULL DEFAULT 'EUR',
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            )
+            conn.execute(
+                sqlt("""
+                CREATE TABLE IF NOT EXISTS wealth_accounts (
+                    account_id SERIAL PRIMARY KEY,
+                    portfolio_id INTEGER NOT NULL DEFAULT 1,
+                    name VARCHAR(120) NOT NULL,
+                    account_type VARCHAR(50) NOT NULL DEFAULT 'checking',
+                    institution VARCHAR(120) NOT NULL DEFAULT 'Banca',
+                    currency VARCHAR(10) NOT NULL DEFAULT 'EUR',
+                    balance DOUBLE PRECISION NOT NULL DEFAULT 0.00,
+                    is_active INTEGER NOT NULL DEFAULT 1,
+                    iban VARCHAR(64),
+                    notes TEXT,
+                    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            )
+            conn.execute(
+                sqlt("""
+                CREATE TABLE IF NOT EXISTS wealth_categories (
+                    category_id SERIAL PRIMARY KEY,
+                    name VARCHAR(120) NOT NULL,
+                    flow_type VARCHAR(20) NOT NULL,
+                    nature VARCHAR(40) NOT NULL DEFAULT 'essential_need',
+                    parent_id INTEGER REFERENCES wealth_categories(category_id) ON DELETE SET NULL,
+                    icon VARCHAR(16) NOT NULL DEFAULT '🏷️',
+                    color VARCHAR(16) NOT NULL DEFAULT '#6366f1',
+                    is_system INTEGER NOT NULL DEFAULT 0
+                );
+            """)
+            )
+            conn.execute(
+                sqlt("""
+                CREATE TABLE IF NOT EXISTS wealth_cashflow (
+                    tx_id SERIAL PRIMARY KEY,
+                    portfolio_id INTEGER NOT NULL DEFAULT 1,
+                    account_id INTEGER NOT NULL REFERENCES wealth_accounts(account_id) ON DELETE CASCADE,
+                    category_id INTEGER NOT NULL REFERENCES wealth_categories(category_id),
+                    tx_date DATE NOT NULL,
+                    amount DOUBLE PRECISION NOT NULL,
+                    currency VARCHAR(10) NOT NULL DEFAULT 'EUR',
+                    direction VARCHAR(10) NOT NULL,
+                    merchant VARCHAR(160),
+                    notes TEXT,
+                    is_recurring INTEGER NOT NULL DEFAULT 0,
+                    payment_method VARCHAR(60) NOT NULL DEFAULT 'Carta / Bonifico',
+                    tags VARCHAR(250),
+                    tx_hash VARCHAR(64),
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            )
+            conn.execute(
+                sqlt("""
+                CREATE TABLE IF NOT EXISTS wealth_physical_assets (
+                    asset_id SERIAL PRIMARY KEY,
+                    portfolio_id INTEGER NOT NULL DEFAULT 1,
+                    name VARCHAR(180) NOT NULL,
+                    asset_category VARCHAR(50) NOT NULL DEFAULT 'luxury_watches',
+                    brand_or_location VARCHAR(150),
+                    model_or_specs VARCHAR(200),
+                    reference_number VARCHAR(100),
+                    acquisition_date DATE,
+                    purchase_price DOUBLE PRECISION NOT NULL DEFAULT 0.00,
+                    current_market_value DOUBLE PRECISION NOT NULL DEFAULT 0.00,
+                    valuation_date DATE,
+                    valuation_source VARCHAR(120) DEFAULT 'Stima di Mercato',
+                    condition_grade VARCHAR(80) DEFAULT 'Eccellente / Full Set',
+                    currency VARCHAR(10) NOT NULL DEFAULT 'EUR',
+                    notes TEXT,
+                    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            )
+            conn.execute(
+                sqlt("""
+                CREATE TABLE IF NOT EXISTS wealth_pension_plans (
+                    plan_id SERIAL PRIMARY KEY,
+                    portfolio_id INTEGER NOT NULL DEFAULT 1,
+                    plan_name VARCHAR(160) NOT NULL,
+                    provider VARCHAR(120) NOT NULL,
+                    plan_type VARCHAR(60) NOT NULL DEFAULT 'fondo_pensione_aperto',
+                    accumulated_value DOUBLE PRECISION NOT NULL DEFAULT 0.00,
+                    monthly_employee_contrib DOUBLE PRECISION NOT NULL DEFAULT 0.00,
+                    monthly_employer_contrib DOUBLE PRECISION NOT NULL DEFAULT 0.00,
+                    tax_deductible_annual DOUBLE PRECISION NOT NULL DEFAULT 0.00,
+                    expected_retirement_age INTEGER NOT NULL DEFAULT 67,
+                    currency VARCHAR(10) NOT NULL DEFAULT 'EUR',
+                    investment_line VARCHAR(120) DEFAULT 'Azionario / Crescita',
+                    notes TEXT,
+                    yearly_data_json TEXT,
+                    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            )
+            conn.execute(
+                sqlt("""
+                CREATE TABLE IF NOT EXISTS wealth_networth_snapshots (
+                    snapshot_id SERIAL PRIMARY KEY,
+                    portfolio_id INTEGER NOT NULL DEFAULT 1,
+                    run_id VARCHAR(64),
+                    snapshot_date DATE NOT NULL,
+                    snapshot_name VARCHAR(150) DEFAULT 'Snapshot Patrimoniale',
+                    total_net_worth DOUBLE PRECISION NOT NULL,
+                    liquid_assets DOUBLE PRECISION NOT NULL DEFAULT 0.00,
+                    financial_investments DOUBLE PRECISION NOT NULL DEFAULT 0.00,
+                    physical_assets_total DOUBLE PRECISION NOT NULL DEFAULT 0.00,
+                    watches_total DOUBLE PRECISION NOT NULL DEFAULT 0.00,
+                    real_estate_total DOUBLE PRECISION NOT NULL DEFAULT 0.00,
+                    pension_total DOUBLE PRECISION NOT NULL DEFAULT 0.00,
+                    total_liabilities DOUBLE PRECISION NOT NULL DEFAULT 0.00,
+                    monthly_income_avg DOUBLE PRECISION NOT NULL DEFAULT 0.00,
+                    monthly_expense_avg DOUBLE PRECISION NOT NULL DEFAULT 0.00,
+                    savings_rate_pct DOUBLE PRECISION NOT NULL DEFAULT 0.00,
+                    emergency_runway_months DOUBLE PRECISION NOT NULL DEFAULT 0.00,
+                    wealth_health_score DOUBLE PRECISION NOT NULL DEFAULT 0.00,
+                    details_json TEXT,
+                    notes TEXT,
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            )
+            conn.execute(
+                sqlt("""
+                CREATE TABLE IF NOT EXISTS wealth_fixed_expenses (
+                    fixed_id SERIAL PRIMARY KEY,
+                    portfolio_id INTEGER NOT NULL DEFAULT 1,
+                    category VARCHAR(100) NOT NULL,
+                    note VARCHAR(255) NOT NULL,
+                    amount DOUBLE PRECISION NOT NULL,
+                    payment_day INTEGER,
+                    start_date DATE,
+                    end_date DATE,
+                    is_split INTEGER DEFAULT 0,
+                    split_details TEXT,
+                    cadence VARCHAR(50) DEFAULT 'Mensile',
+                    is_active INTEGER DEFAULT 1,
+                    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            )
+            conn.execute(
+                sqlt("""
+                CREATE TABLE IF NOT EXISTS wealth_goals (
+                    goal_id SERIAL PRIMARY KEY,
+                    portfolio_id INTEGER NOT NULL DEFAULT 1,
+                    name VARCHAR(160) NOT NULL,
+                    category VARCHAR(60) NOT NULL DEFAULT 'custom',
+                    target_amount DOUBLE PRECISION NOT NULL DEFAULT 0.00,
+                    target_date DATE NOT NULL,
+                    current_amount DOUBLE PRECISION NOT NULL DEFAULT 0.00,
+                    monthly_contribution DOUBLE PRECISION NOT NULL DEFAULT 0.00,
+                    priority VARCHAR(30) NOT NULL DEFAULT 'medium',
+                    risk_tolerance VARCHAR(30) NOT NULL DEFAULT 'moderate',
+                    inflation_rate DOUBLE PRECISION NOT NULL DEFAULT 0.02,
+                    notes TEXT,
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            )
+            conn.execute(
+                sqlt("""
+                CREATE TABLE IF NOT EXISTS tax_declarations (
+                    id SERIAL PRIMARY KEY,
+                    profile_id VARCHAR(100) NOT NULL DEFAULT 'default',
+                    tax_year INTEGER NOT NULL,
+                    filing_year INTEGER NOT NULL,
+                    model_type VARCHAR(50) NOT NULL,
+                    protocol_id VARCHAR(100),
+                    gross_income DOUBLE PRECISION NOT NULL DEFAULT 0.00,
+                    taxable_income DOUBLE PRECISION NOT NULL DEFAULT 0.00,
+                    net_tax_irpef DOUBLE PRECISION NOT NULL DEFAULT 0.00,
+                    capital_gains_declared DOUBLE PRECISION NOT NULL DEFAULT 0.00,
+                    capital_losses_offset DOUBLE PRECISION NOT NULL DEFAULT 0.00,
+                    substitute_tax_paid DOUBLE PRECISION NOT NULL DEFAULT 0.00,
+                    ivafe_paid DOUBLE PRECISION NOT NULL DEFAULT 0.00,
+                    foreign_assets_val DOUBLE PRECISION NOT NULL DEFAULT 0.00,
+                    notes TEXT,
+                    source_filename VARCHAR(255),
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    CONSTRAINT uq_tax_profile_year UNIQUE (profile_id, tax_year, model_type)
+                );
+            """)
+            )
+            conn.execute(
+                sqlt("""
+                CREATE TABLE IF NOT EXISTS tax_loss_carryforward (
+                    id SERIAL PRIMARY KEY,
+                    profile_id VARCHAR(100) NOT NULL DEFAULT 'default',
+                    generation_year INTEGER NOT NULL,
+                    expiration_year INTEGER NOT NULL,
+                    initial_loss_amount DOUBLE PRECISION NOT NULL,
+                    offset_amount DOUBLE PRECISION NOT NULL DEFAULT 0.00,
+                    remaining_amount DOUBLE PRECISION NOT NULL,
+                    status VARCHAR(30) NOT NULL DEFAULT 'ACTIVE',
+                    is_officially_filed INTEGER NOT NULL DEFAULT 1,
+                    broker_source VARCHAR(100) DEFAULT 'DEGIRO',
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            )
+            conn.execute(
+                sqlt("""
+                CREATE TABLE IF NOT EXISTS tax_verification_documents (
+                    id SERIAL PRIMARY KEY,
+                    profile_id VARCHAR(100) NOT NULL DEFAULT 'default',
+                    tax_year INTEGER NOT NULL,
+                    doc_type VARCHAR(50) NOT NULL,
+                    issuer_name VARCHAR(200),
+                    protocol_or_code VARCHAR(150),
+                    gross_amount DOUBLE PRECISION NOT NULL DEFAULT 0.00,
+                    net_taxable_amount DOUBLE PRECISION NOT NULL DEFAULT 0.00,
+                    tax_withheld_or_due DOUBLE PRECISION NOT NULL DEFAULT 0.00,
+                    tax_paid DOUBLE PRECISION NOT NULL DEFAULT 0.00,
+                    penalty_amount DOUBLE PRECISION NOT NULL DEFAULT 0.00,
+                    interest_amount DOUBLE PRECISION NOT NULL DEFAULT 0.00,
+                    total_due DOUBLE PRECISION NOT NULL DEFAULT 0.00,
+                    secondary_amount DOUBLE PRECISION NOT NULL DEFAULT 0.00,
+                    asset_monitoring_val DOUBLE PRECISION NOT NULL DEFAULT 0.00,
+                    metadata_json TEXT,
+                    notes TEXT,
+                    source_filename VARCHAR(255),
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
                 );
             """)
             )
@@ -730,6 +973,25 @@ def init_wealth_db(engine: Engine) -> None:
                 p_cols = [r[1] for r in conn.execute(sqlt("PRAGMA table_info(wealth_pension_plans)")).fetchall()]
                 if "yearly_data_json" not in p_cols:
                     conn.execute(sqlt("ALTER TABLE wealth_pension_plans ADD COLUMN yearly_data_json TEXT"))
+            elif is_postgres:
+                conn.execute(
+                    sqlt(
+                        "ALTER TABLE wealth_networth_snapshots ADD COLUMN IF NOT EXISTS snapshot_name VARCHAR(150) DEFAULT 'Snapshot Patrimoniale'"
+                    )
+                )
+                conn.execute(sqlt("ALTER TABLE wealth_networth_snapshots ADD COLUMN IF NOT EXISTS details_json TEXT"))
+                conn.execute(sqlt("ALTER TABLE wealth_networth_snapshots ADD COLUMN IF NOT EXISTS run_id VARCHAR(64)"))
+                for t in [
+                    "wealth_accounts",
+                    "wealth_cashflow",
+                    "wealth_physical_assets",
+                    "wealth_pension_plans",
+                    "wealth_networth_snapshots",
+                ]:
+                    conn.execute(
+                        sqlt(f"ALTER TABLE {t} ADD COLUMN IF NOT EXISTS portfolio_id INTEGER NOT NULL DEFAULT 1")
+                    )
+                conn.execute(sqlt("ALTER TABLE wealth_pension_plans ADD COLUMN IF NOT EXISTS yearly_data_json TEXT"))
             else:
                 cols = [r[0] for r in conn.execute(sqlt("SHOW COLUMNS FROM wealth_networth_snapshots")).fetchall()]
                 if "snapshot_name" not in cols:
@@ -782,6 +1044,19 @@ def init_wealth_db(engine: Engine) -> None:
                     )
                 """)
                 )
+            elif is_postgres:
+                conn.execute(
+                    sqlt("""
+                    CREATE TABLE IF NOT EXISTS portfolios (
+                        portfolio_id SERIAL PRIMARY KEY,
+                        name VARCHAR(100) NOT NULL,
+                        owner VARCHAR(100) NOT NULL DEFAULT 'user',
+                        base_currency VARCHAR(3) NOT NULL DEFAULT 'EUR',
+                        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        description TEXT
+                    )
+                """)
+                )
             else:
                 conn.execute(
                     sqlt("""
@@ -817,7 +1092,7 @@ def init_wealth_db(engine: Engine) -> None:
 
         # Tabella di collegamento tra Profili Wealth e Portafogli Risk
         try:
-            if is_sqlite:
+            if is_sqlite or is_postgres:
                 conn.execute(
                     sqlt("""
                     CREATE TABLE IF NOT EXISTS wealth_portfolio_risk_links (
@@ -844,7 +1119,7 @@ def init_wealth_db(engine: Engine) -> None:
         except Exception:
             pass
 
-        # ── OTTIMIZZAZIONI DI INDICIZZAZIONE TIME-SERIES (SQLite & MySQL) ──
+        # ── OTTIMIZZAZIONI DI INDICIZZAZIONE TIME-SERIES (SQLite, PostgreSQL & MySQL) ──
         try:
             conn.execute(
                 sqlt("CREATE INDEX IF NOT EXISTS idx_cf_acct_date ON wealth_cashflow(account_id, tx_date DESC);")
@@ -870,10 +1145,13 @@ def init_wealth_db(engine: Engine) -> None:
             pass
 
         # Migrazione colonna tx_hash per deduplicazione idempotente su wealth_cashflow
-        try:
-            conn.execute(sqlt("ALTER TABLE wealth_cashflow ADD COLUMN tx_hash VARCHAR(64) NULL;"))
-        except Exception:
-            pass
+        if is_postgres:
+            conn.execute(sqlt("ALTER TABLE wealth_cashflow ADD COLUMN IF NOT EXISTS tx_hash VARCHAR(64);"))
+        else:
+            try:
+                conn.execute(sqlt("ALTER TABLE wealth_cashflow ADD COLUMN tx_hash VARCHAR(64) NULL;"))
+            except Exception:
+                pass
         try:
             conn.execute(sqlt("CREATE INDEX IF NOT EXISTS idx_cf_tx_hash ON wealth_cashflow(account_id, tx_hash);"))
         except Exception:
@@ -898,9 +1176,14 @@ def seed_default_categories(engine: Engine) -> None:
 
 
 def _get_last_insert_id(conn: Connection, engine: Engine) -> int:
-    """Ritorna l'ultimo ID inserito in modo compatibile sia con SQLite che con MySQL."""
-    is_sqlite = getattr(engine, "dialect", None) is not None and engine.dialect.name == "sqlite"
-    sql = "SELECT last_insert_rowid()" if is_sqlite else "SELECT LAST_INSERT_ID()"
+    """Ritorna l'ultimo ID inserito in modo compatibile con SQLite, PostgreSQL e MySQL."""
+    dialect_name = getattr(getattr(engine, "dialect", None), "name", "")
+    if dialect_name == "sqlite":
+        sql = "SELECT last_insert_rowid()"
+    elif dialect_name == "postgresql":
+        sql = "SELECT LASTVAL()"
+    else:
+        sql = "SELECT LAST_INSERT_ID()"
     val = conn.execute(sqlt(sql)).scalar()
     return int(val) if val else 1
 
@@ -1978,7 +2261,6 @@ def load_wealth_snapshot_details(engine: Engine, snapshot_id: int) -> Optional[D
 def save_wealth_fixed_expense(engine: Engine, data: Dict[str, Any]) -> int:
     """Salva o aggiorna una spesa fissa/abbonamento nel database."""
     init_wealth_db(engine)
-    is_sqlite = getattr(engine, "dialect", None) is not None and engine.dialect.name == "sqlite"
 
     with engine.begin() as conn:
         fixed_id = data.get("fixed_id")
@@ -2017,11 +2299,8 @@ def save_wealth_fixed_expense(engine: Engine, data: Dict[str, Any]) -> int:
                 (portfolio_id, category, note, amount, payment_day, start_date, end_date, is_split, split_details, cadence, is_active)
                 VALUES (:pid, :cat, :note, :amt, :p_day, :s_date, :e_date, :is_split, :s_det, :cadence, :active)
             """
-            res = conn.execute(sqlt(q_ins), params)
-            if is_sqlite:
-                return conn.execute(sqlt("SELECT last_insert_rowid()")).scalar() or 0
-            else:
-                return res.lastrowid or 0
+            conn.execute(sqlt(q_ins), params)
+            return _get_last_insert_id(conn, engine)
 
 
 def get_wealth_fixed_expenses(engine: Engine, portfolio_id: Optional[int] = None) -> pd.DataFrame:
@@ -2058,7 +2337,6 @@ def clear_wealth_fixed_expenses(engine: Engine, portfolio_id: Optional[int] = No
 def save_wealth_goal(engine: Engine, goal_data: Dict[str, Any]) -> int:
     """Crea o aggiorna un traguardo/obiettivo patrimoniale (Goal-Based Planning)."""
     init_wealth_db(engine)
-    is_sqlite = getattr(engine, "dialect", None) is not None and engine.dialect.name == "sqlite"
     gid = goal_data.get("goal_id")
 
     t_date = goal_data.get("target_date")
@@ -2104,11 +2382,8 @@ def save_wealth_goal(engine: Engine, goal_data: Dict[str, Any]) -> int:
                 (portfolio_id, name, category, target_amount, target_date, current_amount, monthly_contribution, priority, risk_tolerance, inflation_rate, notes)
                 VALUES (:pid, :name, :category, :target_amount, :target_date, :current_amount, :monthly_contribution, :priority, :risk_tolerance, :inflation_rate, :notes)
             """
-            res = conn.execute(sqlt(q_ins), params)
-            if is_sqlite:
-                return conn.execute(sqlt("SELECT last_insert_rowid()")).scalar() or 0
-            else:
-                return res.lastrowid or 0
+            conn.execute(sqlt(q_ins), params)
+            return _get_last_insert_id(conn, engine)
 
 
 def get_wealth_goals(engine: Engine, portfolio_id: Optional[int] = None) -> pd.DataFrame:
@@ -2136,15 +2411,15 @@ def delete_wealth_goal(engine: Engine, goal_id: int) -> bool:
         return bool(res.rowcount and res.rowcount > 0)
 
 
-# ── SINCRONIZZAZIONE DIRETTA MYSQL ⇄ SQLITE LOCALE ─────────────
+# ── SINCRONIZZAZIONE DIRETTA MYSQL / SUPABASE ⇄ SQLITE LOCALE ──
 
 
 def sync_wealth_tables_between_engines(source_engine: Engine, target_engine: Engine) -> dict:
     """
-    Sincronizza in modo sicuro ed efficiente le tabelle del modulo Wealth da un engine a un altro
-    (es. da MySQL online a SQLite locale o viceversa).
-    Tollera differenze di colonne tra dialetti inserendo solo le colonne condivise
-    e normalizza i formati data per la compatibilità con i driver SQLite e MySQL.
+    Sincronizza in modo sicuro ed efficiente le tabelle del modulo Wealth, Risk e Fiscale
+    da un engine a un altro (es. da SQLite locale a Supabase PostgreSQL o da MySQL a SQLite).
+    Tollera differenze di colonne tra dialetti inserendo solo le colonne condivise,
+    normalizza i formati data e riallinea le sequenze SERIAL su PostgreSQL.
     """
     import pandas as pd
     from sqlalchemy import inspect as sqla_inspect
@@ -2169,6 +2444,9 @@ def sync_wealth_tables_between_engines(source_engine: Engine, target_engine: Eng
         "wealth_goals",
         "wealth_networth_snapshots",
         "wealth_portfolio_risk_links",
+        "tax_declarations",
+        "tax_loss_carryforward",
+        "tax_verification_documents",
         "portfolios",
         "assets",
         "transactions",
@@ -2181,7 +2459,9 @@ def sync_wealth_tables_between_engines(source_engine: Engine, target_engine: Eng
     tgt_insp = sqla_inspect(target_engine)
     src_tables = set(src_insp.get_table_names())
     tgt_tables = set(tgt_insp.get_table_names())
-    is_tgt_sqlite = getattr(target_engine, "dialect", None) is not None and target_engine.dialect.name == "sqlite"
+    tgt_dialect = getattr(getattr(target_engine, "dialect", None), "name", "")
+    is_tgt_sqlite = tgt_dialect == "sqlite"
+    is_tgt_postgres = tgt_dialect == "postgresql"
 
     for tbl in tables_to_sync:
         if tbl not in src_tables or tbl not in tgt_tables:
@@ -2216,6 +2496,14 @@ def sync_wealth_tables_between_engines(source_engine: Engine, target_engine: Eng
             results[tbl] = len(df_to_insert)
         except Exception as ex:
             results[tbl] = f"Error: {ex}"
+
+    if is_tgt_postgres:
+        try:
+            from core.supabase_cloud import reset_postgres_sequences
+
+            reset_postgres_sequences(target_engine)
+        except Exception:
+            pass
 
     return results
 
