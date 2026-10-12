@@ -13,8 +13,11 @@ from sqlalchemy import text as sqlt
 
 from core.fetcher import _store_prices
 from core.supabase_cloud import (
+    DEFAULT_SUPABASE_POOLER_HOST,
+    DEFAULT_SUPABASE_PROJECT_REF,
     TABLE_PK_MAP,
     SupabaseAuthManager,
+    build_supabase_db_url,
     generate_supabase_schema_sql,
     get_supabase_config,
     is_supabase_configured,
@@ -49,8 +52,20 @@ def test_normalize_and_mask_supabase_url():
     assert "MySecretPass123" not in masked
     assert "postgres.abcdefgh:****@aws-0-eu-central-1.pooler.supabase.com:6543" in masked
 
+    # Auto-builder from project_ref + db_password
+    built = build_supabase_db_url(db_password="My#Special@Pass!")
+    assert f"postgres.{DEFAULT_SUPABASE_PROJECT_REF}:My%23Special%40Pass%21@{DEFAULT_SUPABASE_POOLER_HOST}:6543" in built
+
 
 def test_supabase_config_from_env(monkeypatch):
+    monkeypatch.delenv("SUPABASE_DB_URL", raising=False)
+    monkeypatch.setenv("SUPABASE_DB_PASSWORD", "OnlyPasswordNeeded99")
+    cfg_pw = get_supabase_config()
+    assert cfg_pw["is_configured"] is True
+    assert DEFAULT_SUPABASE_PROJECT_REF in cfg_pw["db_url"]
+    assert DEFAULT_SUPABASE_POOLER_HOST in cfg_pw["db_url"]
+    assert cfg_pw["supabase_url"] == f"https://{DEFAULT_SUPABASE_PROJECT_REF}.supabase.co"
+
     monkeypatch.setenv(
         "SUPABASE_DB_URL",
         "postgres://postgres.proj:secret@aws-0-eu-central-1.pooler.supabase.com:6543/postgres",

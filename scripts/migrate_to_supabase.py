@@ -18,6 +18,7 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from core.supabase_cloud import (  # noqa: E402
+    build_supabase_db_url,
     create_supabase_engine,
     generate_supabase_schema_sql,
     get_supabase_config,
@@ -40,6 +41,11 @@ def main() -> int:
         "--db-url",
         default=None,
         help="URI PostgreSQL Supabase (default: legge SUPABASE_DB_URL da .env o secrets.toml)",
+    )
+    parser.add_argument(
+        "--password",
+        default=None,
+        help="Password del DB Supabase per il progetto configurato (es. qsexxzbhtocxvyaijngb)",
     )
     parser.add_argument(
         "--include-prices",
@@ -68,11 +74,19 @@ def main() -> int:
         pass
 
     cfg = get_supabase_config()
-    target_url = args.db_url or cfg.get("db_url") or os.getenv("SUPABASE_DB_URL")
+    target_url = args.db_url
+    if not target_url and args.password:
+        target_url = build_supabase_db_url(
+            project_ref=cfg.get("project_ref", "qsexxzbhtocxvyaijngb"),
+            db_password=args.password,
+            pooler_host=cfg.get("pooler_host", "aws-0-eu-west-1.pooler.supabase.com"),
+        )
+    if not target_url:
+        target_url = cfg.get("db_url") or os.getenv("SUPABASE_DB_URL")
     if not target_url:
         print(
-            "[ERRORE] Nessun SUPABASE_DB_URL trovato.\n"
-            "Configura SUPABASE_DB_URL nel file .env / .streamlit/secrets.toml oppure passa --db-url."
+            "[ERRORE] Nessun SUPABASE_DB_URL o SUPABASE_DB_PASSWORD trovato.\n"
+            "Configura SUPABASE_DB_PASSWORD nel file .env oppure passa --password '<LA_TUA_PASSWORD>'."
         )
         return 1
 

@@ -38,6 +38,12 @@ SUPABASE_FREE_TIER_DB_MB = 500.0
 SUPABASE_FREE_TIER_STORAGE_MB = 1024.0
 SUPABASE_INACTIVITY_PAUSE_DAYS = 7
 
+# Default Project Reference & Supavisor Pooler Host (AWS EU-West-1 Ireland)
+DEFAULT_SUPABASE_PROJECT_REF = "qsexxzbhtocxvyaijngb"
+DEFAULT_SUPABASE_POOLER_HOST = "aws-0-eu-west-1.pooler.supabase.com"
+DEFAULT_SUPABASE_POOLER_PORT = 6543
+DEFAULT_SUPABASE_URL = f"https://{DEFAULT_SUPABASE_PROJECT_REF}.supabase.co"
+
 # Mapping of ARGUS tables to their serial/auto-increment Primary Key column
 TABLE_PK_MAP: Dict[str, str] = {
     "portfolios": "portfolio_id",
@@ -84,6 +90,28 @@ ESTIMATED_BYTES_PER_ROW: Dict[str, int] = {
 
 
 # ── 1. URL Normalization & Secrets Discovery ──────────────────
+
+
+def build_supabase_db_url(
+    project_ref: str = DEFAULT_SUPABASE_PROJECT_REF,
+    db_password: str = "",
+    pooler_host: str = DEFAULT_SUPABASE_POOLER_HOST,
+    port: int = DEFAULT_SUPABASE_POOLER_PORT,
+    db_name: str = "postgres",
+) -> str:
+    """
+    Costruisce automaticamente l'URI PostgreSQL Supavisor per un progetto Supabase
+    a partire dal `project_ref` (es. `qsexxzbhtocxvyaijngb`) e dalla password DB,
+    codificando in modo sicuro eventuali caratteri speciali nella password.
+    """
+    ref = (project_ref or DEFAULT_SUPABASE_PROJECT_REF).strip()
+    pwd = (db_password or "").strip()
+    if not ref or not pwd:
+        return ""
+    host = (pooler_host or DEFAULT_SUPABASE_POOLER_HOST).strip()
+    encoded_pwd = urllib.parse.quote_plus(pwd)
+    raw = f"postgresql+psycopg2://postgres.{ref}:{encoded_pwd}@{host}:{int(port)}/{db_name}?sslmode=require"
+    return normalize_supabase_db_url(raw)
 
 
 def normalize_supabase_db_url(raw_url: Optional[str], ensure_ssl: bool = True) -> str:
@@ -161,19 +189,27 @@ def _read_secret_or_env(key: str, default: str = "") -> str:
 def get_supabase_config() -> Dict[str, Any]:
     """
     Raccoglie la configurazione Cloud Supabase da session_state, variabili d'ambiente
-    o `.streamlit/secrets.toml`.
+    o `.streamlit/secrets.toml`. Se `SUPABASE_DB_URL` non è specificato ma è presente
+    `SUPABASE_DB_PASSWORD`, assembla automaticamente l'URI Supavisor per il progetto
+    configurato (default: `qsexxzbhtocxvyaijngb` su `aws-0-eu-west-1.pooler.supabase.com`).
     """
     session_db_url = ""
+    session_db_pass = ""
     session_supa_url = ""
     session_anon_key = ""
     try:
         import streamlit as st
 
         session_db_url = str(st.session_state.get("supabase_db_url", "") or "").strip()
+        session_db_pass = str(st.session_state.get("supabase_db_password", "") or "").strip()
         session_supa_url = str(st.session_state.get("supabase_url", "") or "").strip()
         session_anon_key = str(st.session_state.get("supabase_anon_key", "") or "").strip()
     except Exception:
         pass
+
+    project_ref = _read_secret_or_env("SUPABASE_PROJECT_REF", DEFAULT_SUPABASE_PROJECT_REF)
+    pooler_host = _read_secret_or_env("SUPABASE_POOLER_HOST", DEFAULT_SUPABASE_POOLER_HOST)
+    db_password = session_db_pass or _read_secret_or_env("SUPABASE_DB_PASSWORD")
 
     raw_db_url = (
         session_db_url
@@ -184,8 +220,18 @@ def get_supabase_config() -> Dict[str, Any]:
     if raw_db_url and not raw_db_url.lower().startswith("postgres"):
         raw_db_url = ""
 
+    if not raw_db_url and db_password and project_ref:
+        raw_db_url = build_supabase_db_url(
+            project_ref=project_ref,
+            db_password=db_password,
+            pooler_host=pooler_host,
+        )
+
     normalized_db_url = normalize_supabase_db_url(raw_db_url)
-    supabase_url = (session_supa_url or _read_secret_or_env("SUPABASE_URL")).rstrip("/")
+    default_api_url = f"https://{project_ref}.supabase.co" if project_ref else DEFAULT_SUPABASE_URL
+    supabase_url = (
+        session_supa_url or _read_secret_or_env("SUPABASE_URL", default_api_url)
+    ).rstrip("/")
     supabase_anon_key = (
         session_anon_key
         or _read_secret_or_env("SUPABASE_ANON_KEY")
@@ -200,6 +246,8 @@ def get_supabase_config() -> Dict[str, Any]:
     storage_bucket = _read_secret_or_env("SUPABASE_STORAGE_BUCKET", "tax-documents")
 
     return {
+        "project_ref": project_ref,
+        "pooler_host": pooler_host,
         "db_url": normalized_db_url,
         "masked_db_url": mask_db_url(normalized_db_url),
         "supabase_url": supabase_url,
@@ -1198,8 +1246,11 @@ def render_supabase_cloud_panel(engine: Optional[Engine] = None) -> None:
         and engine.dialect.name == "postgresql"
     )
 
+    proj_ref = cfg.get("project_ref", DEFAULT_SUPABASE_PROJECT_REF)
+    pooler_host = cfg.get("pooler_host", DEFAULT_SUPABASE_POOLER_HOST)
+
     st.markdown(
-        """
+        f"""
         <div style="padding:10px 14px;border-radius:10px;
                     background:linear-gradient(135deg,rgba(16,185,129,0.12),rgba(59,130,246,0.10));
                     border:1px solid rgba(16,185,129,0.28);margin-bottom:10px;">
@@ -1207,30 +1258,59 @@ def render_supabase_cloud_panel(engine: Optional[Engine] = None) -> None:
                 ☁️ SUPABASE CLOUD & DEPLOYMENT ZERO-COST (€0/MESE)
             </div>
             <div style="font-size:0.74rem;color:#cbd5e1;margin-top:2px;">
-                PostgreSQL 15+ gestito (500 MB Free Tier) • Supavisor Connection Pooler • Backup & Migrazione 1-Click
+                Project Ref: <code>{proj_ref}</code> • Region Pooler: <code>{pooler_host}:6543</code>
             </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    curr_supa_url = st.session_state.get("supabase_db_url", cfg.get("db_url", ""))
-    new_supa_url = st.text_input(
-        "Supabase PostgreSQL Connection URI (`SUPABASE_DB_URL`)",
-        value=curr_supa_url,
+    curr_db_pass = st.session_state.get("supabase_db_password", "")
+    new_db_pass = st.text_input(
+        f"🔑 Password Database Supabase (Progetto `{proj_ref}`)",
+        value=curr_db_pass,
         type="password",
-        key="sb_supabase_db_url_input",
-        placeholder="postgresql://postgres.[project-ref]:[password]@aws-0-eu-central-1.pooler.supabase.com:6543/postgres",
-        help="Incolla la stringa URI da Supabase Dashboard -> Connect -> Transaction/Session Pooler.",
+        key="sb_supabase_db_pass_input",
+        placeholder="Inserisci solo la password del database Supabase...",
+        help=(
+            f"Costruisce in automatico l'URI Supavisor: "
+            f"postgresql://postgres.{proj_ref}:[PASSWORD]@{pooler_host}:6543/postgres?sslmode=require"
+        ),
     ).strip()
 
-    if new_supa_url != curr_supa_url:
-        st.session_state.supabase_db_url = normalize_supabase_db_url(new_supa_url)
+    if new_db_pass != curr_db_pass:
+        st.session_state.supabase_db_password = new_db_pass
+        if new_db_pass:
+            st.session_state.supabase_db_url = build_supabase_db_url(
+                project_ref=proj_ref,
+                db_password=new_db_pass,
+                pooler_host=pooler_host,
+            )
+
+    curr_supa_url = st.session_state.get("supabase_db_url", cfg.get("db_url", ""))
+    with st.expander("⚙️ URI PostgreSQL Completo (`SUPABASE_DB_URL` — Avanzato)", expanded=False):
+        new_supa_url = st.text_input(
+            "Supabase PostgreSQL Connection URI (`SUPABASE_DB_URL`)",
+            value=curr_supa_url,
+            type="password",
+            key="sb_supabase_db_url_input",
+            placeholder=f"postgresql://postgres.{proj_ref}:[password]@{pooler_host}:6543/postgres",
+            help="Incolla la stringa URI da Supabase Dashboard -> Connect -> Transaction/Session Pooler.",
+        ).strip()
+
+        if new_supa_url != curr_supa_url:
+            st.session_state.supabase_db_url = normalize_supabase_db_url(new_supa_url)
+
+    active_target_url = (
+        st.session_state.get("supabase_db_url")
+        or new_supa_url
+        or cfg.get("db_url")
+    )
 
     col_b1, col_b2 = st.columns(2)
     with col_b1:
         if st.button("🔍 Testa Connessione Cloud", use_container_width=True, key="sb_btn_test_supa"):
-            diag = test_supabase_connection(new_supa_url or cfg.get("db_url"))
+            diag = test_supabase_connection(active_target_url)
             if diag["ok"]:
                 st.success(
                     f"✅ Connesso a **{diag['current_db']}** ({diag['pg_version']}) "
@@ -1244,14 +1324,14 @@ def render_supabase_cloud_panel(engine: Optional[Engine] = None) -> None:
             "🚀 Migra SQLite Locale ➔ Supabase",
             use_container_width=True,
             key="sb_btn_migrate_supa",
-            disabled=not bool(new_supa_url or cfg.get("db_url")),
+            disabled=not bool(active_target_url),
             help="Copia tutti i tuoi conti, movimenti, asset, obiettivi e dichiarazioni fiscali dal DB locale SQLite a Supabase.",
         ):
             try:
                 with st.spinner("Migrazione crittografata TLS verso Supabase in corso..."):
                     mig_res = migrate_local_to_supabase(
                         sqlite_path="data/argus_local.db",
-                        target_db_url=new_supa_url or cfg.get("db_url"),
+                        target_db_url=active_target_url,
                     )
                 st.success(
                     f"🎉 Migrazione completata! **{mig_res['total_rows_migrated']}** record trasferiti su Supabase."
