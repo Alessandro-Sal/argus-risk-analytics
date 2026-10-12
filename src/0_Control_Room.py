@@ -209,19 +209,26 @@ benchmark = st.session_state.get("benchmark", "SPY")
 # ── Funzioni di Supporto Database ─────────────────────────────
 
 @st.cache_resource(show_spinner=False)
-def get_db_engine(user, password, host, port, db, data_env="Auto (Ibrido)", supa_fp=""):
+def get_db_engine(user, password, host, port, db, data_env="Auto (Ibrido)", supa_fp="", auth_ctx="owner:user"):
     is_off = data_env == "Local SQLite"
     return get_engine(user=user, password=password, host=host, port=port, db=db, offline=is_off)
 
 
 def get_analysis_history(engine):
-    """Recupera la lista degli snapshot storici salvati nel database per il richiamo rapido."""
+    """Recupera la lista degli snapshot storici salvati nel database per il richiamo rapido (isolata per utente)."""
     if engine is None:
         return []
     from sqlalchemy import text as sqlt
+
+    role = str(st.session_state.get("argus_auth_role", "owner") or "owner").strip().lower()
+    uname = str(st.session_state.get("argus_auth_user", "user") or "user").strip().lower()
+    owner_clause = "WHERE LOWER(COALESCE(p.owner, '')) = :uowner" if role == "user" else ""
+    params = {"uowner": uname} if role == "user" else {}
+
     try:
         with engine.connect() as conn:
-            rows = conn.execute(sqlt("""
+            rows = conn.execute(
+                sqlt(f"""
                 SELECT 
                     s.snapshot_id,
                     s.calc_date,
@@ -236,9 +243,12 @@ def get_analysis_history(engine):
                     s.var_95_pct
                 FROM portfolio_snapshots s
                 JOIN portfolios p ON s.portfolio_id = p.portfolio_id
+                {owner_clause}
                 ORDER BY s.calc_date DESC
                 LIMIT 50
-            """)).fetchall()
+            """),
+                params,
+            ).fetchall()
             return rows
     except Exception:
         return []
@@ -255,8 +265,13 @@ if not offline_mode:
         from core.supabase_cloud import get_supabase_config
 
         supa_fp = get_supabase_config().get("masked_db_url", "")
+        auth_ctx = (
+            f"{st.session_state.get('argus_auth_role', 'owner')}:"
+            f"{st.session_state.get('argus_auth_user', 'user')}:"
+            f"{st.session_state.get('argus_user_custom_db_url', '')}"
+        )
         engine_sidebar = get_db_engine(
-            db_user, db_pass, db_host, db_port, db_name, data_env=data_environment, supa_fp=supa_fp
+            db_user, db_pass, db_host, db_port, db_name, data_env=data_environment, supa_fp=supa_fp, auth_ctx=auth_ctx
         )
         st.session_state["engine"] = engine_sidebar
         st.session_state["db_engine"] = engine_sidebar
@@ -2272,38 +2287,49 @@ with tab_bitemporal:
         except Exception:
             pass
 
-        # 5. Profili persistiti in data/multi_portfolios/*.pkl (inclusi tutti i sync GSheets eseguiti)
-        try:
-            import os
-            import pickle
+        # 5. Profili persistiti in data/multi_portfolios/*.pkl (solo per il Titolare / Owner)
+        role_active = str(st.session_state.get("argus_auth_role", "owner") or "owner").strip().lower()
+        uname_active = str(st.session_state.get("argus_auth_user", "user") or "user").strip().lower()
+        if role_active == "owner":
+            try:
+                import os
+                import pickle
 
-            from core.multi_portfolio import PORTFOLIOS_DIR
-            if os.path.exists(PORTFOLIOS_DIR):
-                for fn in sorted(os.listdir(PORTFOLIOS_DIR)):
-                    if fn.endswith(".pkl"):
-                        fp = os.path.join(PORTFOLIOS_DIR, fn)
-                        try:
-                            with open(fp, "rb") as f:
-                                pdata = pickle.load(f)
-                            rf = pdata.get("results_full", {}) if isinstance(pdata.get("results_full"), dict) else {}
-                            df_tx_f = rf.get("df_tx") if isinstance(rf.get("df_tx"), pd.DataFrame) else (rf.get("df_tx_raw") if isinstance(rf.get("df_tx_raw"), pd.DataFrame) else None)
-                            if df_tx_f is not None and not df_tx_f.empty:
-                                p_label = pdata.get("name") or fn.replace(".pkl", "")
-                                if p_label not in ports:
-                                    ports[p_label] = df_tx_f
-                        except Exception:
-                            continue
-        except Exception:
-            pass
+                from core.multi_portfolio import PORTFOLIOS_DIR
+                if os.path.exists(PORTFOLIOS_DIR):
+                    for fn in sorted(os.listdir(PORTFOLIOS_DIR)):
+                        if fn.endswith(".pkl"):
+                            fp = os.path.join(PORTFOLIOS_DIR, fn)
+                            try:
+                                with open(fp, "rb") as f:
+                                    pdata = pickle.load(f)
+                                rf = pdata.get("results_full", {}) if isinstance(pdata.get("results_full"), dict) else {}
+                                df_tx_f = rf.get("df_tx") if isinstance(rf.get("df_tx"), pd.DataFrame) else (rf.get("df_tx_raw") if isinstance(rf.get("df_tx_raw"), pd.DataFrame) else None)
+                                if df_tx_f is not None and not df_tx_f.empty:
+                                    p_label = pdata.get("name") or fn.replace(".pkl", "")
+                                    if p_label not in ports:
+                                        ports[p_label] = df_tx_f
+                            except Exception:
+                                continue
+            except Exception:
+                pass
 
-        # 6. Database SQL
+        # 6. Database SQL (isolato per utente)
         eng = st.session_state.get("engine")
         if eng:
             try:
                 from sqlalchemy import text as sqlt
                 with eng.connect() as conn:
-                    sql_p = "SELECT DISTINCT p.portfolio_id, p.name FROM portfolios p JOIN transactions t ON p.portfolio_id = t.portfolio_id"
-                    df_plist = pd.read_sql(sqlt(sql_p), conn)
+                    if role_active == "user":
+                        sql_p = (
+                            "SELECT DISTINCT p.portfolio_id, p.name "
+                            "FROM portfolios p JOIN transactions t ON p.portfolio_id = t.portfolio_id "
+                            "WHERE LOWER(COALESCE(p.owner, '')) = :uowner"
+                        )
+                        df_plist = pd.read_sql(sqlt(sql_p), conn, params={"uowner": uname_active})
+                    else:
+                        sql_p = "SELECT DISTINCT p.portfolio_id, p.name FROM portfolios p JOIN transactions t ON p.portfolio_id = t.portfolio_id"
+                        df_plist = pd.read_sql(sqlt(sql_p), conn)
                     for _, prow in df_plist.iterrows():
                         db_pid = prow["portfolio_id"]
                         db_pname = prow["name"] or f"Portafoglio #{db_pid}"

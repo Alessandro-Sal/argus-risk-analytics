@@ -837,6 +837,19 @@ def render_splash_html(
     </div>
     """
 
+    try:
+        from core.supabase_cloud import get_active_account_badge_info
+
+        acct = get_active_account_badge_info()
+        user_pill_html = (
+            f'<span class="splash-pill" style="border-color:{acct["badge_border"]}; '
+            f'background:{acct["badge_bg"]}; color:#ffffff;">'
+            f'👤 <b>{html.escape(acct["display_name"])}</b> &bull; '
+            f'<span style="color:{acct["badge_color"]};">{html.escape(acct["badge_label"])}</span></span>'
+        )
+    except Exception:
+        user_pill_html = '<span class="splash-pill">🔒 <b>Zero-Cloud Leak</b> Crittografia Locale</span>'
+
     return _clean_html(f"""
     {loading_shield_html}
     <div class="splash-ambient-glow"></div>
@@ -852,10 +865,10 @@ def render_splash_html(
             </div>
             
             <div class="splash-badge-ribbon">
+                {user_pill_html}
                 <span class="splash-pill">🟢 <b>{html.escape(version_tag)}</b></span>
                 <span class="splash-pill">⚡ <b>22 Moduli Attivi</b> (12 Risk + 10 Wealth)</span>
-                <span class="splash-pill">🔒 <b>Zero-Cloud Leak</b> Crittografia Locale</span>
-                <span class="splash-pill">🗄️ <b>DuckDB SIMD &amp; SQLite</b> Vectorized OLAP</span>
+                <span class="splash-pill">🗄️ <b>Supabase Cloud &amp; DuckDB SIMD</b></span>
             </div>
 
             <div class="telemetry-bar">
@@ -1023,6 +1036,28 @@ def render_splash_screen(
             _on_click_enter_wealth()
             from core.sidebar import switch_to_page
             switch_to_page("pages/12_🎛️_Wealth_Control_Room.py")
+
+    try:
+        from core.supabase_cloud import (
+            SupabaseAuthManager,
+            get_active_account_badge_info,
+            logout_argus_user,
+        )
+
+        acct_splash = get_active_account_badge_info()
+        _, col_logout_sp, _ = st.columns([1.4, 1.2, 1.4])
+        with col_logout_sp:
+            if st.button(
+                f"🚪 Cambia Account / Logout ({acct_splash['display_name']})",
+                key="btn_splash_switch_account",
+                use_container_width=True,
+                help="Disconnette la sessione corrente e riapre il terminale di Login ARGUS.",
+            ):
+                SupabaseAuthManager.set_security_settings(require_login=True)
+                logout_argus_user()
+                st.rerun()
+    except Exception:
+        pass
 
     return True
 

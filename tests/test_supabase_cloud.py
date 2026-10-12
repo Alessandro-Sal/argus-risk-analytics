@@ -303,3 +303,74 @@ def test_multi_user_authentication_and_isolation(tmp_path: Path):
 
     engine.dispose()
 
+
+def test_strict_portfolio_id_1_no_leak_between_users(tmp_path: Path, monkeypatch):
+    """Verifica che un utente standard ('marco') non veda MAI i conti/spese/obiettivi di portfolio_id = 1 del Titolare."""
+    import streamlit as st
+    from core.wealth.wealth_db import (
+        get_wealth_accounts,
+        get_wealth_fixed_expenses,
+        get_wealth_goals,
+        get_wealth_portfolios,
+    )
+
+    db_file = tmp_path / "strict_isolation.db"
+    engine = create_engine(f"sqlite:///{db_file.as_posix()}")
+    init_wealth_db(engine)
+
+    # 1. Seed Owner data in portfolio_id = 1
+    monkeypatch.setattr(
+        st,
+        "session_state",
+        {"argus_auth_role": "owner", "argus_auth_user": "alessandro", "argus_auth_display_name": "Alessandro (Titolare)"},
+        raising=False,
+    )
+    save_wealth_account(
+        engine,
+        {
+            "portfolio_id": 1,
+            "name": "Conto Privato Alessandro",
+            "account_type": "checking",
+            "institution": "Intesa",
+            "currency": "EUR",
+            "balance": 150000.0,
+        },
+    )
+    save_wealth_fixed_expense(
+        engine,
+        {"portfolio_id": 1, "category": "Casa", "note": "Mutuo Privato", "amount": 1200.0, "payment_day": 1},
+    )
+    save_wealth_goal(
+        engine,
+        {"portfolio_id": 1, "name": "Villa Privata", "target_amount": 500000.0, "target_date": "2030-01-01"},
+    )
+
+    # 2. Register 'marco' (creates his own isolated profile, e.g. profile_id = 2)
+    SupabaseAuthManager.create_or_update_user(
+        engine, "marco", "MarcoPass2026!", role="user", display_name="Marco Rossi"
+    )
+
+    # 3. Switch active session to 'marco' (role = 'user')
+    monkeypatch.setattr(
+        st,
+        "session_state",
+        {"argus_auth_role": "user", "argus_auth_user": "marco", "argus_auth_display_name": "Marco Rossi"},
+        raising=False,
+    )
+
+    marco_profs = get_wealth_portfolios(engine)
+    assert len(marco_profs) == 1
+    marco_pid = int(marco_profs.iloc[0]["portfolio_id"])
+    assert marco_pid != 1
+
+    # Even if marco queries with portfolio_id=None or portfolio_id=1 or his own marco_pid,
+    # he must NEVER see Owner's portfolio_id = 1 data!
+    assert get_wealth_accounts(engine, portfolio_id=marco_pid).empty
+    assert get_wealth_accounts(engine, portfolio_id=1).empty
+    assert get_wealth_accounts(engine, portfolio_id=None).empty
+    assert get_wealth_fixed_expenses(engine, portfolio_id=marco_pid).empty
+    assert get_wealth_goals(engine, portfolio_id=marco_pid).empty
+
+    engine.dispose()
+
+

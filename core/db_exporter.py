@@ -180,37 +180,61 @@ def ensure_snapshot_tables(engine):
             pass
 
 
+def _get_active_risk_isolation_context() -> tuple[str, str]:
+    """Restituisce (role, username) dell'utente autenticato per isolare i portafogli Risk."""
+    try:
+        import streamlit as st
+
+        role = str(st.session_state.get("argus_auth_role", "owner") or "owner").strip().lower()
+        uname = str(st.session_state.get("argus_auth_user", "user") or "user").strip().lower()
+        return role, uname
+    except Exception:
+        return "owner", "user"
+
+
 def get_or_create_portfolio_id(
     engine_or_conn, name: str, owner: str = "streamlit_user", base_currency: str = "EUR"
 ) -> int:
     """
-    Risolve in modo univoco e deterministico l'ID del portafoglio per nome.
-    Se esiste già un portafoglio con questo nome, riutilizza l'ID canonico (il più basso).
+    Risolve in modo univoco e deterministico l'ID del portafoglio per nome (e owner in modalità multi-utente).
+    Se esiste già un portafoglio con questo nome per l'utente corrente, riutilizza l'ID canonico.
     Se non esiste, crea un nuovo record in 'portfolios' e ne restituisce l'ID.
     """
     if not name or not str(name).strip():
         name = "Portafoglio Quantitativo"
     name = str(name).strip()
 
+    role, uname = _get_active_risk_isolation_context()
+    effective_owner = uname if (role == "user" and owner in ("streamlit_user", "user", "")) else owner
+
     def _execute_with_conn(conn):
-        existing_id = conn.execute(
-            sqlt("SELECT portfolio_id FROM portfolios WHERE name = :n ORDER BY portfolio_id ASC LIMIT 1"), {"n": name}
-        ).scalar()
+        if role == "user":
+            existing_id = conn.execute(
+                sqlt(
+                    "SELECT portfolio_id FROM portfolios "
+                    "WHERE name = :n AND LOWER(COALESCE(owner, '')) = :o "
+                    "ORDER BY portfolio_id ASC LIMIT 1"
+                ),
+                {"n": name, "o": effective_owner.lower()},
+            ).scalar()
+        else:
+            existing_id = conn.execute(
+                sqlt("SELECT portfolio_id FROM portfolios WHERE name = :n ORDER BY portfolio_id ASC LIMIT 1"),
+                {"n": name},
+            ).scalar()
         if existing_id:
-            # Assicura valuta base aggiornata
             conn.execute(
                 sqlt("UPDATE portfolios SET base_currency = :curr WHERE portfolio_id = :pid"),
                 {"curr": base_currency, "pid": int(existing_id)},
             )
             return int(existing_id)
 
-        # Inserimento nuovo portafoglio univoco
         conn.execute(
             sqlt("""
             INSERT INTO portfolios (name, owner, base_currency, created_at)
             VALUES (:name, :owner, :curr, CURRENT_TIMESTAMP)
         """),
-            {"name": name, "owner": owner, "curr": base_currency},
+            {"name": name, "owner": effective_owner, "curr": base_currency},
         )
 
         try:
@@ -607,6 +631,10 @@ def get_all_snapshots_history(engine, portfolio_name: str = None, run_name: str 
         WHERE 1=1
     """
     params = {}
+    role, uname = _get_active_risk_isolation_context()
+    if role == "user":
+        query += " AND LOWER(COALESCE(p.owner, '')) = :uowner"
+        params["uowner"] = uname.lower()
     if portfolio_name:
         query += " AND p.name = :pname"
         params["pname"] = portfolio_name

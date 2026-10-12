@@ -1087,6 +1087,15 @@ def init_wealth_db(engine: Engine) -> None:
                     VALUES ('Patrimonio Personale', 'user', 'EUR', 'Portafoglio e Profilo Patrimoniale Principale', CURRENT_TIMESTAMP)
                 """)
                 )
+
+            wp_cnt = conn.execute(sqlt("SELECT COUNT(*) FROM wealth_profiles")).scalar()
+            if wp_cnt == 0:
+                conn.execute(
+                    sqlt("""
+                    INSERT INTO wealth_profiles (name, description, owner, base_currency, created_at)
+                    VALUES ('Personale', 'Profilo Patrimoniale Principale del Titolare', 'user', 'EUR', CURRENT_TIMESTAMP)
+                """)
+                )
         except Exception:
             pass
 
@@ -1247,16 +1256,50 @@ def _get_active_user_isolation_context() -> Tuple[str, str, bool]:
         import streamlit as st
         from streamlit.runtime.scriptrunner import get_script_run_ctx
 
-        if get_script_run_ctx() is not None:
-            uname = str(st.session_state.get("argus_auth_user", "user") or "user").strip().lower()
-            disp = str(st.session_state.get("argus_auth_display_name", uname.capitalize()) or uname.capitalize()).strip()
-            role = str(st.session_state.get("argus_auth_role", "owner") or "owner").strip().lower()
-            has_custom_db = bool(str(st.session_state.get("argus_user_custom_db_url", "") or "").strip())
+        ss = getattr(st, "session_state", None)
+        if ss is not None and (get_script_run_ctx() is not None or isinstance(ss, dict)):
+            uname = str(ss.get("argus_auth_user", "user") or "user").strip().lower()
+            disp = str(ss.get("argus_auth_display_name", uname.capitalize()) or uname.capitalize()).strip()
+            role = str(ss.get("argus_auth_role", "owner") or "owner").strip().lower()
+            has_custom_db = bool(str(ss.get("argus_user_custom_db_url", "") or "").strip())
             enforce = (role == "user") and not has_custom_db
             return uname, disp, enforce
     except Exception:
         pass
     return "user", "Personale", False
+
+
+def _resolve_isolated_portfolio_filter(
+    engine: Engine, portfolio_id: Optional[int], col_name: str = "portfolio_id"
+) -> Tuple[str, Dict[str, Any]]:
+    """
+    Costruisce la clausola SQL e i parametri per filtrare le tabelle Wealth per `portfolio_id`
+    garantendo isolamento rigoroso tra utenti e tra profili:
+    - Se l'utente corrente è un utente standard (`enforce_owner=True`), vincola `portfolio_id`
+      esclusivamente ai profili di proprietà dell'utente e NON include mai `OR portfolio_id = 1`.
+    - Se l'utente è Owner / Admin (`enforce_owner=False`), usa `({col_name} = 1 OR {col_name} IS NULL)`
+      solo quando `portfolio_id == 1`, e `{col_name} = :pid` per qualsiasi altro profilo (`2, 3, 4, ...`).
+    """
+    curr_user, _, enforce_owner = _get_active_user_isolation_context()
+    if enforce_owner:
+        try:
+            df_user_ports = get_wealth_portfolios(engine)
+            allowed_pids = [int(x) for x in df_user_ports["portfolio_id"].tolist()] if not df_user_ports.empty else []
+        except Exception:
+            allowed_pids = []
+        if portfolio_id is None or (allowed_pids and int(portfolio_id) not in allowed_pids):
+            effective_pid = allowed_pids[0] if allowed_pids else -999999
+        else:
+            effective_pid = int(portfolio_id)
+        return f" AND {col_name} = :pid", {"pid": effective_pid}
+
+    if portfolio_id is None:
+        return "", {}
+
+    pid_int = int(portfolio_id)
+    if pid_int == 1:
+        return f" AND ({col_name} = :pid OR {col_name} IS NULL)", {"pid": 1}
+    return f" AND {col_name} = :pid", {"pid": pid_int}
 
 
 def get_wealth_portfolios(engine: Engine) -> pd.DataFrame:
@@ -1632,13 +1675,11 @@ def reset_all_wealth_database(engine: Engine) -> Dict[str, int]:
 def get_wealth_accounts(
     engine: Engine, portfolio_id: Optional[int] = None, is_active_only: bool = False
 ) -> pd.DataFrame:
-    """Recupera tutti i conti censiti per il portafoglio/profilo specificato."""
+    """Recupera tutti i conti censiti per il portafoglio/profilo specificato (con isolamento per utente)."""
     init_wealth_db(engine)
     query = "SELECT * FROM wealth_accounts WHERE 1=1"
-    params = {}
-    if portfolio_id is not None:
-        query += " AND (portfolio_id = :pid OR portfolio_id IS NULL OR portfolio_id = 1)"
-        params["pid"] = portfolio_id
+    p_clause, params = _resolve_isolated_portfolio_filter(engine, portfolio_id, col_name="portfolio_id")
+    query += p_clause
     if is_active_only:
         query += " AND is_active = 1"
     query += " ORDER BY is_active DESC, name ASC"
@@ -1666,8 +1707,11 @@ def save_wealth_account(engine: Engine, account: Dict[str, Any]) -> int:
     with engine.begin() as conn:
         if not acc_id:
             existing_id = conn.execute(
-                sqlt("SELECT account_id FROM wealth_accounts WHERE LOWER(TRIM(name)) = LOWER(TRIM(:name))"),
-                {"name": account["name"]},
+                sqlt(
+                    "SELECT account_id FROM wealth_accounts "
+                    "WHERE LOWER(TRIM(name)) = LOWER(TRIM(:name)) AND portfolio_id = :pid"
+                ),
+                {"name": account["name"], "pid": int(p_id)},
             ).scalar()
             if existing_id:
                 acc_id = existing_id
@@ -1767,7 +1811,7 @@ def get_cashflow_records(
     portfolio_id: Optional[int] = None,
     account_id: Optional[int] = None,
 ) -> pd.DataFrame:
-    """Recupera le transazioni di cassa unite alle categorie e ai conti."""
+    """Recupera le transazioni di cassa unite alle categorie e ai conti (con isolamento per utente)."""
     init_wealth_db(engine)
     query = """
         SELECT c.tx_id, c.tx_date, c.amount, c.currency, c.direction, 
@@ -1779,10 +1823,8 @@ def get_cashflow_records(
         JOIN wealth_categories cat ON c.category_id = cat.category_id
         WHERE 1=1
     """
-    params = {}
-    if portfolio_id is not None:
-        query += " AND (c.portfolio_id = :pid OR c.portfolio_id IS NULL OR c.portfolio_id = 1)"
-        params["pid"] = portfolio_id
+    p_clause, params = _resolve_isolated_portfolio_filter(engine, portfolio_id, col_name="c.portfolio_id")
+    query += p_clause
     if account_id is not None:
         query += " AND c.account_id = :aid"
         params["aid"] = account_id
@@ -1948,13 +1990,11 @@ def bulk_insert_cashflow_tx(
 def get_physical_assets(
     engine: Engine, category: Optional[str] = None, portfolio_id: Optional[int] = None
 ) -> pd.DataFrame:
-    """Recupera tutti gli asset fisici (orologi, immobili, metalli, collezioni)."""
+    """Recupera tutti gli asset fisici (orologi, immobili, metalli, collezioni) con isolamento per utente."""
     init_wealth_db(engine)
     query = "SELECT * FROM wealth_physical_assets WHERE 1=1"
-    params = {}
-    if portfolio_id is not None:
-        query += " AND (portfolio_id = :pid OR portfolio_id IS NULL OR portfolio_id = 1)"
-        params["pid"] = portfolio_id
+    p_clause, params = _resolve_isolated_portfolio_filter(engine, portfolio_id, col_name="portfolio_id")
+    query += p_clause
     if category:
         query += " AND asset_category = :cat"
         params["cat"] = category
@@ -2020,13 +2060,11 @@ def save_physical_asset(engine: Engine, asset: Dict[str, Any]) -> int:
 
 
 def get_pension_plans(engine: Engine, portfolio_id: Optional[int] = None) -> pd.DataFrame:
-    """Recupera tutti i fondi pensione e piani di previdenza complementare."""
+    """Recupera tutti i fondi pensione e piani di previdenza complementare (con isolamento per utente)."""
     init_wealth_db(engine)
     query = "SELECT * FROM wealth_pension_plans WHERE 1=1"
-    params = {}
-    if portfolio_id is not None:
-        query += " AND (portfolio_id = :pid OR portfolio_id IS NULL OR portfolio_id = 1)"
-        params["pid"] = portfolio_id
+    p_clause, params = _resolve_isolated_portfolio_filter(engine, portfolio_id, col_name="portfolio_id")
+    query += p_clause
     query += " ORDER BY accumulated_value DESC"
 
     with engine.connect() as conn:
@@ -2271,7 +2309,7 @@ def save_wealth_snapshot_to_db(
 
 
 def get_wealth_snapshots_history(engine: Engine, portfolio_id: Optional[int] = None) -> pd.DataFrame:
-    """Recupera l'elenco cronologico di tutti gli snapshot patrimoniali salvati con nome profilo."""
+    """Recupera l'elenco cronologico di tutti gli snapshot patrimoniali salvati con nome profilo (con isolamento per utente)."""
     init_wealth_db(engine)
     query = """
         SELECT s.*, p.name as portfolio_name
@@ -2279,10 +2317,8 @@ def get_wealth_snapshots_history(engine: Engine, portfolio_id: Optional[int] = N
         LEFT JOIN portfolios p ON s.portfolio_id = p.portfolio_id
         WHERE 1=1
     """
-    params = {}
-    if portfolio_id is not None:
-        query += " AND (s.portfolio_id = :pid OR s.portfolio_id IS NULL OR s.portfolio_id = 1)"
-        params["pid"] = portfolio_id
+    p_clause, params = _resolve_isolated_portfolio_filter(engine, portfolio_id, col_name="s.portfolio_id")
+    query += p_clause
     query += " ORDER BY s.snapshot_date DESC, s.snapshot_id DESC"
 
     with engine.connect() as conn:
@@ -2370,13 +2406,11 @@ def save_wealth_fixed_expense(engine: Engine, data: Dict[str, Any]) -> int:
 
 
 def get_wealth_fixed_expenses(engine: Engine, portfolio_id: Optional[int] = None) -> pd.DataFrame:
-    """Recupera l'elenco delle spese fisse/abbonamenti per il profilo patrimoniale specificato."""
+    """Recupera l'elenco delle spese fisse/abbonamenti per il profilo patrimoniale specificato (con isolamento per utente)."""
     init_wealth_db(engine)
     query = "SELECT * FROM wealth_fixed_expenses WHERE is_active = 1"
-    params = {}
-    if portfolio_id is not None:
-        query += " AND (portfolio_id = :pid OR portfolio_id IS NULL OR portfolio_id = 1)"
-        params["pid"] = portfolio_id
+    p_clause, params = _resolve_isolated_portfolio_filter(engine, portfolio_id, col_name="portfolio_id")
+    query += p_clause
     query += " ORDER BY amount DESC, fixed_id ASC"
 
     with engine.connect() as conn:
@@ -2453,13 +2487,11 @@ def save_wealth_goal(engine: Engine, goal_data: Dict[str, Any]) -> int:
 
 
 def get_wealth_goals(engine: Engine, portfolio_id: Optional[int] = None) -> pd.DataFrame:
-    """Recupera tutti i traguardi/obiettivi patrimoniali memorizzati."""
+    """Recupera tutti i traguardi/obiettivi patrimoniali memorizzati (con isolamento per utente)."""
     init_wealth_db(engine)
-    query = "SELECT * FROM wealth_goals"
-    params = {}
-    if portfolio_id is not None:
-        query += " WHERE (portfolio_id = :pid OR portfolio_id = 1)"
-        params["pid"] = int(portfolio_id)
+    query = "SELECT * FROM wealth_goals WHERE 1=1"
+    p_clause, params = _resolve_isolated_portfolio_filter(engine, portfolio_id, col_name="portfolio_id")
+    query += p_clause
     query += " ORDER BY target_date ASC, priority DESC, goal_id ASC"
 
     with engine.connect() as conn:

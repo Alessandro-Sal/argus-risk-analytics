@@ -1739,23 +1739,55 @@ class SupabaseAuthManager:
         return hmac.compare_digest(a, b)
 
 
+_USER_SESSION_ISOLATED_KEYS = (
+    "argus_user_custom_db_url",
+    "engine",
+    "db_engine",
+    "active_wealth_portfolio_id",
+    "active_wealth_profile_name",
+    "wealth_active_portfolio_id",
+    "wealth_active_snapshot",
+    "sb_wealth_profile_selector",
+    "wealth_profile_selector_widget",
+    "cf_profile_selector_widget",
+    "portfolio_id",
+    "portfolio_name",
+    "data_loaded",
+    "positions_df",
+    "returns_df",
+    "pipeline_done",
+    "results",
+    "df_clean",
+    "df_tx",
+    "df_raw_injected",
+    "active_archetype_code",
+    "active_archetype_name",
+    "bitemp_ingested_portfolios",
+    "selected_bitemp_port",
+    "_argus_workspace_context",
+)
+
+
 def apply_authenticated_user_session(auth_res: Dict[str, Any]) -> None:
     """Applica il contesto dell'utente autenticato a `st.session_state` isolando cache e profili."""
     import streamlit as st
 
+    for k in _USER_SESSION_ISOLATED_KEYS:
+        st.session_state.pop(k, None)
+
     st.session_state.argus_auth_verified = True
-    st.session_state.argus_auth_role = auth_res.get("role", "user")
-    st.session_state.argus_auth_user = auth_res.get("username", "user")
-    st.session_state.argus_auth_display_name = auth_res.get("display_name", auth_res.get("username", "Utente"))
+    role = auth_res.get("role", "user")
+    uname = auth_res.get("username", "user")
+    st.session_state.argus_auth_role = role
+    st.session_state.argus_auth_user = uname
+    st.session_state.argus_auth_display_name = auth_res.get("display_name", uname or "Utente")
+    st.session_state.argus_auth_email = auth_res.get("email", "")
     custom_db = auth_res.get("custom_db_url", "")
     st.session_state.argus_user_custom_db_url = custom_db
-    if auth_res.get("role") == "guest_demo":
+    if role == "guest_demo":
         st.session_state.offline_mode = True
     else:
         st.session_state.offline_mode = False
-    # Reset cached engines & active profile selection so the new user sees only their own profiles
-    for k in ("engine", "db_engine", "active_wealth_portfolio_id", "active_wealth_profile_name", "portfolio_id"):
-        st.session_state.pop(k, None)
     st.cache_data.clear()
     st.cache_resource.clear()
 
@@ -1765,18 +1797,7 @@ def logout_argus_user() -> None:
     import streamlit as st
 
     for k in list(st.session_state.keys()):
-        if k.startswith("argus_auth_") or k in (
-            "argus_user_custom_db_url",
-            "engine",
-            "db_engine",
-            "active_wealth_portfolio_id",
-            "active_wealth_profile_name",
-            "wealth_active_portfolio_id",
-            "portfolio_id",
-            "data_loaded",
-            "positions_df",
-            "returns_df",
-        ):
+        if k.startswith("argus_auth_") or k in _USER_SESSION_ISOLATED_KEYS:
             st.session_state.pop(k, None)
     st.session_state["splash_dismissed"] = False
     st.session_state["_app_initialized"] = False
@@ -1784,11 +1805,60 @@ def logout_argus_user() -> None:
     st.cache_resource.clear()
 
 
+def get_active_account_badge_info() -> Dict[str, str]:
+    """Restituisce i metadati formattati dell'account attualmente autenticato per Sidebar, Header e Splash."""
+    try:
+        import streamlit as st
+
+        role = str(st.session_state.get("argus_auth_role", "owner") or "owner").strip().lower()
+        uname = str(st.session_state.get("argus_auth_user", "alessandro") or "alessandro").strip()
+        disp = str(
+            st.session_state.get("argus_auth_display_name")
+            or ("Alessandro (Titolare)" if role == "owner" else uname)
+        ).strip()
+        custom_db = str(st.session_state.get("argus_user_custom_db_url", "") or "").strip()
+    except Exception:
+        role, uname, disp, custom_db = "owner", "alessandro", "Alessandro (Titolare)", ""
+
+    if role == "owner":
+        return {
+            "role": "owner",
+            "username": "alessandro" if uname in ("user", "owner", "") else uname,
+            "display_name": disp,
+            "badge_label": "👑 OWNER VAULT",
+            "badge_color": "#f59e0b",
+            "badge_bg": "rgba(245, 158, 11, 0.16)",
+            "badge_border": "rgba(245, 158, 11, 0.38)",
+            "isolation_desc": "Accesso Completo (Personale + Archetipi)",
+        }
+    if role == "guest_demo":
+        return {
+            "role": "guest_demo",
+            "username": "guest_demo",
+            "display_name": "Ospite Demo (Sandbox)",
+            "badge_label": "🧪 SANDBOX",
+            "badge_color": "#a78bfa",
+            "badge_bg": "rgba(167, 139, 250, 0.16)",
+            "badge_border": "rgba(167, 139, 250, 0.38)",
+            "isolation_desc": "Ambiente Demo Isolato (Zero dati privati)",
+        }
+    return {
+        "role": "user",
+        "username": uname,
+        "display_name": disp,
+        "badge_label": "🛡️ BYOD DB" if custom_db else "🛡️ ISOLATO",
+        "badge_color": "#38bdf8",
+        "badge_bg": "rgba(56, 189, 248, 0.16)",
+        "badge_border": "rgba(56, 189, 248, 0.38)",
+        "isolation_desc": "DB Dedicato Personale" if custom_db else f"Spazio Privato (@{uname})",
+    }
+
+
 def render_cloud_auth_gate() -> bool:
     """
     Se `ARGUS_REQUIRE_LOGIN=true`, mostra il terminale di Login Istituzionale a tutto schermo
     PRIMA dello Splash Screen (con sidebar completamente nascosta), offrendo:
-    - 🔐 Accedi: Login Multi-Utente / Titolare (`argus_users` + Admin/Supabase Password).
+    - 🔐 Accedi: Login Multi-Utente / Titolare (`argus_users` + Admin/Supabase Password) con invio da tastiera (Enter).
     - ➕ Nuovo Account: Registrazione rapida con spazio isolato o DB Supabase dedicato.
     - 🚀 Demo Sandbox: Accesso 1-Click Ospite / Recruiter in ambiente sandbox isolato.
     Restituisce True se l'utente è autorizzato a proseguire verso lo Splash Screen / App.
@@ -1808,6 +1878,12 @@ def render_cloud_auth_gate() -> bool:
         eye_svg = get_argus_eye_svg(size=60, animated=True, accent="#f59e0b", unique_id="auth_gate_eye_logo")
     except Exception:
         eye_svg = "🏛️"
+
+    proj_ref = cfg.get("project_ref", DEFAULT_SUPABASE_PROJECT_REF)
+    is_cloud_cfg = bool(cfg.get("is_configured"))
+    cloud_pill_label = (
+        f"🟢 Cloud DB Attivo ({proj_ref[:8]}…)" if is_cloud_cfg else "💾 Vault Ibrido / Auto-Connect"
+    )
 
     st.markdown(
         f"""
@@ -1842,8 +1918,8 @@ def render_cloud_auth_gate() -> bool:
         .block-container,
         div[data-testid="stAppViewBlockContainer"],
         .main .block-container {{
-            padding-top: 1.5rem !important;
-            padding-bottom: 1.5rem !important;
+            padding-top: 1.2rem !important;
+            padding-bottom: 1.2rem !important;
             max-width: 1140px !important;
             min-height: 92vh !important;
             display: flex !important;
@@ -1855,8 +1931,14 @@ def render_cloud_auth_gate() -> bool:
             background: radial-gradient(900px circle at 50% 0%, rgba(26, 36, 54, 0.92) 0%, rgba(13, 19, 32, 0.97) 65%, rgba(6, 9, 16, 0.99) 100%) !important;
             border: 1px solid rgba(245, 158, 11, 0.28) !important;
             border-radius: 20px !important;
-            padding: 22px 26px 24px 26px !important;
+            padding: 20px 26px 22px 26px !important;
             box-shadow: 0 24px 64px rgba(0, 0, 0, 0.78), 0 0 40px rgba(245, 158, 11, 0.06) !important;
+        }}
+
+        div[data-testid="stForm"] {{
+            border: none !important;
+            padding: 0 !important;
+            background: transparent !important;
         }}
 
         button[data-baseweb="tab"] {{
@@ -1867,7 +1949,7 @@ def render_cloud_auth_gate() -> bool:
         }}
         </style>
 
-        <div style="text-align:center; max-width:680px; margin: 0 auto 18px auto;">
+        <div style="text-align:center; max-width:680px; margin: 0 auto 14px auto;">
             <div style="display:flex; justify-content:center; margin-bottom:6px; filter:drop-shadow(0 0 20px rgba(245,158,11,0.40));">
                 {eye_svg}
             </div>
@@ -1883,7 +1965,7 @@ def render_cloud_auth_gate() -> bool:
             <div style="display:flex; justify-content:center; gap:8px; flex-wrap:wrap; margin-bottom:4px;">
                 <span style="font-family:'JetBrains Mono',monospace; font-size:10px; color:#34d399;
                              background:rgba(16,185,129,0.10); border:1px solid rgba(16,185,129,0.28);
-                             padding:3px 10px; border-radius:999px;">🔒 TLS 1.3 Supabase Cloud</span>
+                             padding:3px 10px; border-radius:999px;">{cloud_pill_label}</span>
                 <span style="font-family:'JetBrains Mono',monospace; font-size:10px; color:#fbbf24;
                              background:rgba(245,158,11,0.10); border:1px solid rgba(245,158,11,0.28);
                              padding:3px 10px; border-radius:999px;">🛡️ PBKDF2-SHA256 Vault</span>
@@ -1896,7 +1978,7 @@ def render_cloud_auth_gate() -> bool:
         unsafe_allow_html=True,
     )
 
-    col_l, col_c, col_r = st.columns([0.9, 1.8, 0.9])
+    col_l, col_c, col_r = st.columns([0.85, 1.9, 0.85])
     with col_c:
         with st.container(border=True):
             tab_login, tab_reg, tab_guest = st.tabs(
@@ -1909,29 +1991,29 @@ def render_cloud_auth_gate() -> bool:
             with tab_login:
                 st.markdown(
                     "<div style='font-size:12.5px; color:#94a3b8; margin-bottom:10px;'>"
-                    "Inserisci le tue credenziali per sbloccare il tuo spazio patrimoniale privato e proseguire verso il portale ARGUS."
+                    "Inserisci le tue credenziali e premi <b>Invio (Enter)</b> o clicca sul pulsante per sbloccare il tuo spazio patrimoniale privato."
                     "</div>",
                     unsafe_allow_html=True,
                 )
-                user_in = st.text_input(
-                    "Username o Email",
-                    key="auth_gate_email",
-                    placeholder="es. owner, alessandro, marco, sara...",
-                    help="Lascia vuoto oppure scrivi 'owner' / 'alessandro' per accedere come Titolare principale.",
-                )
-                pass_in = st.text_input(
-                    "Password",
-                    type="password",
-                    key="auth_gate_pass",
-                    placeholder="Inserisci la tua password personale...",
-                )
-                st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
-                if st.button(
-                    "🔓 Sblocca & Accedi ad ARGUS",
-                    type="primary",
-                    use_container_width=True,
-                    key="btn_auth_owner",
-                ):
+                with st.form("argus_auth_login_form", clear_on_submit=False, border=False):
+                    user_in = st.text_input(
+                        "Username o Email",
+                        key="auth_gate_email",
+                        placeholder="es. alessandro, owner@argus.cloud, marco...",
+                        help="Per il Titolare: inserisci 'alessandro' (o 'owner@argus.cloud' o lascia vuoto) + la tua password.",
+                    )
+                    pass_in = st.text_input(
+                        "Password",
+                        type="password",
+                        key="auth_gate_pass",
+                        placeholder="Inserisci la tua password personale...",
+                    )
+                    submitted_login = st.form_submit_button(
+                        "🔓 Sblocca & Accedi ad ARGUS",
+                        type="primary",
+                        use_container_width=True,
+                    )
+                if submitted_login:
                     res = SupabaseAuthManager.authenticate_user(user_in, pass_in)
                     if res.get("ok"):
                         apply_authenticated_user_session(res)
@@ -1939,27 +2021,46 @@ def render_cloud_auth_gate() -> bool:
                     else:
                         st.error(f"Autenticazione fallita: {res.get('error')}")
 
+                st.markdown(
+                    """
+                    <div style="margin-top:10px; padding:9px 12px; border-radius:10px;
+                                background:rgba(15,23,42,0.65); border:1px solid rgba(148,163,184,0.16);
+                                font-size:11.5px; color:#94a3b8; line-height:1.45;">
+                        <b style="color:#f8fafc;">📌 Guida Rapida ai Profili di Accesso:</b><br>
+                        • 👑 <b>Titolare (Owner)</b>: Username <code>alessandro</code> (o <code>owner@argus.cloud</code>) + Password Master/Supabase.<br>
+                        • 👤 <b>Utente Privato</b>: Registra un account nella tab <b>➕ Nuovo Account</b> per ottenere uno spazio 100% isolato.<br>
+                        • 🧪 <b>Tester / Recruiter</b>: Usa la tab <b>🚀 Demo Sandbox</b> per esplorare l'app senza registrazione.
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
             with tab_reg:
                 st.markdown(
                     "<div style='font-size:12.5px; color:#94a3b8; margin-bottom:10px;'>"
-                    "Crea un account personale isolato: vedrai esclusivamente i tuoi portafogli e conti, senza alcun accesso ai dati degli altri utenti."
+                    "Crea un account personale isolato: vedrai esclusivamente i tuoi portafogli e conti, senza alcun accesso ai dati del Titolare o degli altri utenti."
                     "</div>",
                     unsafe_allow_html=True,
                 )
-                rc1, rc2 = st.columns(2)
-                with rc1:
-                    reg_uname = st.text_input("Username univoco", key="auth_reg_uname", placeholder="es. marco")
-                with rc2:
-                    reg_disp = st.text_input("Nome Completo", key="auth_reg_disp", placeholder="es. Marco Rossi")
-                reg_pass = st.text_input("Scegli una Password", type="password", key="auth_reg_pass")
-                with st.expander("⚙️ Database Supabase Personale Dedicato (Opzionale — BYOD)", expanded=False):
+                with st.form("argus_auth_register_form", clear_on_submit=False, border=False):
+                    rc1, rc2 = st.columns(2)
+                    with rc1:
+                        reg_uname = st.text_input("Username univoco", key="auth_reg_uname", placeholder="es. marco")
+                    with rc2:
+                        reg_disp = st.text_input("Nome Completo", key="auth_reg_disp", placeholder="es. Marco Rossi")
+                    reg_pass = st.text_input("Scegli una Password (min. 4 caratteri)", type="password", key="auth_reg_pass")
                     reg_custom_db = st.text_input(
-                        "URI PostgreSQL Supabase Personale",
+                        "URI PostgreSQL Supabase Personale (Opzionale — lascia vuoto per isolamento automatico)",
                         type="password",
                         key="auth_reg_db",
-                        placeholder="Lascia vuoto per usare il Cloud condiviso in modalità isolata",
+                        placeholder="Opzionale: postgresql://postgres.[ref]:[pass]@aws-0-eu-west-1.pooler.supabase.com:6543/postgres",
                     )
-                if st.button("✨ Crea Account & Entra", type="primary", use_container_width=True, key="btn_auth_register"):
+                    submitted_reg = st.form_submit_button(
+                        "✨ Crea Account & Entra Subito",
+                        type="primary",
+                        use_container_width=True,
+                    )
+                if submitted_reg:
                     try:
                         from core.fetcher import get_engine
 
@@ -2006,11 +2107,12 @@ def render_cloud_auth_gate() -> bool:
                 st.markdown(
                     "<div style='font-size:12.5px; color:#94a3b8; margin-bottom:12px;'>"
                     "La <b>Modalità Demo Sandbox</b> avvia un ambiente dimostrativo locale isolato "
-                    "(<code>argus_demo_sandbox.db</code>) senza leggere né modificare il database Supabase di alcun utente."
+                    "(<code>argus_demo_sandbox.db</code>) con 3 archetipi istituzionali pre-caricati, "
+                    "senza leggere né modificare il database Supabase di alcun utente."
                     "</div>",
                     unsafe_allow_html=True,
                 )
-                if st.button("🚀 Entra in Modalità Demo Ospite", type="primary", use_container_width=True, key="btn_auth_guest"):
+                if st.button("🚀 Entra in Modalità Demo Ospite (1-Click)", type="primary", use_container_width=True, key="btn_auth_guest"):
                     apply_authenticated_user_session(
                         {
                             "username": "guest_demo",

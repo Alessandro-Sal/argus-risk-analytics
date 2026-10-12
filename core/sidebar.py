@@ -1874,9 +1874,10 @@ def render_sidebar():
         st.session_state["_prev_active_db"] = curr_active_db
         st.session_state["_prev_offline_mode"] = curr_offline
 
-        from core.supabase_cloud import is_supabase_configured
+        from core.supabase_cloud import get_active_account_badge_info, is_supabase_configured
         from core.ui_utils import get_display_portfolio_name
 
+        acct_badge = get_active_account_badge_info()
         port_label, has_port = get_display_portfolio_name()
         port_text_style = (
             "color:#ffffff; font-weight:700;" if has_port else "color:#e3b341; font-style:italic; font-weight:600;"
@@ -1914,6 +1915,10 @@ def render_sidebar():
                 </div>
                 <div style="font-size:11.5px; color:#ffffff; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom: 4px;">
                     🏛️ Wealth &amp; Personal Finance
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center; font-size:10.5px; color:#e2e8f0; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 5px; margin-bottom: 4px;">
+                    <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:130px;">👤 <b>{acct_badge["display_name"]}</b></span>
+                    <span style="font-size:9.5px; font-weight:800; color:{acct_badge["badge_color"]}; background:{acct_badge["badge_bg"]}; border:1px solid {acct_badge["badge_border"]}; padding:1px 6px; border-radius:999px;">{acct_badge["badge_label"]}</span>
                 </div>
                 <div style="display:flex; justify-content:space-between; align-items:center; font-size:10.5px; color:#8b949e; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 5px;">
                     <span>🗄️ <b style="color:#c9d1d9;">{w_db_label}</b></span>
@@ -2057,6 +2062,10 @@ def render_sidebar():
                 <div style="font-size:11.5px; {port_text_style} white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom: 4px;">
                     💼 {active_port_label}
                 </div>
+                <div style="display:flex; justify-content:space-between; align-items:center; font-size:10.5px; color:#e2e8f0; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 5px; margin-bottom: 4px;">
+                    <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:130px;">👤 <b>{acct_badge["display_name"]}</b></span>
+                    <span style="font-size:9.5px; font-weight:800; color:{acct_badge["badge_color"]}; background:{acct_badge["badge_bg"]}; border:1px solid {acct_badge["badge_border"]}; padding:1px 6px; border-radius:999px;">{acct_badge["badge_label"]}</span>
+                </div>
                 <div style="display:flex; justify-content:space-between; align-items:center; font-size:10.5px; color:#8b949e; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 5px;">
                     <span>🗄️ <b style="color:#c9d1d9;">{active_db_label}</b></span>
                     <span>💱 <b style="color:#c9d1d9;">{st.session_state.base_currency}</b> &bull; 🎯 <b style="color:#c9d1d9;">{st.session_state.get("benchmark", "SPY")}</b></span>
@@ -2195,6 +2204,21 @@ def render_sidebar():
         if st.button("👁️ Schermata di Avvio (Splash)", key="btn_sidebar_show_splash", use_container_width=True):
             st.session_state["splash_dismissed"] = False
             st.session_state["_app_initialized"] = False
+            try:
+                st.switch_page("0_Control_Room.py")
+            except Exception:
+                st.rerun()
+
+        if st.button(
+            "🚪 Logout / Cambia Account",
+            key="btn_sidebar_quick_logout",
+            use_container_width=True,
+            help=f"Disconnette {acct_badge['display_name']} (@{acct_badge['username']}), pulisce la cache in RAM e apre il terminale di Login ARGUS.",
+        ):
+            from core.supabase_cloud import SupabaseAuthManager, logout_argus_user
+
+            SupabaseAuthManager.set_security_settings(require_login=True)
+            logout_argus_user()
             try:
                 st.switch_page("0_Control_Room.py")
             except Exception:
