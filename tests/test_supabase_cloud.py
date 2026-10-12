@@ -307,6 +307,7 @@ def test_multi_user_authentication_and_isolation(tmp_path: Path):
 def test_strict_portfolio_id_1_no_leak_between_users(tmp_path: Path, monkeypatch):
     """Verifica che un utente standard ('marco') non veda MAI i conti/spese/obiettivi di portfolio_id = 1 del Titolare."""
     import streamlit as st
+
     from core.wealth.wealth_db import (
         get_wealth_accounts,
         get_wealth_fixed_expenses,
