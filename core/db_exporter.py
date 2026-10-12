@@ -91,9 +91,17 @@ def ensure_snapshot_tables(engine):
             ("portfolio_convexity", "DECIMAL(10,4)"),
             ("portfolio_ytm_weighted_pct", "DECIMAL(10,4)"),
         ]
+        is_pg = getattr(getattr(engine, "dialect", None), "name", "") == "postgresql"
+        from sqlalchemy import inspect as sqla_inspect
+
+        insp = sqla_inspect(engine)
+        existing_snap_cols = {c["name"] for c in insp.get_columns("portfolio_snapshots")} if insp.has_table("portfolio_snapshots") else set()
         for col_name, col_type in cols_to_add_snapshots:
+            if col_name in existing_snap_cols:
+                continue
             try:
-                conn.execute(sqlt(f"ALTER TABLE portfolio_snapshots ADD COLUMN {col_name} {col_type}"))
+                if_not_exists = "IF NOT EXISTS " if is_pg else ""
+                conn.execute(sqlt(f"ALTER TABLE portfolio_snapshots ADD COLUMN {if_not_exists}{col_name} {col_type}"))
             except Exception:
                 pass
 
@@ -130,9 +138,13 @@ def ensure_snapshot_tables(engine):
             ("rsi_14", "DECIMAL(10,2)"),
             ("total_return", "DECIMAL(18,6)"),
         ]
+        existing_pos_cols = {c["name"] for c in insp.get_columns("snapshot_positions")} if insp.has_table("snapshot_positions") else set()
         for col_name, col_type in cols_to_add_positions:
+            if col_name in existing_pos_cols:
+                continue
             try:
-                conn.execute(sqlt(f"ALTER TABLE snapshot_positions ADD COLUMN {col_name} {col_type}"))
+                if_not_exists = "IF NOT EXISTS " if is_pg else ""
+                conn.execute(sqlt(f"ALTER TABLE snapshot_positions ADD COLUMN {if_not_exists}{col_name} {col_type}"))
             except Exception:
                 pass
 
@@ -202,8 +214,11 @@ def get_or_create_portfolio_id(
         )
 
         try:
-            if hasattr(conn, "dialect") and conn.dialect.name == "sqlite":
+            d_name = getattr(getattr(conn, "dialect", None), "name", "")
+            if d_name == "sqlite":
                 new_id = conn.execute(sqlt("SELECT last_insert_rowid()")).scalar()
+            elif d_name == "postgresql":
+                new_id = conn.execute(sqlt("SELECT LASTVAL()")).scalar()
             else:
                 new_id = conn.execute(sqlt("SELECT LAST_INSERT_ID()")).scalar()
         except Exception:
@@ -430,10 +445,13 @@ def save_snapshot_to_db(results: dict, engine, portfolio_id: int, run_id: str, r
             },
         )
 
-        # Recupero ID generato compatibile sia con SQLite che MySQL
+        # Recupero ID generato compatibile con SQLite, PostgreSQL (Supabase) e MySQL
         try:
-            if hasattr(engine, "dialect") and engine.dialect.name == "sqlite":
+            d_name = getattr(getattr(engine, "dialect", None), "name", "")
+            if d_name == "sqlite":
                 snapshot_id = conn.execute(sqlt("SELECT last_insert_rowid()")).scalar()
+            elif d_name == "postgresql":
+                snapshot_id = conn.execute(sqlt("SELECT LASTVAL()")).scalar()
             else:
                 snapshot_id = conn.execute(sqlt("SELECT LAST_INSERT_ID()")).scalar()
         except Exception:

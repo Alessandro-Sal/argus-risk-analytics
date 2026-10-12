@@ -1237,29 +1237,47 @@ def save_wealth_category(engine: Engine, category: Dict[str, Any]) -> int:
 # ── PORTFOLIOS & PROFILES CRUD ──────────────────────────────
 
 
-def get_wealth_portfolios(engine: Engine) -> pd.DataFrame:
-    """Recupera l'elenco dei profili patrimoniali dalla tabella dedicata wealth_profiles."""
-    init_wealth_db(engine)
-    with engine.connect() as conn:
-        df = pd.read_sql(
-            """
-            SELECT profile_id AS portfolio_id, name, owner, base_currency, created_at, description 
-            FROM wealth_profiles 
-            WHERE name IS NOT NULL AND TRIM(name) != ''
-            ORDER BY profile_id ASC
-        """,
-            conn,
-        )
+def _get_active_user_isolation_context() -> Tuple[str, str, bool]:
+    """
+    Restituisce (username, display_name, enforce_owner_filter) in base alla sessione
+    autenticata corrente. Se un utente standard (`role == 'user'`) è autenticato sul DB
+    condiviso, `enforce_owner_filter=True` garantisce che veda solo i propri profili.
+    """
+    try:
+        import streamlit as st
+        from streamlit.runtime.scriptrunner import get_script_run_ctx
 
-    if df.empty:
-        with engine.begin() as wconn:
-            wconn.execute(
+        if get_script_run_ctx() is not None:
+            uname = str(st.session_state.get("argus_auth_user", "user") or "user").strip().lower()
+            disp = str(st.session_state.get("argus_auth_display_name", uname.capitalize()) or uname.capitalize()).strip()
+            role = str(st.session_state.get("argus_auth_role", "owner") or "owner").strip().lower()
+            has_custom_db = bool(str(st.session_state.get("argus_user_custom_db_url", "") or "").strip())
+            enforce = (role == "user") and not has_custom_db
+            return uname, disp, enforce
+    except Exception:
+        pass
+    return "user", "Personale", False
+
+
+def get_wealth_portfolios(engine: Engine) -> pd.DataFrame:
+    """Recupera l'elenco dei profili patrimoniali dalla tabella dedicata wealth_profiles (con isolamento per utente)."""
+    init_wealth_db(engine)
+    curr_user, curr_disp, enforce_owner = _get_active_user_isolation_context()
+
+    with engine.connect() as conn:
+        if enforce_owner:
+            df = pd.read_sql(
                 sqlt("""
-                INSERT INTO wealth_profiles (name, owner, base_currency, description, created_at)
-                VALUES ('Personale', 'user', 'EUR', 'Profilo Patrimoniale Principale', CURRENT_TIMESTAMP)
-            """)
+                    SELECT profile_id AS portfolio_id, name, owner, base_currency, created_at, description 
+                    FROM wealth_profiles 
+                    WHERE name IS NOT NULL AND TRIM(name) != ''
+                      AND LOWER(TRIM(owner)) = LOWER(TRIM(:owner))
+                    ORDER BY profile_id ASC
+                """),
+                conn,
+                params={"owner": curr_user},
             )
-        with engine.connect() as conn2:
+        else:
             df = pd.read_sql(
                 """
                 SELECT profile_id AS portfolio_id, name, owner, base_currency, created_at, description 
@@ -1267,8 +1285,43 @@ def get_wealth_portfolios(engine: Engine) -> pd.DataFrame:
                 WHERE name IS NOT NULL AND TRIM(name) != ''
                 ORDER BY profile_id ASC
             """,
-                conn2,
+                conn,
             )
+
+    if df.empty:
+        default_prof_name = f"Patrimonio {curr_disp}" if enforce_owner else "Personale"
+        default_owner = curr_user if enforce_owner else "user"
+        with engine.begin() as wconn:
+            wconn.execute(
+                sqlt("""
+                INSERT INTO wealth_profiles (name, owner, base_currency, description, created_at)
+                VALUES (:pname, :powner, 'EUR', 'Profilo Patrimoniale Principale', CURRENT_TIMESTAMP)
+            """),
+                {"pname": default_prof_name, "powner": default_owner},
+            )
+        with engine.connect() as conn2:
+            if enforce_owner:
+                df = pd.read_sql(
+                    sqlt("""
+                        SELECT profile_id AS portfolio_id, name, owner, base_currency, created_at, description 
+                        FROM wealth_profiles 
+                        WHERE name IS NOT NULL AND TRIM(name) != ''
+                          AND LOWER(TRIM(owner)) = LOWER(TRIM(:owner))
+                        ORDER BY profile_id ASC
+                    """),
+                    conn2,
+                    params={"owner": curr_user},
+                )
+            else:
+                df = pd.read_sql(
+                    """
+                    SELECT profile_id AS portfolio_id, name, owner, base_currency, created_at, description 
+                    FROM wealth_profiles 
+                    WHERE name IS NOT NULL AND TRIM(name) != ''
+                    ORDER BY profile_id ASC
+                """,
+                    conn2,
+                )
     return df
 
 
@@ -1287,15 +1340,19 @@ def create_wealth_portfolio(
 ) -> int:
     """Crea un nuovo profilo patrimoniale dedicato nella tabella wealth_profiles."""
     init_wealth_db(engine)
+    curr_user, _, enforce_owner = _get_active_user_isolation_context()
+    effective_owner = curr_user if (enforce_owner or not owner or owner == "user") else owner
     clean_name = (name or "").strip()
     if not clean_name:
         clean_name = "Nuovo Profilo"
     with engine.begin() as conn:
         existing_id = conn.execute(
             sqlt(
-                "SELECT profile_id FROM wealth_profiles WHERE LOWER(TRIM(name)) = LOWER(TRIM(:name)) ORDER BY profile_id ASC LIMIT 1"
+                "SELECT profile_id FROM wealth_profiles "
+                "WHERE LOWER(TRIM(name)) = LOWER(TRIM(:name)) AND LOWER(TRIM(owner)) = LOWER(TRIM(:owner)) "
+                "ORDER BY profile_id ASC LIMIT 1"
             ),
-            {"name": clean_name},
+            {"name": clean_name, "owner": effective_owner},
         ).scalar()
         if existing_id:
             return int(existing_id)
@@ -1305,7 +1362,7 @@ def create_wealth_portfolio(
             INSERT INTO wealth_profiles (name, owner, base_currency, description, created_at)
             VALUES (:name, :owner, :bcurr, :desc, CURRENT_TIMESTAMP)
         """),
-            {"name": clean_name, "owner": owner, "bcurr": base_currency or "EUR", "desc": description or ""},
+            {"name": clean_name, "owner": effective_owner, "bcurr": base_currency or "EUR", "desc": description or ""},
         )
         return _get_last_insert_id(conn, engine)
 
@@ -1347,34 +1404,43 @@ def delete_wealth_portfolio(engine: Engine, portfolio_id: int) -> bool:
 def get_available_risk_portfolios(engine: Engine, exclude_wealth_portfolio_id: Optional[int] = None) -> pd.DataFrame:
     """Recupera tutti i portafogli di investimento censiti nel modulo Risk Analytics dal database attivo."""
     init_wealth_db(engine)
+    try:
+        from core.db_exporter import ensure_snapshot_tables
+
+        ensure_snapshot_tables(engine)
+    except Exception:
+        pass
+    curr_user, _, enforce_owner = _get_active_user_isolation_context()
     exclude_clause = f"AND p.portfolio_id != {int(exclude_wealth_portfolio_id)}" if exclude_wealth_portfolio_id else ""
+    owner_clause = "AND LOWER(TRIM(p.owner)) = LOWER(TRIM(:owner))" if enforce_owner else ""
+    query_sql = f"""
+        SELECT 
+            p.portfolio_id,
+            p.name,
+            p.owner,
+            p.base_currency,
+            p.created_at,
+            MAX(s.calc_date) as last_calc_date,
+            COUNT(s.snapshot_id) as snapshot_count,
+            COALESCE(
+                (SELECT s2.total_value 
+                 FROM portfolio_snapshots s2 
+                 WHERE s2.portfolio_id = p.portfolio_id 
+                 ORDER BY s2.calc_date DESC, s2.snapshot_id DESC LIMIT 1),
+                0.0
+            ) as latest_value
+        FROM portfolios p
+        INNER JOIN portfolio_snapshots s ON p.portfolio_id = s.portfolio_id
+        WHERE p.name IS NOT NULL AND TRIM(p.name) != '' {exclude_clause} {owner_clause}
+        GROUP BY p.portfolio_id, p.name, p.owner, p.base_currency, p.created_at
+        HAVING COUNT(s.snapshot_id) > 0
+        ORDER BY latest_value DESC, p.portfolio_id ASC
+    """
     with engine.connect() as conn:
-        df = pd.read_sql(
-            f"""
-            SELECT 
-                p.portfolio_id,
-                p.name,
-                p.owner,
-                p.base_currency,
-                p.created_at,
-                MAX(s.calc_date) as last_calc_date,
-                COUNT(s.snapshot_id) as snapshot_count,
-                COALESCE(
-                    (SELECT s2.total_value 
-                     FROM portfolio_snapshots s2 
-                     WHERE s2.portfolio_id = p.portfolio_id 
-                     ORDER BY s2.calc_date DESC, s2.snapshot_id DESC LIMIT 1),
-                    0.0
-                ) as latest_value
-            FROM portfolios p
-            INNER JOIN portfolio_snapshots s ON p.portfolio_id = s.portfolio_id
-            WHERE p.name IS NOT NULL AND TRIM(p.name) != '' {exclude_clause}
-            GROUP BY p.portfolio_id, p.name, p.owner, p.base_currency, p.created_at
-            HAVING COUNT(s.snapshot_id) > 0
-            ORDER BY latest_value DESC, p.portfolio_id ASC
-        """,
-            conn,
-        )
+        if enforce_owner:
+            df = pd.read_sql(sqlt(query_sql), conn, params={"owner": curr_user})
+        else:
+            df = pd.read_sql(query_sql, conn)
         return df
 
 
@@ -2471,7 +2537,8 @@ def sync_wealth_tables_between_engines(source_engine: Engine, target_engine: Eng
             if df is None:
                 continue
 
-            tgt_cols = {col["name"] for col in tgt_insp.get_columns(tbl)}
+            tgt_col_meta = {col["name"]: str(col.get("type", "")).upper() for col in tgt_insp.get_columns(tbl)}
+            tgt_cols = set(tgt_col_meta.keys())
             common_cols = [c for c in df.columns if c in tgt_cols]
 
             if not common_cols:
@@ -2479,12 +2546,21 @@ def sync_wealth_tables_between_engines(source_engine: Engine, target_engine: Eng
 
             df_to_insert = df[common_cols].copy()
 
-            if is_tgt_sqlite:
-                for col in df_to_insert.columns:
-                    col_l = col.lower()
-                    if "date" in col_l and not ("created_at" in col_l or "updated_at" in col_l or "calc_date" in col_l):
+            for col in df_to_insert.columns:
+                col_l = col.lower()
+                col_t = tgt_col_meta.get(col, "")
+                is_date_col = col_l == "date" or col_l.endswith("_date")
+                is_ts_col = col_l in ("created_at", "updated_at", "calc_date", "ping_timestamp")
+                is_num_col = any(
+                    k in col_t for k in ("NUMERIC", "DECIMAL", "DOUBLE", "FLOAT", "REAL", "INT", "BIGINT", "SMALLINT")
+                ) and not is_date_col and not is_ts_col
+
+                if is_num_col:
+                    df_to_insert[col] = pd.to_numeric(df_to_insert[col], errors="coerce")
+                elif is_tgt_sqlite:
+                    if is_date_col:
                         df_to_insert[col] = pd.to_datetime(df_to_insert[col], errors="coerce").dt.strftime("%Y-%m-%d")
-                    elif "created_at" in col_l or "updated_at" in col_l or "calc_date" in col_l:
+                    elif is_ts_col:
                         df_to_insert[col] = pd.to_datetime(df_to_insert[col], errors="coerce").dt.strftime(
                             "%Y-%m-%d %H:%M:%S"
                         )
@@ -2492,7 +2568,7 @@ def sync_wealth_tables_between_engines(source_engine: Engine, target_engine: Eng
             with target_engine.begin() as conn:
                 conn.execute(sqlt(f"DELETE FROM {tbl}"))
                 if not df_to_insert.empty:
-                    df_to_insert.to_sql(tbl, conn, if_exists="append", index=False)
+                    df_to_insert.to_sql(tbl, conn, if_exists="append", index=False, chunksize=1000)
             results[tbl] = len(df_to_insert)
         except Exception as ex:
             results[tbl] = f"Error: {ex}"

@@ -13,6 +13,16 @@ if _root_dir not in sys.path:
 
 import streamlit as st
 
+try:
+    import importlib
+
+    import core.supabase_cloud as _supa_early
+
+    importlib.reload(_supa_early)
+    _supa_early.harvest_active_streamlit_sessions_for_supabase()
+except Exception:
+    pass
+
 # Gestione parametri URL e calcolo stato sidebar (collassata all'avvio su splash, aperta nei moduli)
 _qp = getattr(st, "query_params", None)
 _is_splash = not st.session_state.get("_app_initialized", False) and not st.session_state.get("splash_dismissed", False)
@@ -149,12 +159,26 @@ def fetch_yahoo_ticker_for_isin(isin: str) -> str:
 inject_custom_css()
 
 # ── Sidebar (Caricata solo dopo l'accesso al terminale) ───────
+try:
+    import importlib
+
+    import core.supabase_cloud as _supa_mod
+
+    if not hasattr(_supa_mod, "harvest_active_streamlit_sessions_for_supabase"):
+        importlib.reload(_supa_mod)
+    _supa_mod.harvest_active_streamlit_sessions_for_supabase()
+except Exception:
+    pass
+
 from core.sidebar import render_sidebar
 
 render_sidebar()
 
 # Fetch parameters safely from session_state
 offline_mode = st.session_state.get("offline_mode", False)
+data_environment = st.session_state.get("data_environment", "Auto (Ibrido)")
+if data_environment == "Local SQLite":
+    offline_mode = True
 db_host = st.session_state.get("db_host", "localhost")
 try:
     db_port = int(st.session_state.get("db_port", 3306))
@@ -171,8 +195,9 @@ benchmark = st.session_state.get("benchmark", "SPY")
 # ── Funzioni di Supporto Database ─────────────────────────────
 
 @st.cache_resource(show_spinner=False)
-def get_db_engine(user, password, host, port, db):
-    return get_engine(user=user, password=password, host=host, port=port, db=db)
+def get_db_engine(user, password, host, port, db, data_env="Auto (Ibrido)", supa_fp=""):
+    is_off = data_env == "Local SQLite"
+    return get_engine(user=user, password=password, host=host, port=port, db=db, offline=is_off)
 
 
 def get_analysis_history(engine):
@@ -213,7 +238,14 @@ engine_sidebar = None
 db_error = None
 if not offline_mode:
     try:
-        engine_sidebar = get_db_engine(db_user, db_pass, db_host, db_port, db_name)
+        from core.supabase_cloud import get_supabase_config
+
+        supa_fp = get_supabase_config().get("masked_db_url", "")
+        engine_sidebar = get_db_engine(
+            db_user, db_pass, db_host, db_port, db_name, data_env=data_environment, supa_fp=supa_fp
+        )
+        st.session_state["engine"] = engine_sidebar
+        st.session_state["db_engine"] = engine_sidebar
     except Exception as e:
         db_error = e
 

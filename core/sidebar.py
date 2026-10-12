@@ -588,9 +588,24 @@ def render_settings_status_hud(current_module: str = "risk") -> None:
     is_wealth = current_module == "wealth"
     is_off = bool(st.session_state.get("offline_mode", False))
     db_name = st.session_state.get("db_name", "wealth")
+    active_eng = st.session_state.get("engine")
+    is_pg = (
+        active_eng is not None
+        and getattr(getattr(active_eng, "dialect", None), "name", "") == "postgresql"
+    )
+    is_supa = False
+    try:
+        from core.supabase_cloud import is_supabase_configured
+
+        is_supa = not is_off and (is_pg or is_supabase_configured())
+    except Exception:
+        is_supa = is_pg
 
     if is_off:
         db_label = "💾 SQLite" if is_wealth else "☁️ RAM"
+        db_color = "#38bdf8"
+    elif is_supa:
+        db_label = "☁️ Supabase"
         db_color = "#38bdf8"
     else:
         db_label = f"🟢 {db_name}"
@@ -1041,7 +1056,21 @@ def render_settings_dialog(current_module: str = "risk") -> None:
         curr_env = st.session_state.get("data_environment", "Auto (Ibrido)")
         env_idx = env_opts.index(curr_env) if curr_env in env_opts else 0
         sel_env = st.selectbox("Sorgente Dati", env_opts, index=env_idx, key="sb_data_environment")
-        st.session_state.data_environment = sel_env
+        if sel_env != curr_env:
+            st.session_state.data_environment = sel_env
+            force_off = sel_env == "Local SQLite"
+            st.session_state.offline_mode = force_off
+            st.session_state["sb_offline_toggle"] = force_off
+            try:
+                from core.workspace_context import WorkspaceContext
+
+                WorkspaceContext.execute_database_switch(
+                    st.session_state.get("db_name", "wealth"), offline_mode=force_off
+                )
+            except Exception:
+                st.cache_resource.clear()
+        else:
+            st.session_state.data_environment = sel_env
 
         off_lbl = "Modalità Offline (SQLite Locale)" if is_wealth else "Modalità Offline (RAM)"
         off_hlp = (

@@ -1,7 +1,6 @@
 -- ============================================================
 -- ARGUS INSTITUTIONAL PLATFORM — SUPABASE POSTGRESQL SCHEMA
 -- Zero-Cost Cloud Architecture (PostgreSQL 15+ / Supabase)
--- Paste into: Supabase Dashboard -> SQL Editor -> New Query
 -- ============================================================
 
 -- 1. CORE RISK & PORTFOLIO TABLES
@@ -13,7 +12,6 @@ CREATE TABLE IF NOT EXISTS portfolios (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     description TEXT
 );
-
 CREATE TABLE IF NOT EXISTS assets (
     asset_id SERIAL PRIMARY KEY,
     ticker VARCHAR(20) NOT NULL UNIQUE,
@@ -47,7 +45,6 @@ CREATE TABLE IF NOT EXISTS assets (
     revenue_growth NUMERIC(10,4),
     earnings_growth NUMERIC(10,4)
 );
-
 CREATE TABLE IF NOT EXISTS transactions (
     tx_id SERIAL PRIMARY KEY,
     portfolio_id INTEGER NOT NULL REFERENCES portfolios(portfolio_id) ON DELETE CASCADE,
@@ -61,7 +58,6 @@ CREATE TABLE IF NOT EXISTS transactions (
     fx_rate_to_eur NUMERIC(12,6) NOT NULL DEFAULT 1.000000,
     notes VARCHAR(500)
 );
-
 CREATE TABLE IF NOT EXISTS market_prices (
     price_id BIGSERIAL PRIMARY KEY,
     asset_id INTEGER NOT NULL REFERENCES assets(asset_id) ON DELETE CASCADE,
@@ -71,7 +67,6 @@ CREATE TABLE IF NOT EXISTS market_prices (
     source VARCHAR(50) NOT NULL DEFAULT 'yfinance',
     CONSTRAINT uq_asset_date UNIQUE (asset_id, price_date)
 );
-
 CREATE TABLE IF NOT EXISTS portfolio_snapshots (
     snapshot_id SERIAL PRIMARY KEY,
     portfolio_id INTEGER NOT NULL REFERENCES portfolios(portfolio_id) ON DELETE CASCADE,
@@ -88,7 +83,6 @@ CREATE TABLE IF NOT EXISTS portfolio_snapshots (
     effective_n NUMERIC(8,2),
     diversification_ratio NUMERIC(8,4)
 );
-
 CREATE TABLE IF NOT EXISTS snapshot_positions (
     id SERIAL PRIMARY KEY,
     snapshot_id INTEGER NOT NULL REFERENCES portfolio_snapshots(snapshot_id) ON DELETE CASCADE,
@@ -109,7 +103,6 @@ CREATE TABLE IF NOT EXISTS wealth_profiles (
     base_currency VARCHAR(10) NOT NULL DEFAULT 'EUR',
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-
 CREATE TABLE IF NOT EXISTS wealth_accounts (
     account_id SERIAL PRIMARY KEY,
     portfolio_id INTEGER NOT NULL DEFAULT 1,
@@ -123,7 +116,6 @@ CREATE TABLE IF NOT EXISTS wealth_accounts (
     notes TEXT,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-
 CREATE TABLE IF NOT EXISTS wealth_categories (
     category_id SERIAL PRIMARY KEY,
     name VARCHAR(120) NOT NULL,
@@ -134,7 +126,6 @@ CREATE TABLE IF NOT EXISTS wealth_categories (
     color VARCHAR(16) NOT NULL DEFAULT '#6366f1',
     is_system INTEGER NOT NULL DEFAULT 0
 );
-
 CREATE TABLE IF NOT EXISTS wealth_cashflow (
     tx_id SERIAL PRIMARY KEY,
     portfolio_id INTEGER NOT NULL DEFAULT 1,
@@ -152,7 +143,6 @@ CREATE TABLE IF NOT EXISTS wealth_cashflow (
     tx_hash VARCHAR(64),
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-
 CREATE TABLE IF NOT EXISTS wealth_physical_assets (
     asset_id SERIAL PRIMARY KEY,
     portfolio_id INTEGER NOT NULL DEFAULT 1,
@@ -171,7 +161,6 @@ CREATE TABLE IF NOT EXISTS wealth_physical_assets (
     notes TEXT,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-
 CREATE TABLE IF NOT EXISTS wealth_pension_plans (
     plan_id SERIAL PRIMARY KEY,
     portfolio_id INTEGER NOT NULL DEFAULT 1,
@@ -189,7 +178,6 @@ CREATE TABLE IF NOT EXISTS wealth_pension_plans (
     yearly_data_json TEXT,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-
 CREATE TABLE IF NOT EXISTS wealth_networth_snapshots (
     snapshot_id SERIAL PRIMARY KEY,
     portfolio_id INTEGER NOT NULL DEFAULT 1,
@@ -213,7 +201,6 @@ CREATE TABLE IF NOT EXISTS wealth_networth_snapshots (
     notes TEXT,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-
 CREATE TABLE IF NOT EXISTS wealth_fixed_expenses (
     fixed_id SERIAL PRIMARY KEY,
     portfolio_id INTEGER NOT NULL DEFAULT 1,
@@ -229,7 +216,6 @@ CREATE TABLE IF NOT EXISTS wealth_fixed_expenses (
     is_active INTEGER DEFAULT 1,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-
 CREATE TABLE IF NOT EXISTS wealth_goals (
     goal_id SERIAL PRIMARY KEY,
     portfolio_id INTEGER NOT NULL DEFAULT 1,
@@ -245,7 +231,6 @@ CREATE TABLE IF NOT EXISTS wealth_goals (
     notes TEXT,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-
 CREATE TABLE IF NOT EXISTS wealth_portfolio_risk_links (
     wealth_portfolio_id INTEGER NOT NULL,
     risk_portfolio_id INTEGER NOT NULL,
@@ -274,7 +259,6 @@ CREATE TABLE IF NOT EXISTS tax_declarations (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT uq_tax_profile_year UNIQUE (profile_id, tax_year, model_type)
 );
-
 CREATE TABLE IF NOT EXISTS tax_loss_carryforward (
     id SERIAL PRIMARY KEY,
     profile_id VARCHAR(100) NOT NULL DEFAULT 'default',
@@ -288,7 +272,6 @@ CREATE TABLE IF NOT EXISTS tax_loss_carryforward (
     broker_source VARCHAR(100) DEFAULT 'DEGIRO',
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-
 CREATE TABLE IF NOT EXISTS tax_verification_documents (
     id SERIAL PRIMARY KEY,
     profile_id VARCHAR(100) NOT NULL DEFAULT 'default',
@@ -311,13 +294,24 @@ CREATE TABLE IF NOT EXISTS tax_verification_documents (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- 4. CLOUD HEARTBEAT TABLE (ANTI-PAUSE KEEP-ALIVE FOR SUPABASE FREE TIER)
+-- 4. CLOUD HEARTBEAT & MULTI-USER AUTHENTICATION TABLES
 CREATE TABLE IF NOT EXISTS argus_cloud_heartbeat (
     id SERIAL PRIMARY KEY,
     ping_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     source VARCHAR(80) NOT NULL DEFAULT 'github_actions_keepalive',
     status VARCHAR(40) NOT NULL DEFAULT 'OK',
     details TEXT
+);
+CREATE TABLE IF NOT EXISTS argus_users (
+    user_id SERIAL PRIMARY KEY,
+    username VARCHAR(80) NOT NULL UNIQUE,
+    email VARCHAR(160),
+    display_name VARCHAR(120) NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    role VARCHAR(30) NOT NULL DEFAULT 'user',
+    custom_db_url TEXT,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- 5. HIGH-PERFORMANCE B-TREE INDEXES
@@ -335,6 +329,7 @@ CREATE INDEX IF NOT EXISTS idx_pens_port ON wealth_pension_plans(portfolio_id);
 CREATE INDEX IF NOT EXISTS idx_acct_port ON wealth_accounts(portfolio_id);
 CREATE INDEX IF NOT EXISTS idx_verif_profile_year ON tax_verification_documents(profile_id, tax_year);
 CREATE INDEX IF NOT EXISTS idx_verif_doc_type ON tax_verification_documents(doc_type);
+CREATE INDEX IF NOT EXISTS idx_argus_users_uname ON argus_users(username);
 
 -- 6. SUPABASE STORAGE PRIVATE BUCKET FOR FISCAL PDF VAULT
 DO $$
@@ -347,6 +342,8 @@ BEGIN
 END $$;
 
 -- 7. OPTIONAL ROW-LEVEL SECURITY (RLS) HARDENING FOR SUPABASE DATA API
+-- Nota: la connessione diretta PostgreSQL (ruolo 'postgres') bypassa RLS,
+-- mentre l'attivazione di RLS blocca qualsiasi accesso non autorizzato via PostgREST/Anon Key.
 ALTER TABLE portfolios ENABLE ROW LEVEL SECURITY;
 ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE wealth_profiles ENABLE ROW LEVEL SECURITY;
@@ -360,3 +357,4 @@ ALTER TABLE wealth_goals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tax_declarations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tax_loss_carryforward ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tax_verification_documents ENABLE ROW LEVEL SECURITY;
+ALTER TABLE argus_users ENABLE ROW LEVEL SECURITY;

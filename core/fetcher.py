@@ -124,6 +124,26 @@ def get_engine(
     except ImportError:
         pass
 
+    session_data_env = ""
+    session_custom_db_url = ""
+    is_guest_demo = False
+    try:
+        import streamlit as st
+        from streamlit.runtime.scriptrunner import get_script_run_ctx
+
+        if get_script_run_ctx() is not None:
+            session_data_env = str(st.session_state.get("data_environment", "") or "")
+            session_custom_db_url = str(st.session_state.get("argus_user_custom_db_url", "") or "").strip()
+            is_guest_demo = st.session_state.get("argus_auth_role") == "guest_demo"
+    except Exception:
+        pass
+
+    if is_guest_demo and sqlite_path == "data/argus_local.db":
+        offline = True
+        sqlite_path = "data/argus_demo_sandbox.db"
+    elif session_data_env == "Local SQLite":
+        offline = True
+
     if offline:
         os.makedirs(os.path.dirname(sqlite_path) or ".", exist_ok=True)
         sqlite_url = f"sqlite:///{sqlite_path.replace(chr(92), '/')}"
@@ -133,19 +153,30 @@ def get_engine(
         except Exception:
             pass
     else:
-        # 1. Priorità Cloud: se è configurato SUPABASE_DB_URL (o DATABASE_URL postgres://)
-        # e non è stato forzato un host MySQL custom diverso da localhost, usa Supabase PostgreSQL.
+        # 1. Priorità Cloud: se l'utente ha un custom_db_url dedicato (BYOD) oppure se è configurato
+        # SUPABASE_DB_URL (in modalità Auto o Supabase Cloud) e non è richiesto un host MySQL custom,
+        # usa Supabase PostgreSQL con connection pool warm.
         engine = None
         custom_mysql_requested = (host and host not in ("localhost", "127.0.0.1")) or (user and user != "root")
         if not custom_mysql_requested:
             try:
-                from core.supabase_cloud import create_supabase_engine, get_supabase_config
+                from core.supabase_cloud import (
+                    _SUPABASE_ENGINE_CACHE,
+                    create_supabase_engine,
+                    get_supabase_config,
+                    normalize_supabase_db_url,
+                )
 
                 supa_cfg = get_supabase_config()
-                if supa_cfg.get("is_configured"):
-                    supa_eng = create_supabase_engine(supa_cfg["db_url"])
-                    with supa_eng.connect() as test_conn:
-                        test_conn.execute(text("SELECT 1"))
+                target_cloud_url = normalize_supabase_db_url(
+                    session_custom_db_url or (supa_cfg.get("db_url", "") if supa_cfg.get("is_configured") else "")
+                )
+                if target_cloud_url:
+                    already_warm = target_cloud_url in _SUPABASE_ENGINE_CACHE
+                    supa_eng = create_supabase_engine(target_cloud_url, use_cache=True)
+                    if not already_warm:
+                        with supa_eng.connect() as test_conn:
+                            test_conn.execute(text("SELECT 1"))
                     engine = supa_eng
             except Exception as supa_ex:
                 logger.warning("Connessione Supabase non riuscita, fallback a MySQL/SQLite: %s", supa_ex)

@@ -249,3 +249,57 @@ def test_postgres_dialect_sql_generation():
     assert cnt == 2
     price_sql = str(mock_conn.execute.call_args[0][0])
     assert "ON CONFLICT (asset_id, price_date) DO NOTHING" in price_sql
+
+
+def test_multi_user_authentication_and_isolation(tmp_path: Path):
+    db_file = tmp_path / "multi_user.db"
+    engine = create_engine(f"sqlite:///{db_file.as_posix()}")
+    init_wealth_db(engine)
+
+    # Create 4 users (1 owner + 3 isolated standard users)
+    r1 = SupabaseAuthManager.create_or_update_user(
+        engine, "alessandro", "OwnerSecret99!", role="owner", display_name="Alessandro"
+    )
+    r2 = SupabaseAuthManager.create_or_update_user(
+        engine, "marco", "MarcoPass2026!", role="user", display_name="Marco Rossi"
+    )
+    r3 = SupabaseAuthManager.create_or_update_user(
+        engine, "sara", "SaraPass2026!", role="user", display_name="Sara Bianchi"
+    )
+    r4 = SupabaseAuthManager.create_or_update_user(
+        engine,
+        "luca",
+        "LucaPass2026!",
+        role="user",
+        display_name="Luca Verdi",
+        custom_db_url="postgres://postgres.lucaref:LucaDbPass@aws-0-eu-west-1.pooler.supabase.com:6543/postgres",
+    )
+
+    assert r1["ok"] and r2["ok"] and r3["ok"] and r4["ok"]
+    assert r4["has_custom_db"] is True
+
+    users = SupabaseAuthManager.list_users(engine)
+    assert len(users) == 4
+
+    # Authenticate each user
+    auth_ok = SupabaseAuthManager.authenticate_user("marco", "MarcoPass2026!", engine=engine)
+    assert auth_ok["ok"] is True
+    assert auth_ok["username"] == "marco"
+    assert auth_ok["role"] == "user"
+
+    auth_bad = SupabaseAuthManager.authenticate_user("marco", "WrongPassword", engine=engine)
+    assert auth_bad["ok"] is False
+
+    # Verify isolated wealth_profiles were created for marco and sara
+    with engine.connect() as conn:
+        marco_prof = conn.execute(
+            sqlt("SELECT COUNT(*) FROM wealth_profiles WHERE LOWER(owner) = 'marco'")
+        ).scalar()
+        sara_prof = conn.execute(
+            sqlt("SELECT COUNT(*) FROM wealth_profiles WHERE LOWER(owner) = 'sara'")
+        ).scalar()
+        assert marco_prof == 1
+        assert sara_prof == 1
+
+    engine.dispose()
+
