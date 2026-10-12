@@ -175,8 +175,12 @@ def get_engine(
                     already_warm = target_cloud_url in _SUPABASE_ENGINE_CACHE
                     supa_eng = create_supabase_engine(target_cloud_url, use_cache=True)
                     if not already_warm:
-                        with supa_eng.connect() as test_conn:
-                            test_conn.execute(text("SELECT 1"))
+                        try:
+                            with supa_eng.connect() as test_conn:
+                                test_conn.execute(text("SELECT 1"))
+                        except Exception:
+                            _SUPABASE_ENGINE_CACHE.pop(target_cloud_url, None)
+                            raise
                     engine = supa_eng
             except Exception as supa_ex:
                 logger.warning("Connessione Supabase non riuscita, fallback a MySQL/SQLite: %s", supa_ex)

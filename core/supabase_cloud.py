@@ -355,6 +355,11 @@ def get_supabase_config() -> Dict[str, Any]:
     project_ref = _read_secret_or_env("SUPABASE_PROJECT_REF", DEFAULT_SUPABASE_PROJECT_REF)
     pooler_host = _read_secret_or_env("SUPABASE_POOLER_HOST", DEFAULT_SUPABASE_POOLER_HOST)
     db_password = session_db_pass or _read_secret_or_env("SUPABASE_DB_PASSWORD")
+    if db_password and (
+        db_password.startswith("<") and db_password.endswith(">")
+        or "LA_TUA_PASSWORD" in db_password.upper()
+    ):
+        db_password = ""
 
     if session_db_pass or session_db_url:
         persist_supabase_credentials_to_env(
@@ -369,8 +374,12 @@ def get_supabase_config() -> Dict[str, Any]:
         or _read_secret_or_env("SUPABASE_DB_URL")
         or _read_secret_or_env("DATABASE_URL")
     )
-    # Only treat DATABASE_URL as Supabase/Postgres if it starts with postgres
-    if raw_db_url and not raw_db_url.lower().startswith("postgres"):
+    # Only treat DATABASE_URL as Supabase/Postgres if it starts with postgres and has no placeholder
+    if raw_db_url and (
+        not raw_db_url.lower().startswith("postgres")
+        or "LA_TUA_PASSWORD" in raw_db_url.upper()
+        or "%3CLA_TUA_PASSWORD" in raw_db_url.upper()
+    ):
         raw_db_url = ""
 
     if not raw_db_url and db_password and project_ref:
@@ -1521,53 +1530,66 @@ class SupabaseAuthManager:
         if not pwd:
             return {"ok": False, "error": "Inserisci la password."}
 
-        # 1. Check argus_users table
-        target_eng = engine
-        if target_eng is None:
+        # 1. Check argus_users table (Cloud Supabase + Local SQLite Fallback)
+        candidate_engines: List[Engine] = []
+        if engine is not None:
+            candidate_engines.append(engine)
+        else:
             try:
                 cfg = get_supabase_config()
                 if cfg.get("is_configured"):
-                    target_eng = create_supabase_engine(cfg["db_url"], use_cache=True)
+                    candidate_engines.append(create_supabase_engine(cfg["db_url"], use_cache=True))
             except Exception:
-                target_eng = None
-
-        if target_eng is not None and ident:
+                pass
             try:
-                cls.ensure_users_table(target_eng)
-                with target_eng.connect() as conn:
-                    row = (
-                        conn.execute(
-                            sqlt("""
-                            SELECT user_id, username, email, display_name, password_hash, role, custom_db_url, is_active
-                            FROM argus_users
-                            WHERE LOWER(username) = :ident OR (email IS NOT NULL AND email != '' AND LOWER(email) = :ident)
-                            LIMIT 1
-                        """),
-                            {"ident": ident},
+                from core.fetcher import get_engine
+
+                candidate_engines.append(get_engine(offline=True))
+            except Exception:
+                pass
+
+        if ident:
+            for cand_eng in candidate_engines:
+                if cand_eng is None:
+                    continue
+                try:
+                    cls.ensure_users_table(cand_eng)
+                    with cand_eng.connect() as conn:
+                        row = (
+                            conn.execute(
+                                sqlt("""
+                                SELECT user_id, username, email, display_name, password_hash, role, custom_db_url, is_active
+                                FROM argus_users
+                                WHERE LOWER(username) = :ident OR (email IS NOT NULL AND email != '' AND LOWER(email) = :ident)
+                                LIMIT 1
+                            """),
+                                {"ident": ident},
+                            )
+                            .mappings()
+                            .fetchone()
                         )
-                        .mappings()
-                        .fetchone()
-                    )
-                if row:
-                    if not int(row["is_active"] or 0):
-                        return {"ok": False, "error": "Account utente disabilitato."}
-                    if cls.verify_password_hash(pwd, str(row["password_hash"])):
-                        return {
-                            "ok": True,
-                            "username": str(row["username"]),
-                            "display_name": str(row["display_name"]),
-                            "email": str(row["email"] or ""),
-                            "role": str(row["role"] or "user"),
-                            "custom_db_url": str(row["custom_db_url"] or ""),
-                            "error": None,
-                        }
-                    return {"ok": False, "error": "Password non valida per questo utente."}
-            except Exception as ex:
-                logger.debug("argus_users auth lookup skipped: %s", ex)
+                    if row:
+                        if not int(row["is_active"] or 0):
+                            return {"ok": False, "error": "Account utente disabilitato."}
+                        if cls.verify_password_hash(pwd, str(row["password_hash"])):
+                            return {
+                                "ok": True,
+                                "username": str(row["username"]),
+                                "display_name": str(row["display_name"]),
+                                "email": str(row["email"] or ""),
+                                "role": str(row["role"] or "user"),
+                                "custom_db_url": str(row["custom_db_url"] or ""),
+                                "error": None,
+                            }
+                        return {"ok": False, "error": "Password non valida per questo utente."}
+                except Exception as ex:
+                    logger.debug("argus_users auth lookup skipped on engine: %s", ex)
 
         # 2. Check Master Owner password (ARGUS_ADMIN_PASSWORD or SUPABASE_DB_PASSWORD)
         cfg = get_supabase_config()
-        supa_db_pwd = _read_secret_or_env("SUPABASE_DB_PASSWORD")
+        supa_db_pwd = cfg.get("db_password") or _read_secret_or_env("SUPABASE_DB_PASSWORD")
+        if supa_db_pwd and ("LA_TUA_PASSWORD" in supa_db_pwd.upper() or (supa_db_pwd.startswith("<") and supa_db_pwd.endswith(">"))):
+            supa_db_pwd = ""
         is_owner_ident = ident in ("", "owner", "admin", "alessandro", "user", "owner@argus.cloud")
         if is_owner_ident:
             if cfg.get("admin_password") and cls.verify_admin_password(pwd, cfg["admin_password"]):
@@ -1581,6 +1603,27 @@ class SupabaseAuthManager:
                     "error": None,
                 }
             if supa_db_pwd and cls.verify_admin_password(pwd, supa_db_pwd):
+                return {
+                    "ok": True,
+                    "username": "user",
+                    "display_name": "Alessandro (Titolare)",
+                    "email": ident if "@" in ident else "owner@argus.cloud",
+                    "role": "owner",
+                    "custom_db_url": "",
+                    "error": None,
+                }
+            # Se SUPABASE_DB_PASSWORD non era ancora configurata nei Secrets (o aveva il placeholder),
+            # verifica se la password inserita dal Titolare apre direttamente il DB Supabase Cloud
+            proj_ref = cfg.get("project_ref", DEFAULT_SUPABASE_PROJECT_REF)
+            pool_host = cfg.get("pooler_host", DEFAULT_SUPABASE_POOLER_HOST)
+            candidate_url = build_supabase_db_url(project_ref=proj_ref, db_password=pwd, pooler_host=pool_host)
+            if candidate_url and test_supabase_connection(candidate_url).get("ok"):
+                persist_supabase_credentials_to_env(
+                    db_password=pwd,
+                    db_url=candidate_url,
+                    project_ref=proj_ref,
+                    pooler_host=pool_host,
+                )
                 return {
                     "ok": True,
                     "username": "user",
@@ -1918,19 +1961,32 @@ def render_cloud_auth_gate() -> bool:
                     )
                 if st.button("✨ Crea Account & Entra", type="primary", use_container_width=True, key="btn_auth_register"):
                     try:
+                        from core.fetcher import get_engine
+
                         eng = create_supabase_engine(cfg["db_url"], use_cache=True) if cfg.get("is_configured") else None
                         if eng is None:
-                            from core.fetcher import get_engine
-
                             eng = get_engine(offline=True)
-                        c_res = SupabaseAuthManager.create_or_update_user(
-                            engine=eng,
-                            username=reg_uname,
-                            password=reg_pass,
-                            role="user",
-                            display_name=reg_disp or reg_uname,
-                            custom_db_url=reg_custom_db,
-                        )
+                        try:
+                            c_res = SupabaseAuthManager.create_or_update_user(
+                                engine=eng,
+                                username=reg_uname,
+                                password=reg_pass,
+                                role="user",
+                                display_name=reg_disp or reg_uname,
+                                custom_db_url=reg_custom_db,
+                            )
+                        except Exception as db_ex:
+                            logger.warning("Registrazione su DB Cloud fallita (%s), fallback automatico a DB locale isolato.", db_ex)
+                            _SUPABASE_ENGINE_CACHE.pop(normalize_supabase_db_url(cfg.get("db_url", "")), None)
+                            eng_local = get_engine(offline=True)
+                            c_res = SupabaseAuthManager.create_or_update_user(
+                                engine=eng_local,
+                                username=reg_uname,
+                                password=reg_pass,
+                                role="user",
+                                display_name=reg_disp or reg_uname,
+                                custom_db_url=reg_custom_db,
+                            )
                         if c_res.get("ok"):
                             apply_authenticated_user_session(
                                 {
