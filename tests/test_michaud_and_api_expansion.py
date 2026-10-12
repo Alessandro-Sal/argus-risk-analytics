@@ -124,7 +124,7 @@ def test_api_pre_trade_compliance_endpoint():
     response = client.post("/api/v1/compliance/pre-trade-check", json=payload)
     assert response.status_code == 200
     data = response.json()
-    assert data["version"] == "9.19.0"
+    assert data["version"] == "10.0.0"
     assert data["orders_evaluated"] == 2
     assert data["all_approved"] is False  # second order is sanctioned
     assert len(data["batch_audit_seal"]) == 64  # SHA-256
@@ -143,7 +143,7 @@ def test_api_macro_scenarios_2026_endpoint():
     response = client.post("/api/v1/stress/macro-scenarios-2026", json=payload)
     assert response.status_code == 200
     data = response.json()
-    assert data["version"] == "9.19.0"
+    assert data["version"] == "10.0.0"
     sc_eval = data["scenario_evaluation"]
     assert sc_eval["scenario_key"] == "Global_Tariff_War_2026"
     assert sc_eval["portfolio_return_pct"] < 0.0
@@ -166,7 +166,7 @@ def test_api_michaud_resampling_endpoint():
     response = client.post("/api/v1/optimization/michaud-resampled", json=payload)
     assert response.status_code == 200
     data = response.json()
-    assert data["version"] == "9.19.0"
+    assert data["version"] == "10.0.0"
     assert "resampled_max_sharpe" in data
     assert "resampled_frontier" in data
 

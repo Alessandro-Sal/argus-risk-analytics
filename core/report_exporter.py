@@ -2515,7 +2515,7 @@ Relationship: dim_assets[ticker] 1 <---> * fact_positions[ticker]
         # 5. Executive Governance Manifest
         manifest_data = {
             "platform": "ARGUS Risk Analytics & Wealth Platform",
-            "version": "9.19.0",
+            "version": "10.0.0",
             "generated_at": datetime.now().isoformat(),
             "portfolio_name": portfolio_name,
             "standards_compliance": ["MiFID II RTS 28", "Basel IV FRTB", "Solvency II", "ISDA SIMM v2.6"],

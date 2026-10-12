@@ -249,7 +249,7 @@ def test_generate_cro_institutional_dossier_zip():
         manifest_raw = zf.read("00_Executive_Governance_Manifest.json").decode("utf-8")
         manifest = json.loads(manifest_raw)
         assert manifest["platform"] == "ARGUS Risk Analytics & Wealth Platform"
-        assert manifest["version"] == "9.19.0"
+        assert manifest["version"] == "10.0.0"
         assert "audit_seal_sha256" in manifest
         assert len(manifest["audit_seal_sha256"]) == 64
 

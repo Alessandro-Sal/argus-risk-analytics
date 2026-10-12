@@ -1,0 +1,5 @@
+account_id,name,account_type,institution,currency,balance,notes
+1,Conto Corrente Principale,checking,FinecoBank,EUR,12034.83,Conto operativo stipendio e spese
+2,Conto Deposito Risparmio,savings,Illimity Bank,EUR,4000.0,Riserva di risparmio a rendimento
+3,Fondo Emergenza Dedicato,emergency_fund,Banca Mediolanum,EUR,5000.0,Cuscino di liquidità per imprevisti
+4,Brokerage Cash Liquidità,brokerage_cash,Directa / IBKR,EUR,0.0,Liquidità per trading e investimenti

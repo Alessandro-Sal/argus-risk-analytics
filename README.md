@@ -7,11 +7,22 @@
 [![Latest Release](https://img.shields.io/github/v/release/Alessandro-Sal/argus-risk-analytics?color=blue&label=version)](https://github.com/Alessandro-Sal/argus-risk-analytics/releases/latest)
 [![Python Version](https://img.shields.io/badge/python-3.11%20%7C%203.12-green.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-purple.svg)](LICENSE.md)
-[![Test Suite](https://img.shields.io/badge/PyTest-856%2F856%20PASSED%20(100%25)-brightgreen)](tests/)
+[![Test Suite](https://img.shields.io/badge/PyTest-888%2F888%20PASSED%20(100%25)-brightgreen)](tests/)
 [![Documentation: MkDocs](https://img.shields.io/badge/docs-Material%20for%20MkDocs-blue.svg)](https://alessandro-sal.github.io/argus-risk-analytics/)
 [![REST API: FastAPI](https://img.shields.io/badge/REST%20API-FastAPI%20%7C%20OpenAPI-009688.svg)](http://localhost:8000/docs)
 [![Code Style: Ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![Docker Ready](https://img.shields.io/badge/docker-ready-blue.svg)](docker-compose.yml)
+
+---
+
+## 🚀 Institutional Multi-User Cloud Architecture, Supabase PostgreSQL Persistence, Zero-Leakage Data Isolation, BYOD Vault & Fiscal Intelligence Suite (v10.0.0)
+
+ARGUS v10.0.0 segna il passaggio epocale a una piattaforma **Cloud-Native Multi-Tenant** con persistenza ibrida PostgreSQL/SQLite, isolamento crittografico dei portafogli per ciascun utente e suite fiscale italiana completa:
+- **Motore di Persistenza Ibrido Cloud PostgreSQL ⇄ SQLite (`core/cloud_db.py`)**: Layer universale `ArgusConnectionProxy` compatibile simultaneamente con **Supabase PostgreSQL 16 (AWS EU-West-1 Ireland)** tramite SQLAlchemy `QueuePool` (`pool_pre_ping=True`, SSL obbligatorio) e con **SQLite locale (`data/argus_local.db`)** per uso desktop offline. Traduzione trasparente del dialetto SQL (`AUTOINCREMENT` $\leftrightarrow$ `SERIAL`, `INSERT OR IGNORE` $\leftrightarrow$ `ON CONFLICT DO NOTHING`, placeholder parametrizzati).
+- **Pre-Splash Institutional Cloud Auth Gate & PBKDF2-SHA256 User Vault (`core/cloud_auth.py`, `components/splash.py`, `core/sidebar.py`)**: Portale di accesso istituzionale full-screen (`render_cloud_auth_gate`) posizionato prima dello splash screen con 3 modalità operative: **🔑 Accedi al tuo Vault** (autenticazione `PBKDF2-HMAC-SHA256` a 120.000 iterazioni con salt crittografico a 16 byte), **📝 Crea Nuovo Account** (provisioning istantaneo di un profilo patrimoniale isolato su cloud) e **🧪 Esplora in Modalità Demo (1-Click)** (accesso sandbox immediato con i 3 archetipi didattici sintetici). Include **Account Identity Badge** (`👑 Owner`, `🔐 Cloud Member`, `🧪 Demo Sandbox`) e pulsante **🚪 Logout / Cambia Account** a 1-click nella Control Room e nella Sidebar.
+- **Isolamento Multi-Tenant Zero-Leakage & BYOD Database Override (`core/wealth/wealth_db.py`, `core/db_exporter.py`, `src/0_Control_Room.py`)**: Segregazione rigorosa dei dati su oltre 30 tabelle SQL patrimoniali e di rischio (`_resolve_isolated_portfolio_filter`), prenotazione esclusiva del `profile_id = 1` (`Personale`) per l'account `owner`, targatura nominativa dei portafogli Risk (`owner_username`) e supporto **BYOD (Bring Your Own Database)** per consentire agli utenti avanzati di connettere una propria istanza PostgreSQL personale (Supabase/Neon) in sessione.
+- **Suite Fiscale Italiana & Pianificazione Patrimoniale Avanzata (`core/tax_engine.py`, `core/wealth/tax_wealth_engine.py`, `src/pages/6_🧾_Ottimizzazione_Fiscale.py`, `src/pages/18_🏛️_Pianificazione_Fiscale.py`)**: Doppio motore di calcolo plusvalenze (**Costo Medio Ponderato ex Art. 67-68 TUIR** vs simulatore LIFO), regole Crypto-attività 2026 (aliquota 33% diretta vs 26% tramite ETN/ETC), generatore **Quadro RW / IVAFE (0,2% vs 0,4%) / IVIE (1,06%)**, matrice di compensazione **Redditi di Capitale vs Redditi Diversi** con scadenziario quadriennale dello *Zainetto Fiscale* ($T+4$) e simulatore interattivo di Stress Test Normativo.
+- **Audit di Sicurezza & Packaging Certificato (`scripts/package_release.py`, `SECURITY.md`)**: Scanner preventivo automatizzato che garantisce l'assenza totale di database personali, backup compressi, cache o credenziali nel repository Git e nell'archivio di rilascio `dist/ARGUS_v10.0.0.zip`.
 
 ---
 

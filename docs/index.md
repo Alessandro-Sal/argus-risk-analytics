@@ -166,6 +166,9 @@ Intraday execution optimizer balancing Square-Root temporary market impact again
 ### 42. Redington ALM / LDI Immunization & Cash-Flow Matching Linear Programming
 Pension and Total Wealth Asset-Liability Management verifying Redington's (1952) three immunization conditions, Surplus-at-Risk 99%, 20Y Receiver IRS LDI overlay sizing, and exact minimum-cost dedicated bond portfolio construction via Linear Programming (`scipy.optimize.linprog`).
 
+### 43. Hybrid Cloud Multi-Tenant Persistence, PBKDF2-SHA256 Auth Gate & Italian Fiscal Suite (v10.0.0)
+Unified dual-dialect persistence engine (`core/cloud_db.py`) seamlessly bridging **Supabase PostgreSQL 16 (SSL QueuePool)** and **Local SQLite (`data/argus_local.db`)**, paired with a pre-splash institutional authentication gate (`core/cloud_auth.py`), PBKDF2-HMAC-SHA256 (120,000 iterations) user vault, strict multi-tenant row-level isolation across 30+ Wealth & Risk tables, BYOD dedicated database override, and comprehensive Italian TUIR / Quadro RW / IVAFE / IVIE / Crypto 2026 fiscal intelligence.
+
 ---
 
 ## Quick Navigation

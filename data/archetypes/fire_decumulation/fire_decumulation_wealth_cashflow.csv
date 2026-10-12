@@ -1,0 +1,352 @@
+account_name,account_id,category_id,category_name,tx_date,amount,currency,direction,merchant,notes,is_recurring,payment_method,tags
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2023-09-07,350.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2023-09-07,280.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2023-09-07,550.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2023-09-07,180.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2023-09-15,639.56,USD,inflow,KO Payout,Stacco dividendo 1291 azioni @ 0.4954,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2023-09-15,617.1,USD,inflow,PEP Payout,Stacco dividendo 438 azioni @ 1.4089,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2023-09-15,370.97,USD,inflow,SPY Payout,Stacco dividendo 221 azioni @ 1.6786,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2023-09-15,460.01,USD,inflow,BND Payout,Stacco dividendo 2074 azioni @ 0.2218,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2023-09-19,810.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2023-09-23,990.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2023-10-07,350.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2023-10-07,280.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2023-10-07,550.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2023-10-07,180.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2023-10-16,564.36,USD,inflow,PG Payout,Stacco dividendo 538 azioni @ 1.0490,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2023-10-16,478.47,USD,inflow,BND Payout,Stacco dividendo 2074 azioni @ 0.2307,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2023-10-19,810.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2023-10-23,990.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2023-11-07,350.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2023-11-07,280.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2023-11-07,550.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2023-11-07,180.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2023-11-15,721.34,USD,inflow,JNJ Payout,Stacco dividendo 565 azioni @ 1.2767,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2023-11-15,538.09,USD,inflow,IBM Payout,Stacco dividendo 322 azioni @ 1.6711,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2023-11-15,2805.04,EUR,inflow,ISP.MI Payout,Stacco dividendo 17981 azioni @ 0.1560,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2023-11-15,467.89,USD,inflow,BND Payout,Stacco dividendo 2074 azioni @ 0.2256,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2023-11-19,810.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2023-11-23,990.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2023-12-07,350.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2023-12-07,280.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2023-12-07,550.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2023-12-07,180.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2023-12-15,538.9,USD,inflow,KO Payout,Stacco dividendo 1098 azioni @ 0.4908,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2023-12-15,220.43,USD,inflow,WMT Payout,Stacco dividendo 1013 azioni @ 0.2176,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2023-12-15,370.2,USD,inflow,SPY Payout,Stacco dividendo 221 azioni @ 1.6751,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2023-12-15,479.51,USD,inflow,BND Payout,Stacco dividendo 2074 azioni @ 0.2312,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2023-12-19,810.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2023-12-23,990.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2024-01-07,350.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2024-01-07,280.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2024-01-07,550.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2024-01-07,180.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-01-16,536.82,USD,inflow,PG Payout,Stacco dividendo 538 azioni @ 0.9978,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-01-16,609.21,USD,inflow,PEP Payout,Stacco dividendo 438 azioni @ 1.3909,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-01-16,478.06,USD,inflow,BND Payout,Stacco dividendo 2074 azioni @ 0.2305,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2024-01-19,810.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2024-01-23,990.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2024-02-07,350.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2024-02-07,280.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2024-02-07,550.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2024-02-07,180.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-02-15,721.0,USD,inflow,JNJ Payout,Stacco dividendo 565 azioni @ 1.2761,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-02-15,547.27,USD,inflow,IBM Payout,Stacco dividendo 322 azioni @ 1.6996,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-02-15,461.05,USD,inflow,BND Payout,Stacco dividendo 2074 azioni @ 0.2223,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2024-02-19,810.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2024-02-23,990.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2024-03-07,350.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2024-03-07,280.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2024-03-07,550.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2024-03-07,180.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-03-15,454.58,USD,inflow,KO Payout,Stacco dividendo 934 azioni @ 0.4867,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-03-15,607.37,USD,inflow,PEP Payout,Stacco dividendo 438 azioni @ 1.3867,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-03-15,216.48,USD,inflow,WMT Payout,Stacco dividendo 1013 azioni @ 0.2137,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-03-15,373.58,USD,inflow,SPY Payout,Stacco dividendo 221 azioni @ 1.6904,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-03-15,462.92,USD,inflow,BND Payout,Stacco dividendo 2074 azioni @ 0.2232,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2024-03-19,810.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2024-03-23,990.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2024-04-07,350.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2024-04-07,280.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2024-04-07,550.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2024-04-07,180.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-04-15,530.58,USD,inflow,PG Payout,Stacco dividendo 538 azioni @ 0.9862,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-04-15,458.35,USD,inflow,BND Payout,Stacco dividendo 2074 azioni @ 0.2210,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2024-04-19,810.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2024-04-23,990.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2024-05-07,350.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2024-05-07,280.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2024-05-07,550.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2024-05-07,180.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-05-15,724.22,USD,inflow,JNJ Payout,Stacco dividendo 565 azioni @ 1.2818,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-05-15,211.72,USD,inflow,WMT Payout,Stacco dividendo 1013 azioni @ 0.2090,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-05-15,544.66,USD,inflow,IBM Payout,Stacco dividendo 322 azioni @ 1.6915,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-05-15,2675.57,EUR,inflow,ISP.MI Payout,Stacco dividendo 17981 azioni @ 0.1488,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-05-15,4030.47,EUR,inflow,BMW.DE Payout,Stacco dividendo 644 azioni @ 6.2585,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-05-15,472.66,USD,inflow,BND Payout,Stacco dividendo 2074 azioni @ 0.2279,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2024-05-19,810.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2024-05-23,990.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2024-06-07,350.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2024-06-07,280.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2024-06-07,550.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2024-06-07,180.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-06-17,378.58,USD,inflow,KO Payout,Stacco dividendo 794 azioni @ 0.4768,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-06-17,585.52,USD,inflow,PEP Payout,Stacco dividendo 438 azioni @ 1.3368,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-06-17,375.55,USD,inflow,SPY Payout,Stacco dividendo 221 azioni @ 1.6993,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-06-17,467.06,USD,inflow,BND Payout,Stacco dividendo 2074 azioni @ 0.2252,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2024-06-19,810.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2024-06-23,990.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2024-07-07,350.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2024-07-07,280.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2024-07-07,550.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2024-07-07,180.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-07-15,538.38,USD,inflow,PG Payout,Stacco dividendo 538 azioni @ 1.0007,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-07-15,450.89,USD,inflow,BND Payout,Stacco dividendo 2074 azioni @ 0.2174,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2024-07-19,810.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2024-07-23,990.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2024-08-07,350.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2024-08-07,280.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2024-08-07,550.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2024-08-07,180.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-08-16,714.78,USD,inflow,JNJ Payout,Stacco dividendo 565 azioni @ 1.2651,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-08-16,215.16,USD,inflow,WMT Payout,Stacco dividendo 1013 azioni @ 0.2124,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-08-16,527.82,USD,inflow,IBM Payout,Stacco dividendo 322 azioni @ 1.6392,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-08-16,478.26,USD,inflow,BND Payout,Stacco dividendo 2074 azioni @ 0.2306,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2024-08-19,810.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2024-08-23,990.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2024-09-07,350.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2024-09-07,280.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2024-09-07,550.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2024-09-07,180.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-09-16,341.75,USD,inflow,KO Payout,Stacco dividendo 675 azioni @ 0.5063,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-09-16,592.4,USD,inflow,PEP Payout,Stacco dividendo 438 azioni @ 1.3525,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-09-16,390.95,USD,inflow,SPY Payout,Stacco dividendo 221 azioni @ 1.7690,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-09-16,474.12,USD,inflow,BND Payout,Stacco dividendo 2074 azioni @ 0.2286,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2024-09-19,810.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2024-09-23,990.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2024-10-07,350.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2024-10-07,280.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2024-10-07,550.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2024-10-07,180.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-10-15,548.54,USD,inflow,PG Payout,Stacco dividendo 538 azioni @ 1.0196,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-10-15,478.68,USD,inflow,BND Payout,Stacco dividendo 2074 azioni @ 0.2308,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2024-10-19,810.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2024-10-23,990.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2024-11-07,350.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2024-11-07,280.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2024-11-07,550.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2024-11-07,180.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-11-15,687.32,USD,inflow,JNJ Payout,Stacco dividendo 565 azioni @ 1.2165,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-11-15,534.81,USD,inflow,IBM Payout,Stacco dividendo 322 azioni @ 1.6609,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-11-15,2779.86,EUR,inflow,ISP.MI Payout,Stacco dividendo 17981 azioni @ 0.1546,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-11-15,456.9,USD,inflow,BND Payout,Stacco dividendo 2074 azioni @ 0.2203,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2024-11-19,810.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2024-11-23,990.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2024-12-07,350.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2024-12-07,280.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2024-12-07,550.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2024-12-07,180.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-12-16,284.36,USD,inflow,KO Payout,Stacco dividendo 574 azioni @ 0.4954,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-12-16,215.77,USD,inflow,WMT Payout,Stacco dividendo 1013 azioni @ 0.2130,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-12-16,385.16,USD,inflow,SPY Payout,Stacco dividendo 221 azioni @ 1.7428,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-12-16,473.08,USD,inflow,BND Payout,Stacco dividendo 2074 azioni @ 0.2281,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2024-12-19,810.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2024-12-23,990.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2025-01-07,350.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2025-01-07,280.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2025-01-07,550.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2025-01-07,180.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-01-15,543.06,USD,inflow,PG Payout,Stacco dividendo 538 azioni @ 1.0094,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-01-15,593.1,USD,inflow,PEP Payout,Stacco dividendo 438 azioni @ 1.3541,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-01-15,469.14,USD,inflow,BND Payout,Stacco dividendo 2074 azioni @ 0.2262,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2025-01-19,810.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2025-01-23,990.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2025-02-07,350.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2025-02-07,280.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2025-02-07,550.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2025-02-07,180.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-02-18,718.74,USD,inflow,JNJ Payout,Stacco dividendo 565 azioni @ 1.2721,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-02-18,551.84,USD,inflow,IBM Payout,Stacco dividendo 322 azioni @ 1.7138,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-02-18,452.75,USD,inflow,BND Payout,Stacco dividendo 2074 azioni @ 0.2183,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2025-02-19,810.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2025-02-23,990.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2025-03-07,350.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2025-03-07,280.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2025-03-07,550.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2025-03-07,180.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-03-17,242.39,USD,inflow,KO Payout,Stacco dividendo 488 azioni @ 0.4967,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-03-17,599.67,USD,inflow,PEP Payout,Stacco dividendo 438 azioni @ 1.3691,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-03-17,216.98,USD,inflow,WMT Payout,Stacco dividendo 1013 azioni @ 0.2142,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-03-17,392.96,USD,inflow,SPY Payout,Stacco dividendo 221 azioni @ 1.7781,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-03-17,457.11,USD,inflow,BND Payout,Stacco dividendo 2074 azioni @ 0.2204,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2025-03-19,810.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2025-03-23,990.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2025-04-07,350.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2025-04-07,280.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2025-04-07,550.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2025-04-07,180.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-04-15,564.25,USD,inflow,PG Payout,Stacco dividendo 538 azioni @ 1.0488,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-04-15,455.04,USD,inflow,BND Payout,Stacco dividendo 2074 azioni @ 0.2194,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2025-04-19,810.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2025-04-23,990.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2025-05-07,350.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2025-05-07,280.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2025-05-07,550.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2025-05-07,180.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-05-15,716.59,USD,inflow,JNJ Payout,Stacco dividendo 565 azioni @ 1.2683,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-05-15,212.93,USD,inflow,WMT Payout,Stacco dividendo 1013 azioni @ 0.2102,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-05-15,547.46,USD,inflow,IBM Payout,Stacco dividendo 322 azioni @ 1.7002,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-05-15,2688.16,EUR,inflow,ISP.MI Payout,Stacco dividendo 17981 azioni @ 0.1495,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-05-15,3815.06,EUR,inflow,BMW.DE Payout,Stacco dividendo 644 azioni @ 5.9240,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-05-15,453.79,USD,inflow,BND Payout,Stacco dividendo 2074 azioni @ 0.2188,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2025-05-19,810.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2025-05-23,990.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2025-06-07,350.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2025-06-07,280.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2025-06-07,550.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2025-06-07,180.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-06-16,203.47,USD,inflow,KO Payout,Stacco dividendo 415 azioni @ 0.4903,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-06-16,619.9,USD,inflow,PEP Payout,Stacco dividendo 438 azioni @ 1.4153,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-06-16,379.19,USD,inflow,SPY Payout,Stacco dividendo 221 azioni @ 1.7158,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-06-16,469.76,USD,inflow,BND Payout,Stacco dividendo 2074 azioni @ 0.2265,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2025-06-19,810.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2025-06-23,990.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2025-07-07,350.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2025-07-07,280.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2025-07-07,550.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2025-07-07,180.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-07-15,550.48,USD,inflow,PG Payout,Stacco dividendo 538 azioni @ 1.0232,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-07-15,476.61,USD,inflow,BND Payout,Stacco dividendo 2074 azioni @ 0.2298,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2025-07-19,810.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2025-07-23,990.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2025-08-07,350.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2025-08-07,280.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2025-08-07,550.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2025-08-07,180.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-08-18,716.59,USD,inflow,JNJ Payout,Stacco dividendo 565 azioni @ 1.2683,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-08-18,218.2,USD,inflow,WMT Payout,Stacco dividendo 1013 azioni @ 0.2154,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-08-18,528.98,USD,inflow,IBM Payout,Stacco dividendo 322 azioni @ 1.6428,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-08-18,480.55,USD,inflow,BND Payout,Stacco dividendo 2074 azioni @ 0.2317,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2025-08-19,810.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2025-08-23,990.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2025-09-07,350.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2025-09-07,280.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2025-09-07,550.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2025-09-07,180.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-09-15,172.26,USD,inflow,KO Payout,Stacco dividendo 353 azioni @ 0.4880,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-09-15,598.4,USD,inflow,PEP Payout,Stacco dividendo 438 azioni @ 1.3662,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-09-15,378.97,USD,inflow,SPY Payout,Stacco dividendo 221 azioni @ 1.7148,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-09-15,455.66,USD,inflow,BND Payout,Stacco dividendo 2074 azioni @ 0.2197,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2025-09-19,810.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2025-09-23,990.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2025-10-07,350.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2025-10-07,280.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2025-10-07,550.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2025-10-07,180.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-10-15,534.34,USD,inflow,PG Payout,Stacco dividendo 538 azioni @ 0.9932,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-10-15,470.38,USD,inflow,BND Payout,Stacco dividendo 2074 azioni @ 0.2268,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2025-10-19,810.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2025-10-23,990.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2025-11-07,350.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2025-11-07,280.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2025-11-07,550.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2025-11-07,180.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-11-17,700.37,USD,inflow,JNJ Payout,Stacco dividendo 565 azioni @ 1.2396,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-11-17,549.49,USD,inflow,IBM Payout,Stacco dividendo 322 azioni @ 1.7065,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-11-17,2677.37,EUR,inflow,ISP.MI Payout,Stacco dividendo 17981 azioni @ 0.1489,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-11-17,451.3,USD,inflow,BND Payout,Stacco dividendo 2074 azioni @ 0.2176,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2025-11-19,810.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2025-11-23,990.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2025-12-07,350.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2025-12-07,280.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2025-12-07,550.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2025-12-07,180.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-12-15,143.55,USD,inflow,KO Payout,Stacco dividendo 301 azioni @ 0.4769,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-12-15,210.2,USD,inflow,WMT Payout,Stacco dividendo 1013 azioni @ 0.2075,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-12-15,375.55,USD,inflow,SPY Payout,Stacco dividendo 221 azioni @ 1.6993,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-12-15,456.49,USD,inflow,BND Payout,Stacco dividendo 2074 azioni @ 0.2201,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2025-12-19,810.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2025-12-23,990.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2026-01-07,350.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2026-01-07,280.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2026-01-07,550.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2026-01-07,180.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2026-01-15,553.55,USD,inflow,PG Payout,Stacco dividendo 538 azioni @ 1.0289,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2026-01-15,595.24,USD,inflow,PEP Payout,Stacco dividendo 438 azioni @ 1.3590,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2026-01-15,475.98,USD,inflow,BND Payout,Stacco dividendo 2074 azioni @ 0.2295,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2026-01-19,810.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2026-01-23,990.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2026-02-07,350.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2026-02-07,280.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2026-02-07,550.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2026-02-07,180.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2026-02-17,691.39,USD,inflow,JNJ Payout,Stacco dividendo 565 azioni @ 1.2237,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2026-02-17,545.92,USD,inflow,IBM Payout,Stacco dividendo 322 azioni @ 1.6954,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2026-02-17,479.09,USD,inflow,BND Payout,Stacco dividendo 2074 azioni @ 0.2310,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2026-02-19,810.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2026-02-23,990.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2026-03-07,350.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2026-03-07,280.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2026-03-07,550.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2026-03-07,180.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2026-03-16,123.14,USD,inflow,KO Payout,Stacco dividendo 256 azioni @ 0.4810,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2026-03-16,584.55,USD,inflow,PEP Payout,Stacco dividendo 438 azioni @ 1.3346,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2026-03-16,220.12,USD,inflow,WMT Payout,Stacco dividendo 1013 azioni @ 0.2173,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2026-03-16,379.7,USD,inflow,SPY Payout,Stacco dividendo 221 azioni @ 1.7181,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2026-03-16,479.92,USD,inflow,BND Payout,Stacco dividendo 2074 azioni @ 0.2314,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2026-03-19,810.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2026-03-23,990.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2026-04-07,350.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2026-04-07,280.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2026-04-07,550.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2026-04-07,180.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2026-04-15,544.62,USD,inflow,PG Payout,Stacco dividendo 538 azioni @ 1.0123,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2026-04-15,463.75,USD,inflow,BND Payout,Stacco dividendo 2074 azioni @ 0.2236,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2026-04-19,810.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2026-04-23,990.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2026-05-07,350.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2026-05-07,280.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2026-05-07,550.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2026-05-07,180.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2026-05-15,695.85,USD,inflow,JNJ Payout,Stacco dividendo 565 azioni @ 1.2316,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2026-05-15,210.6,USD,inflow,WMT Payout,Stacco dividendo 1013 azioni @ 0.2079,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2026-05-15,532.65,USD,inflow,IBM Payout,Stacco dividendo 322 azioni @ 1.6542,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2026-05-15,2706.14,EUR,inflow,ISP.MI Payout,Stacco dividendo 17981 azioni @ 0.1505,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2026-05-15,3939.67,EUR,inflow,BMW.DE Payout,Stacco dividendo 644 azioni @ 6.1175,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2026-05-15,472.46,USD,inflow,BND Payout,Stacco dividendo 2074 azioni @ 0.2278,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2026-05-19,810.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2026-05-23,990.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2026-06-07,350.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2026-06-07,280.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2026-06-07,550.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2026-06-07,180.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2026-06-15,106.75,USD,inflow,KO Payout,Stacco dividendo 218 azioni @ 0.4897,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2026-06-15,597.61,USD,inflow,PEP Payout,Stacco dividendo 438 azioni @ 1.3644,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2026-06-15,388.98,USD,inflow,SPY Payout,Stacco dividendo 221 azioni @ 1.7601,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2026-06-15,460.64,USD,inflow,BND Payout,Stacco dividendo 2074 azioni @ 0.2221,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2026-06-19,810.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2026-06-23,990.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2026-07-07,350.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2026-07-07,280.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2026-07-07,550.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2026-07-07,180.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2026-07-15,555.59,USD,inflow,PG Payout,Stacco dividendo 538 azioni @ 1.0327,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2026-07-15,471.42,USD,inflow,BND Payout,Stacco dividendo 2074 azioni @ 0.2273,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2026-07-19,810.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2026-07-23,990.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2026-08-07,350.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2026-08-07,280.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2026-08-07,550.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2026-08-07,180.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2026-08-17,697.21,USD,inflow,JNJ Payout,Stacco dividendo 565 azioni @ 1.2340,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2026-08-17,206.55,USD,inflow,WMT Payout,Stacco dividendo 1013 azioni @ 0.2039,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2026-08-17,527.05,USD,inflow,IBM Payout,Stacco dividendo 322 azioni @ 1.6368,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2026-08-17,453.79,USD,inflow,BND Payout,Stacco dividendo 2074 azioni @ 0.2188,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2026-08-19,810.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2026-08-23,990.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2026-09-07,350.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2026-09-07,280.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2026-09-07,550.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2026-09-07,180.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2026-09-19,810.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2026-09-23,990.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want

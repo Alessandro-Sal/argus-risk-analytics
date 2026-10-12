@@ -6,9 +6,10 @@ La sicurezza e l'integrità dei dati patrimoniali e finanziari degli utenti sono
 
 | Versione | Stato Supporto | Note di Sicurezza |
 | :--- | :---: | :--- |
-| **8.1.x** | :white_check_mark: **Attivo** | Suite di sicurezza completa, Universal Ledger, protezione CWE-1236, PII masking, Fernet Vault |
-| **7.x** | :warning: Manutenzione | Solo patch critiche; raccomandato l'aggiornamento |
-| **< 7.0** | :x: Deprecato | Fine supporto ciclo vitale |
+| **10.0.x** | :white_check_mark: **Attivo (Latest)** | Multi-User Cloud Vault (PBKDF2-SHA256), Zero-Leakage Tenant Isolation, Supabase SSL Pooler, Fernet Vault, CWE-1236 & PII Masking |
+| **9.x** | :white_check_mark: **Attivo** | Suite di sicurezza completa, Universal Ledger, protezione CWE-1236, PII masking, Fernet Vault |
+| **8.x** | :warning: Manutenzione | Solo patch critiche; raccomandato l'aggiornamento a v10.0.0 |
+| **< 8.0** | :x: Deprecato | Fine supporto ciclo vitale |
 
 ---
 
@@ -32,12 +33,17 @@ ARGUS implementa un'architettura difensiva a più livelli (*Defense-in-Depth*) c
 - Derivazione della chiave di cifratura tramite **PBKDF2-HMAC-SHA256** con salt crittografico casuale a 16 byte e 100.000 iterazioni standard.
 
 ### 4. Zero-Leakage Credential Stripping & AI Isolation
-- Tutte le chiavi API (broker, Yahoo Finance, connettori macroeconomici, token LLM OpenAI/Google Gemini) sono caricate esclusivamente tramite variabili d'ambiente (`.env`) e isolate dal filesystem di repository (`.gitignore`).
+- Tutte le chiavi API (broker, Yahoo Finance, connettori macroeconomici, token LLM OpenAI/Google Gemini) sono caricate esclusivamente tramite variabili d'ambiente (`.env` / `.streamlit/secrets.toml`) e isolate dal filesystem di repository (`.gitignore`).
 - Prima dell'inoltro di dati di bilancio o prompt all'AI Copilot e ai modelli LLM esterni, il testo viene analizzato e depurato (`strip_sensitive_headers`) per prevenire la fuga accidentale di token di autenticazione o credenziali di sessione.
 
 ### 5. Hot Backup & Disaster Recovery Atomico
 - Il modulo `core/backup_engine.py` garantisce snapshot coerenti a caldo del database patrimoniale (`data/argus_wealth.db` e `data/argus_local.db`) tramite le API SQLite Online Backup con checkpointing esplicito del WAL (`PRAGMA wal_checkpoint(TRUNCATE)`).
 - Ogni operazione di ripristino genera preliminarmente una copia d'emergenza (`.emergency_pre_restore`) per garantire il rollback immediato in caso di fallimento o corruzione.
+
+### 6. Autenticazione Multi-Utente Cloud & Isolamento Multi-Tenant (v10.0.0)
+- **Password Hashing Crittografico**: Le credenziali utente nel database cloud (`argus_cloud_users`) sono protette tramite **PBKDF2-HMAC-SHA256** con 120.000 iterazioni, salt crittografico univoco a 16 byte generato con `secrets.token_hex(16)` e verifica in tempo costante (`hmac.compare_digest`) contro attacchi di timing.
+- **Isolamento Rigoroso dei Portafogli (Zero-Leakage Multi-Tenancy)**: Tutte le query SQL sul patrimonio (`core/wealth/wealth_db.py`) e sui portafogli di rischio (`core/db_exporter.py`) applicano un filtro dinamico (`_resolve_isolated_portfolio_filter`) basato sull'identità autenticata in sessione, impedendo qualsiasi accesso trasversale ai dati di altri utenti o al profilo riservato del proprietario (`profile_id = 1`).
+- **Connessioni Cloud Cifrate (TLS/SSL)**: Le connessioni verso Supabase PostgreSQL utilizzano obbligatoriamente `sslmode=require` e supporto **BYOD (Bring Your Own Database)** isolato in memoria di sessione.
 
 ---
 

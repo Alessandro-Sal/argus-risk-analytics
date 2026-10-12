@@ -1,7 +1,7 @@
 """
-Script di packaging per la creazione dell'archivio ZIP della release v9.0.0 di ARGUS.
+Script di packaging per la creazione dell'archivio ZIP della release v10.0.0 di ARGUS.
 Esegue un'ispezione preventiva di sicurezza per garantire che NESSUN file sensibile
-(credenziali, chiavi, .env, token, database locali, file temporanei o cache) venga incluso.
+(credenziali, chiavi, .env, secrets.toml, token, database locali, backup compressi, file temporanei o cache) venga incluso.
 """
 
 import os
@@ -21,7 +21,7 @@ def create_secure_release_zip(version: str = ""):
     if not version and len(sys.argv) > 1:
         version = sys.argv[1]
     if not version:
-        version = "v9.0.0"
+        version = "v10.0.0"
     if not version.startswith("v"):
         version = f"v{version}"
     
@@ -35,16 +35,30 @@ def create_secure_release_zip(version: str = ""):
     # Cartelle e file rigorosamente ESCLUSI
     EXCLUDED_DIRS = {
         ".git", ".github", ".agents", ".dsp", ".pytest_cache", ".ruff_cache",
-        "__pycache__", "scratch", "logs", "build", "dist", ".venv", "venv",
-        "ENV", ".gemini", ".idea", ".vscode"
+        "__pycache__", "scratch", "_temp_scripts", "logs", "build", "dist",
+        ".venv", "venv", "ENV", ".gemini", ".idea", ".vscode",
+        "backups", "cache", "multi_portfolios", "tax_documents_vault",
+        "vault_backups", "exports", ".ipynb_checkpoints", "site", "htmlcov",
+        "credentials"
     }
     
     EXCLUDED_FILE_PATTERNS = [
         r"^\.env$",
         r"^\.env\..*$",
+        r"^secrets\.toml$",
+        r"^Transactions\.csv$",
+        r"^\.coverage$",
+        r"^coverage\.xml$",
+        r"^uv\.lock$",
         r".*\.sqlite$",
         r".*\.sqlite3$",
         r".*\.db$",
+        r".*\.db\.gz$",
+        r".*\.gz$",
+        r".*\.pkl$",
+        r".*\.parquet$",
+        r".*\.duckdb$",
+        r".*\.enc$",
         r".*\.py[cod]$",
         r".*\.log$",
         r".*credentials.*\.json$",
@@ -69,7 +83,7 @@ def create_secure_release_zip(version: str = ""):
     
     for root, dirs, files in os.walk(project_dir):
         # Filtra cartelle escluse inline
-        dirs[:] = [d for d in dirs if d not in EXCLUDED_DIRS and not d.startswith(".agent")]
+        dirs[:] = [d for d in dirs if d not in EXCLUDED_DIRS and not d.startswith(".agent") and not d.endswith(".egg-info")]
         
         rel_root = os.path.relpath(root, project_dir)
         if rel_root == ".":
@@ -100,11 +114,17 @@ def create_secure_release_zip(version: str = ""):
         "sk" + "-proj-",
         "AI" + "zaSy",
         "BEGIN" + " PRIVATE KEY",
-        "BEGIN" + " RSA PRIVATE KEY"
+        "BEGIN" + " RSA PRIVATE KEY",
+        "Modena" + "works"
     ]
     flagged_files = []
+    SAFE_EXAMPLE_MOCK_FILES = {
+        "scripts/package_release.py",
+        "gsheets_sync_subproject/google_service_account.json.example",
+        "gsheets_sync_subproject/tests/test_gsheets_sync.py",
+    }
     for full_p, rel_p in files_to_zip:
-        if rel_p == "scripts/package_release.py":
+        if rel_p in SAFE_EXAMPLE_MOCK_FILES:
             continue
         try:
             with open(full_p, "r", encoding="utf-8", errors="ignore") as file_handle:

@@ -971,7 +971,7 @@ def create_app() -> FastAPI:
             "EBA Reverse Stress Testing, Fama-French multi-factor attribution, Fixed Income YAS, "
             "and ISO/IEC 9075:2011 bitemporal ledger time-travel reconstruction."
         ),
-        version="9.19.0",
+        version="10.0.0",
         docs_url="/docs",
         redoc_url="/redoc",
     )
@@ -996,7 +996,7 @@ def create_app() -> FastAPI:
         from core.bitemporal_engine import HAS_DUCKDB
         return HealthResponse(
             status="healthy",
-            version="9.19.0",
+            version="10.0.0",
             engine="ARGUS Headless Core",
             duckdb_available=HAS_DUCKDB,
             timestamp=datetime.now(timezone.utc).isoformat()
@@ -2215,7 +2215,7 @@ def create_app() -> FastAPI:
             session_state_dict={"global_macro_shock": eff_shock},
         )
         return {
-            "version": "9.19.0",
+            "version": "10.0.0",
             "command_resolution": cmd_res,
             "shocked_inputs": shocked_inputs,
         }
@@ -2248,7 +2248,7 @@ def create_app() -> FastAPI:
             batch_seal = verdicts[0].audit_hash if verdicts else ""
             all_approved = all(v.passed for v in verdicts)
             return {
-                "version": "9.19.0",
+                "version": "10.0.0",
                 "all_approved": all_approved,
                 "batch_audit_seal": batch_seal,
                 "orders_evaluated": len(verdicts),
@@ -2265,7 +2265,7 @@ def create_app() -> FastAPI:
             df_pos = pd.DataFrame(req.positions) if req.positions else None
             res = evaluate_macro_stress_scenario(req.scenario_key, df_positions=df_pos)
             return {
-                "version": "9.19.0",
+                "version": "10.0.0",
                 "scenario_evaluation": res,
             }
         except Exception as exc:
@@ -2286,7 +2286,7 @@ def create_app() -> FastAPI:
             if "df_comparison" in res and hasattr(res["df_comparison"], "to_dict"):
                 res["df_comparison"] = res["df_comparison"].to_dict(orient="records")
             return {
-                "version": "9.19.0",
+                "version": "10.0.0",
                 **res,
             }
         except Exception as exc:

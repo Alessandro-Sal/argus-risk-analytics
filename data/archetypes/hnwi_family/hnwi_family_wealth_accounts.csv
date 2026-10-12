@@ -1,0 +1,6 @@
+account_id,name,account_type,institution,currency,balance,notes
+1,Conto Corrente Principale,checking,FinecoBank,EUR,239179.62,Conto operativo stipendio e spese
+2,Conto Deposito Risparmio,savings,Illimity Bank,EUR,200000.0,Riserva di risparmio a rendimento
+3,Fondo Emergenza Dedicato,emergency_fund,Banca Mediolanum,EUR,60000.0,Cuscino di liquidità per imprevisti
+4,Brokerage Cash Liquidità,brokerage_cash,Directa / IBKR,EUR,227873.46,Liquidità per trading e investimenti
+5,Mutuo Ipotecario Prima Casa,mortgage,Intesa Sanpaolo,EUR,-369770.13,Mutuo Francese 2.85% su 20 anni

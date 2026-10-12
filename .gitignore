@@ -52,6 +52,8 @@ data/*
 !data/portfolio_transactions_realistic.csv
 !data/wealth/
 !data/wealth/template_*.csv
+!data/archetypes/
+!data/archetypes/**
 
 # Exports and Generated Reports (NEVER tracked by git)
 exports/*
@@ -69,9 +71,10 @@ gsheets_sync_subproject/logs/
 !docs/argus-architecture.json
 !core/i18n/locales/*.json
 
-# PyInstaller builds
+# PyInstaller builds & Release Archives
 build/
-dist/
+dist/*
+!dist/ARGUS_v10.0.0.zip
 *.spec
 !argus_desktop.spec
 

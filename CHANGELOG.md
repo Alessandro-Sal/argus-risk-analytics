@@ -7,6 +7,38 @@ e questo progetto aderisce a [Semantic Versioning](https://semver.org/lang/it/).
 
 ---
 
+## [10.0.0] - 2026-10-12
+
+### ☁️ Institutional Multi-User Cloud Architecture, Supabase PostgreSQL Persistence, Zero-Leakage Data Isolation, BYOD Vault & Fiscal Intelligence Suite
+
+Questa major release (`v10.0.0`) trasforma ARGUS in una piattaforma **Cloud-Native Multi-Tenant** pronta per il deployment pubblico (Streamlit Community Cloud + Supabase PostgreSQL), mantenendo la piena compatibilità offline su SQLite locale e arricchendo il motore fiscale italiano:
+
+- **Motore di Persistenza Ibrido Cloud PostgreSQL ⇄ SQLite (`core/cloud_db.py`)**:
+  - Implementazione di `ArgusConnectionProxy` e `ArgusCursorProxy` per l'astrazione trasparente tra **PostgreSQL 16 (Supabase Cloud EU-West-1)** tramite SQLAlchemy `QueuePool` (`pool_size=5`, `max_overflow=10`, `pool_pre_ping=True`, `sslmode=require`) e **SQLite locale (`data/argus_local.db`)**.
+  - Traduzione automatica del dialetto SQL (`INTEGER PRIMARY KEY AUTOINCREMENT` $\to$ `SERIAL PRIMARY KEY`, `INSERT OR IGNORE` $\to$ `ON CONFLICT DO NOTHING`, conversione parametri posizionali `?` in bind nominativi `:p0, :p1` e gestione automatica di `lastrowid`).
+- **Pre-Splash Institutional Cloud Auth Gate & PBKDF2-SHA256 User Vault (`core/cloud_auth.py`, `components/splash.py`, `core/sidebar.py`)**:
+  - Portale di autenticazione full-screen (`render_cloud_auth_gate`) eseguito prima dello splash screen per proteggere l'accesso ai dati fin dal primo caricamento.
+  - Gestione utenti multi-tenant nella tabella `argus_cloud_users` con hashing password **PBKDF2-HMAC-SHA256** (120.000 iterazioni, salt crittografico casuale a 16 byte e confronto in tempo costante `hmac.compare_digest`).
+  - Supporto nativo per invio con tasto `Invio` (`st.form`), validazione della complessità password e 3 modalità di ingresso: **🔑 Accedi al tuo Vault**, **📝 Crea Nuovo Account** e **🧪 Esplora in Modalità Demo (1-Click)**.
+  - **Account Identity Badge** (`👑 Owner`, `🔐 Cloud Member`, `🧪 Demo Sandbox`) e pulsante rapido **🚪 Logout / Cambia Account** sempre visibili sia nella barra superiore della Control Room sia nella Sidebar globale.
+- **Isolamento Multi-Tenant Zero-Leakage & BYOD Database Override (`core/wealth/wealth_db.py`, `core/db_exporter.py`, `src/0_Control_Room.py`)**:
+  - Risoluzione e blindatura di tutte le query su oltre 30 tabelle patrimoniali tramite `_resolve_isolated_portfolio_filter(conn)`: rimosso qualsiasi fallback statico a `portfolio_id = 1`, garantendo che ogni utente visualizzi esclusivamente il proprio `personal_profile_id` e i 3 profili archetipali didattici (`hnwi_family`, `young_accumulator`, `fire_decumulation`).
+  - Prenotazione deterministica di `profile_id = 1` (`Personale`, `owner='user'`) in `init_wealth_db()` per impedire collisioni con gli archetipi sintetici (`id >= 2`).
+  - Isolamento per utente dei portafogli e degli snapshot di rischio (`argus_portfolios` e `argus_portfolio_snapshots` filtrati per `owner_username`).
+  - Supporto **BYOD (Bring Your Own Database)**: possibilità per ciascun utente di connettere in sessione una propria stringa di connessione PostgreSQL dedicata (Supabase/Neon) senza esporla ad altri utenti.
+- **Suite Fiscale Italiana & Pianificazione Patrimoniale Avanzata (`core/tax_engine.py`, `core/wealth/tax_wealth_engine.py`, `src/pages/6_🧾_Ottimizzazione_Fiscale.py`, `src/pages/18_🏛️_Pianificazione_Fiscale.py`)**:
+  - Doppio metodo di calcolo del costo fiscale: **Costo Medio Ponderato (Art. 67-68 TUIR)** vs simulatore LIFO, con selettore interattivo e badge metodologico.
+  - Adeguamento normativo Cripto-attività 2026 (aliquota 33% su detenzione diretta vs 26% su ETN/ETC armonizzati con efficienza di compensazione).
+  - Calcolatore **Quadro RW, IVAFE (0,2% ordinaria vs 0,4% Paesi Blacklist) e IVIE (1,06%)** con verifica soglie di esenzione (€5.000 giacenza media / €15.000 picco per conti esteri; €200 franchigia IVIE).
+  - Matrice di compensazione **Redditi di Capitale vs Redditi Diversi** e scadenziario quadriennale dello **Zainetto Fiscale ($T+4$)** con alert di scadenza e simulatore di **Stress Test Normativo**.
+- **Audit di Sicurezza, Pulizia Dati Sensibili & Packaging Release v10.0.0 (`scripts/package_release.py`, `.gitignore`, `SECURITY.md`)**:
+  - Hardening dello script `scripts/package_release.py` con esclusione tassativa di backup compressi (`*.db.gz`), cache (`data/cache`), pickle (`*.pkl`), transazioni personali (`Transactions.csv`), `.streamlit/secrets.toml` e verifica automatica di assenza di keyword sensibili.
+  - Generazione dell'archivio pulito `dist/ARGUS_v10.0.0.zip` e inclusione degli archetipi sintetici `data/archetypes/` nel repository.
+- **Test Suite PyTest Espansa a 888 Test (100% Pass Rate)**:
+  - Aggiunta la suite `tests/test_supabase_cloud.py` per la verifica end-to-end dell'isolamento multi-utente, dell'autenticazione PBKDF2-SHA256 e della persistenza ibrida.
+
+---
+
 ## [9.19.0] - 2026-10-04
 
 ### 🔬 Quant Risk Audit, Exact Euler Homogeneity, Multi-Asset Calendar Harmonization & Dynamic Wealth-Risk Liquidity Bridge

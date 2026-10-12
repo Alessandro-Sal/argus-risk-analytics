@@ -1,6 +1,6 @@
 # ============================================================
 # 0_Control_Room.py (Main Entry Point)
-# ARGUS Risk Analytics & Wealth Ecosystem | Control Room v9.19.0
+# ARGUS Risk Analytics & Wealth Ecosystem | Control Room v10.0.0
 # ============================================================
 
 import sys
@@ -1887,7 +1887,7 @@ with tab_diagnostics:
             </div>
             """, unsafe_allow_html=True)
 
-            # ── V9.19.0: ARGUS DATA VAULT AT-REST SECURITY & ENCRYPTED SNAPSHOT ──
+            # ── V10.0.0: ARGUS DATA VAULT AT-REST SECURITY & ENCRYPTED SNAPSHOT ──
             import hashlib
             from pathlib import Path
 

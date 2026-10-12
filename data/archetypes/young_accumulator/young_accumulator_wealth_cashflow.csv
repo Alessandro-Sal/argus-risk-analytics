@@ -1,0 +1,381 @@
+account_name,account_id,category_id,category_name,tx_date,amount,currency,direction,merchant,notes,is_recurring,payment_method,tags
+Conto Corrente Principale,1,1,Stipendio / Compensi,2023-09-01,2600.0,EUR,inflow,Datore di Lavoro / Studio,Accredito stipendio netto mese 9/2023,1,Bonifico Sepa,"stipendio,lavoro_attivo"
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2023-09-07,750.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2023-09-07,120.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2023-09-07,320.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2023-09-07,90.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,19,PAC / Investimenti Titoli,2023-09-08,850.0,EUR,transfer,Directa SIM / Fineco Trading,Giroconto per alimentazione PAC periodico 9/2023,1,Giroconto,"saving_investment,pac"
+Conto Corrente Principale,1,20,Versamento Fondo Pensione,2023-09-13,120.0,EUR,outflow,Amundi SGR,"Contribuzione SecondaPensione Espansione (Deducibilità annua max €5.164,57)",1,Bonifico / SDD,"previdenza,fondo_pensione,deducibile"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2023-09-15,29.95,GBP,inflow,VWRL.L Payout,Stacco dividendo 59 azioni @ 0.5077,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2023-09-15,5.65,USD,inflow,QQQ Payout,Stacco dividendo 8 azioni @ 0.7064,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2023-09-19,171.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2023-09-23,209.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,1,Stipendio / Compensi,2023-10-02,2609.55,EUR,inflow,Datore di Lavoro / Studio,Accredito stipendio netto mese 10/2023,1,Bonifico Sepa,"stipendio,lavoro_attivo"
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2023-10-07,750.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2023-10-07,120.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2023-10-07,320.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2023-10-07,90.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,19,PAC / Investimenti Titoli,2023-10-09,850.0,EUR,transfer,Directa SIM / Fineco Trading,Giroconto per alimentazione PAC periodico 10/2023,1,Giroconto,"saving_investment,pac"
+Conto Corrente Principale,1,20,Versamento Fondo Pensione,2023-10-13,120.0,EUR,outflow,Amundi SGR,"Contribuzione SecondaPensione Espansione (Deducibilità annua max €5.164,57)",1,Bonifico / SDD,"previdenza,fondo_pensione,deducibile"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2023-10-19,171.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2023-10-23,209.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,1,Stipendio / Compensi,2023-11-01,2619.14,EUR,inflow,Datore di Lavoro / Studio,Accredito stipendio netto mese 11/2023,1,Bonifico Sepa,"stipendio,lavoro_attivo"
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2023-11-07,750.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2023-11-07,120.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2023-11-07,320.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2023-11-07,90.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,19,PAC / Investimenti Titoli,2023-11-08,850.0,EUR,transfer,Directa SIM / Fineco Trading,Giroconto per alimentazione PAC periodico 11/2023,1,Giroconto,"saving_investment,pac"
+Conto Corrente Principale,1,20,Versamento Fondo Pensione,2023-11-13,120.0,EUR,outflow,Amundi SGR,"Contribuzione SecondaPensione Espansione (Deducibilità annua max €5.164,57)",1,Bonifico / SDD,"previdenza,fondo_pensione,deducibile"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2023-11-15,2.7,USD,inflow,AAPL Payout,Stacco dividendo 11 azioni @ 0.2452,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2023-11-19,171.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2023-11-23,209.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,1,Stipendio / Compensi,2023-12-01,2628.77,EUR,inflow,Datore di Lavoro / Studio,Accredito stipendio netto mese 12/2023,1,Bonifico Sepa,"stipendio,lavoro_attivo"
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2023-12-07,750.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2023-12-07,120.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2023-12-07,320.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2023-12-07,90.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,19,PAC / Investimenti Titoli,2023-12-08,850.0,EUR,transfer,Directa SIM / Fineco Trading,Giroconto per alimentazione PAC periodico 12/2023,1,Giroconto,"saving_investment,pac"
+Conto Corrente Principale,1,20,Versamento Fondo Pensione,2023-12-13,120.0,EUR,outflow,Amundi SGR,"Contribuzione SecondaPensione Espansione (Deducibilità annua max €5.164,57)",1,Bonifico / SDD,"previdenza,fondo_pensione,deducibile"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2023-12-15,34.37,GBP,inflow,VWRL.L Payout,Stacco dividendo 68 azioni @ 0.5055,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2023-12-15,7.5,USD,inflow,QQQ Payout,Stacco dividendo 11 azioni @ 0.6816,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2023-12-15,0.62,USD,inflow,NVDA Payout,Stacco dividendo 15 azioni @ 0.0412,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2023-12-19,171.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2023-12-23,209.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,1,Stipendio / Compensi,2024-01-02,2638.43,EUR,inflow,Datore di Lavoro / Studio,Accredito stipendio netto mese 1/2024,1,Bonifico Sepa,"stipendio,lavoro_attivo"
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2024-01-07,750.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2024-01-07,120.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2024-01-07,320.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2024-01-07,90.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,19,PAC / Investimenti Titoli,2024-01-08,850.0,EUR,transfer,Directa SIM / Fineco Trading,Giroconto per alimentazione PAC periodico 1/2024,1,Giroconto,"saving_investment,pac"
+Conto Corrente Principale,1,20,Versamento Fondo Pensione,2024-01-13,120.0,EUR,outflow,Amundi SGR,"Contribuzione SecondaPensione Espansione (Deducibilità annua max €5.164,57)",1,Bonifico / SDD,"previdenza,fondo_pensione,deducibile"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2024-01-19,171.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2024-01-23,209.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,1,Stipendio / Compensi,2024-02-01,2648.12,EUR,inflow,Datore di Lavoro / Studio,Accredito stipendio netto mese 2/2024,1,Bonifico Sepa,"stipendio,lavoro_attivo"
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2024-02-07,750.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2024-02-07,120.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2024-02-07,320.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2024-02-07,90.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,19,PAC / Investimenti Titoli,2024-02-08,850.0,EUR,transfer,Directa SIM / Fineco Trading,Giroconto per alimentazione PAC periodico 2/2024,1,Giroconto,"saving_investment,pac"
+Conto Corrente Principale,1,20,Versamento Fondo Pensione,2024-02-13,120.0,EUR,outflow,Amundi SGR,"Contribuzione SecondaPensione Espansione (Deducibilità annua max €5.164,57)",1,Bonifico / SDD,"previdenza,fondo_pensione,deducibile"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-02-15,3.53,USD,inflow,AAPL Payout,Stacco dividendo 14 azioni @ 0.2523,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2024-02-19,171.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2024-02-23,209.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,1,Stipendio / Compensi,2024-03-01,2657.86,EUR,inflow,Datore di Lavoro / Studio,Accredito stipendio netto mese 3/2024,1,Bonifico Sepa,"stipendio,lavoro_attivo"
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2024-03-07,750.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2024-03-07,120.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2024-03-07,320.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2024-03-07,90.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,19,PAC / Investimenti Titoli,2024-03-08,850.0,EUR,transfer,Directa SIM / Fineco Trading,Giroconto per alimentazione PAC periodico 3/2024,1,Giroconto,"saving_investment,pac"
+Conto Corrente Principale,1,20,Versamento Fondo Pensione,2024-03-13,120.0,EUR,outflow,Amundi SGR,"Contribuzione SecondaPensione Espansione (Deducibilità annua max €5.164,57)",1,Bonifico / SDD,"previdenza,fondo_pensione,deducibile"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-03-15,38.15,GBP,inflow,VWRL.L Payout,Stacco dividendo 77 azioni @ 0.4954,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-03-15,9.78,USD,inflow,QQQ Payout,Stacco dividendo 14 azioni @ 0.6987,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-03-15,0.74,USD,inflow,NVDA Payout,Stacco dividendo 18 azioni @ 0.0409,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2024-03-19,171.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2024-03-23,209.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,1,Stipendio / Compensi,2024-04-01,2667.62,EUR,inflow,Datore di Lavoro / Studio,Accredito stipendio netto mese 4/2024,1,Bonifico Sepa,"stipendio,lavoro_attivo"
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2024-04-07,750.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2024-04-07,120.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2024-04-07,320.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2024-04-07,90.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,19,PAC / Investimenti Titoli,2024-04-08,850.0,EUR,transfer,Directa SIM / Fineco Trading,Giroconto per alimentazione PAC periodico 4/2024,1,Giroconto,"saving_investment,pac"
+Conto Corrente Principale,1,20,Versamento Fondo Pensione,2024-04-13,120.0,EUR,outflow,Amundi SGR,"Contribuzione SecondaPensione Espansione (Deducibilità annua max €5.164,57)",1,Bonifico / SDD,"previdenza,fondo_pensione,deducibile"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2024-04-19,171.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2024-04-23,209.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,1,Stipendio / Compensi,2024-05-02,2677.43,EUR,inflow,Datore di Lavoro / Studio,Accredito stipendio netto mese 5/2024,1,Bonifico Sepa,"stipendio,lavoro_attivo"
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2024-05-07,750.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2024-05-07,120.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2024-05-07,320.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2024-05-07,90.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,19,PAC / Investimenti Titoli,2024-05-08,850.0,EUR,transfer,Directa SIM / Fineco Trading,Giroconto per alimentazione PAC periodico 5/2024,1,Giroconto,"saving_investment,pac"
+Conto Corrente Principale,1,20,Versamento Fondo Pensione,2024-05-13,120.0,EUR,outflow,Amundi SGR,"Contribuzione SecondaPensione Espansione (Deducibilità annua max €5.164,57)",1,Bonifico / SDD,"previdenza,fondo_pensione,deducibile"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-05-15,4.16,USD,inflow,AAPL Payout,Stacco dividendo 17 azioni @ 0.2450,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2024-05-19,171.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2024-05-23,209.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,1,Stipendio / Compensi,2024-06-03,2687.27,EUR,inflow,Datore di Lavoro / Studio,Accredito stipendio netto mese 6/2024,1,Bonifico Sepa,"stipendio,lavoro_attivo"
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2024-06-07,750.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2024-06-07,120.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2024-06-07,320.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2024-06-07,90.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,19,PAC / Investimenti Titoli,2024-06-10,850.0,EUR,transfer,Directa SIM / Fineco Trading,Giroconto per alimentazione PAC periodico 6/2024,1,Giroconto,"saving_investment,pac"
+Conto Corrente Principale,1,20,Versamento Fondo Pensione,2024-06-13,120.0,EUR,outflow,Amundi SGR,"Contribuzione SecondaPensione Espansione (Deducibilità annua max €5.164,57)",1,Bonifico / SDD,"previdenza,fondo_pensione,deducibile"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-06-17,41.82,GBP,inflow,VWRL.L Payout,Stacco dividendo 86 azioni @ 0.4863,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-06-17,11.38,USD,inflow,QQQ Payout,Stacco dividendo 17 azioni @ 0.6694,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-06-17,0.85,USD,inflow,NVDA Payout,Stacco dividendo 21 azioni @ 0.0407,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2024-06-19,171.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2024-06-23,209.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,1,Stipendio / Compensi,2024-07-01,2697.14,EUR,inflow,Datore di Lavoro / Studio,Accredito stipendio netto mese 7/2024,1,Bonifico Sepa,"stipendio,lavoro_attivo"
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2024-07-07,750.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2024-07-07,120.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2024-07-07,320.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2024-07-07,90.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,19,PAC / Investimenti Titoli,2024-07-08,850.0,EUR,transfer,Directa SIM / Fineco Trading,Giroconto per alimentazione PAC periodico 7/2024,1,Giroconto,"saving_investment,pac"
+Conto Corrente Principale,1,20,Versamento Fondo Pensione,2024-07-13,120.0,EUR,outflow,Amundi SGR,"Contribuzione SecondaPensione Espansione (Deducibilità annua max €5.164,57)",1,Bonifico / SDD,"previdenza,fondo_pensione,deducibile"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2024-07-19,171.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2024-07-23,209.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,1,Stipendio / Compensi,2024-08-01,2707.05,EUR,inflow,Datore di Lavoro / Studio,Accredito stipendio netto mese 8/2024,1,Bonifico Sepa,"stipendio,lavoro_attivo"
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2024-08-07,750.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2024-08-07,120.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2024-08-07,320.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2024-08-07,90.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,19,PAC / Investimenti Titoli,2024-08-08,850.0,EUR,transfer,Directa SIM / Fineco Trading,Giroconto per alimentazione PAC periodico 8/2024,1,Giroconto,"saving_investment,pac"
+Conto Corrente Principale,1,20,Versamento Fondo Pensione,2024-08-13,120.0,EUR,outflow,Amundi SGR,"Contribuzione SecondaPensione Espansione (Deducibilità annua max €5.164,57)",1,Bonifico / SDD,"previdenza,fondo_pensione,deducibile"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-08-16,5.1,USD,inflow,AAPL Payout,Stacco dividendo 20 azioni @ 0.2549,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2024-08-19,171.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2024-08-23,209.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,1,Stipendio / Compensi,2024-09-03,2717.0,EUR,inflow,Datore di Lavoro / Studio,Accredito stipendio netto mese 9/2024,1,Bonifico Sepa,"stipendio,lavoro_attivo"
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2024-09-07,750.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2024-09-07,120.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2024-09-07,320.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2024-09-07,90.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,19,PAC / Investimenti Titoli,2024-09-09,850.0,EUR,transfer,Directa SIM / Fineco Trading,Giroconto per alimentazione PAC periodico 9/2024,1,Giroconto,"saving_investment,pac"
+Conto Corrente Principale,1,20,Versamento Fondo Pensione,2024-09-13,120.0,EUR,outflow,Amundi SGR,"Contribuzione SecondaPensione Espansione (Deducibilità annua max €5.164,57)",1,Bonifico / SDD,"previdenza,fondo_pensione,deducibile"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-09-16,47.02,GBP,inflow,VWRL.L Payout,Stacco dividendo 95 azioni @ 0.4950,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-09-16,13.5,USD,inflow,QQQ Payout,Stacco dividendo 20 azioni @ 0.6750,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-09-16,0.99,USD,inflow,NVDA Payout,Stacco dividendo 24 azioni @ 0.0414,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2024-09-19,171.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2024-09-23,209.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,1,Stipendio / Compensi,2024-10-01,2726.98,EUR,inflow,Datore di Lavoro / Studio,Accredito stipendio netto mese 10/2024,1,Bonifico Sepa,"stipendio,lavoro_attivo"
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2024-10-07,750.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2024-10-07,120.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2024-10-07,320.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2024-10-07,90.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,19,PAC / Investimenti Titoli,2024-10-08,850.0,EUR,transfer,Directa SIM / Fineco Trading,Giroconto per alimentazione PAC periodico 10/2024,1,Giroconto,"saving_investment,pac"
+Conto Corrente Principale,1,20,Versamento Fondo Pensione,2024-10-13,120.0,EUR,outflow,Amundi SGR,"Contribuzione SecondaPensione Espansione (Deducibilità annua max €5.164,57)",1,Bonifico / SDD,"previdenza,fondo_pensione,deducibile"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2024-10-19,171.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2024-10-23,209.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,1,Stipendio / Compensi,2024-11-01,2737.01,EUR,inflow,Datore di Lavoro / Studio,Accredito stipendio netto mese 11/2024,1,Bonifico Sepa,"stipendio,lavoro_attivo"
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2024-11-07,750.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2024-11-07,120.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2024-11-07,320.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2024-11-07,90.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,19,PAC / Investimenti Titoli,2024-11-08,850.0,EUR,transfer,Directa SIM / Fineco Trading,Giroconto per alimentazione PAC periodico 11/2024,1,Giroconto,"saving_investment,pac"
+Conto Corrente Principale,1,20,Versamento Fondo Pensione,2024-11-13,120.0,EUR,outflow,Amundi SGR,"Contribuzione SecondaPensione Espansione (Deducibilità annua max €5.164,57)",1,Bonifico / SDD,"previdenza,fondo_pensione,deducibile"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-11-15,5.92,USD,inflow,AAPL Payout,Stacco dividendo 23 azioni @ 0.2573,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2024-11-19,171.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2024-11-23,209.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,1,Stipendio / Compensi,2024-12-02,2747.06,EUR,inflow,Datore di Lavoro / Studio,Accredito stipendio netto mese 12/2024,1,Bonifico Sepa,"stipendio,lavoro_attivo"
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2024-12-07,750.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2024-12-07,120.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2024-12-07,320.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2024-12-07,90.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,19,PAC / Investimenti Titoli,2024-12-09,850.0,EUR,transfer,Directa SIM / Fineco Trading,Giroconto per alimentazione PAC periodico 12/2024,1,Giroconto,"saving_investment,pac"
+Conto Corrente Principale,1,20,Versamento Fondo Pensione,2024-12-13,120.0,EUR,outflow,Amundi SGR,"Contribuzione SecondaPensione Espansione (Deducibilità annua max €5.164,57)",1,Bonifico / SDD,"previdenza,fondo_pensione,deducibile"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-12-16,50.04,GBP,inflow,VWRL.L Payout,Stacco dividendo 104 azioni @ 0.4812,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-12-16,15.58,USD,inflow,QQQ Payout,Stacco dividendo 23 azioni @ 0.6775,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2024-12-16,1.13,USD,inflow,NVDA Payout,Stacco dividendo 27 azioni @ 0.0420,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2024-12-19,171.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2024-12-23,209.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,1,Stipendio / Compensi,2025-01-02,2757.16,EUR,inflow,Datore di Lavoro / Studio,Accredito stipendio netto mese 1/2025,1,Bonifico Sepa,"stipendio,lavoro_attivo"
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2025-01-07,750.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2025-01-07,120.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2025-01-07,320.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2025-01-07,90.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,19,PAC / Investimenti Titoli,2025-01-08,850.0,EUR,transfer,Directa SIM / Fineco Trading,Giroconto per alimentazione PAC periodico 1/2025,1,Giroconto,"saving_investment,pac"
+Conto Corrente Principale,1,20,Versamento Fondo Pensione,2025-01-13,120.0,EUR,outflow,Amundi SGR,"Contribuzione SecondaPensione Espansione (Deducibilità annua max €5.164,57)",1,Bonifico / SDD,"previdenza,fondo_pensione,deducibile"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2025-01-19,171.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2025-01-23,209.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,1,Stipendio / Compensi,2025-02-03,2767.29,EUR,inflow,Datore di Lavoro / Studio,Accredito stipendio netto mese 2/2025,1,Bonifico Sepa,"stipendio,lavoro_attivo"
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2025-02-07,750.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2025-02-07,120.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2025-02-07,320.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2025-02-07,90.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,19,PAC / Investimenti Titoli,2025-02-10,850.0,EUR,transfer,Directa SIM / Fineco Trading,Giroconto per alimentazione PAC periodico 2/2025,1,Giroconto,"saving_investment,pac"
+Conto Corrente Principale,1,20,Versamento Fondo Pensione,2025-02-13,120.0,EUR,outflow,Amundi SGR,"Contribuzione SecondaPensione Espansione (Deducibilità annua max €5.164,57)",1,Bonifico / SDD,"previdenza,fondo_pensione,deducibile"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-02-18,6.62,USD,inflow,AAPL Payout,Stacco dividendo 26 azioni @ 0.2548,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2025-02-19,171.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2025-02-23,209.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,1,Stipendio / Compensi,2025-03-03,2777.46,EUR,inflow,Datore di Lavoro / Studio,Accredito stipendio netto mese 3/2025,1,Bonifico Sepa,"stipendio,lavoro_attivo"
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2025-03-07,750.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2025-03-07,120.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2025-03-07,320.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2025-03-07,90.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,19,PAC / Investimenti Titoli,2025-03-10,850.0,EUR,transfer,Directa SIM / Fineco Trading,Giroconto per alimentazione PAC periodico 3/2025,1,Giroconto,"saving_investment,pac"
+Conto Corrente Principale,1,20,Versamento Fondo Pensione,2025-03-13,120.0,EUR,outflow,Amundi SGR,"Contribuzione SecondaPensione Espansione (Deducibilità annua max €5.164,57)",1,Bonifico / SDD,"previdenza,fondo_pensione,deducibile"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-03-17,56.52,GBP,inflow,VWRL.L Payout,Stacco dividendo 113 azioni @ 0.5002,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-03-17,17.33,USD,inflow,QQQ Payout,Stacco dividendo 26 azioni @ 0.6665,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-03-17,1.18,USD,inflow,NVDA Payout,Stacco dividendo 30 azioni @ 0.0393,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2025-03-19,171.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2025-03-23,209.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,1,Stipendio / Compensi,2025-04-01,2787.67,EUR,inflow,Datore di Lavoro / Studio,Accredito stipendio netto mese 4/2025,1,Bonifico Sepa,"stipendio,lavoro_attivo"
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2025-04-07,750.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2025-04-07,120.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2025-04-07,320.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2025-04-07,90.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,19,PAC / Investimenti Titoli,2025-04-08,850.0,EUR,transfer,Directa SIM / Fineco Trading,Giroconto per alimentazione PAC periodico 4/2025,1,Giroconto,"saving_investment,pac"
+Conto Corrente Principale,1,20,Versamento Fondo Pensione,2025-04-13,120.0,EUR,outflow,Amundi SGR,"Contribuzione SecondaPensione Espansione (Deducibilità annua max €5.164,57)",1,Bonifico / SDD,"previdenza,fondo_pensione,deducibile"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2025-04-19,171.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2025-04-23,209.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,1,Stipendio / Compensi,2025-05-02,2797.91,EUR,inflow,Datore di Lavoro / Studio,Accredito stipendio netto mese 5/2025,1,Bonifico Sepa,"stipendio,lavoro_attivo"
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2025-05-07,750.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2025-05-07,120.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2025-05-07,320.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2025-05-07,90.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,19,PAC / Investimenti Titoli,2025-05-08,850.0,EUR,transfer,Directa SIM / Fineco Trading,Giroconto per alimentazione PAC periodico 5/2025,1,Giroconto,"saving_investment,pac"
+Conto Corrente Principale,1,20,Versamento Fondo Pensione,2025-05-13,120.0,EUR,outflow,Amundi SGR,"Contribuzione SecondaPensione Espansione (Deducibilità annua max €5.164,57)",1,Bonifico / SDD,"previdenza,fondo_pensione,deducibile"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-05-15,7.46,USD,inflow,AAPL Payout,Stacco dividendo 29 azioni @ 0.2571,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2025-05-19,171.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2025-05-23,209.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,1,Stipendio / Compensi,2025-06-02,2808.19,EUR,inflow,Datore di Lavoro / Studio,Accredito stipendio netto mese 6/2025,1,Bonifico Sepa,"stipendio,lavoro_attivo"
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2025-06-07,750.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2025-06-07,120.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2025-06-07,320.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2025-06-07,90.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,19,PAC / Investimenti Titoli,2025-06-09,850.0,EUR,transfer,Directa SIM / Fineco Trading,Giroconto per alimentazione PAC periodico 6/2025,1,Giroconto,"saving_investment,pac"
+Conto Corrente Principale,1,20,Versamento Fondo Pensione,2025-06-13,120.0,EUR,outflow,Amundi SGR,"Contribuzione SecondaPensione Espansione (Deducibilità annua max €5.164,57)",1,Bonifico / SDD,"previdenza,fondo_pensione,deducibile"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-06-16,58.84,GBP,inflow,VWRL.L Payout,Stacco dividendo 122 azioni @ 0.4823,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-06-16,19.87,USD,inflow,QQQ Payout,Stacco dividendo 29 azioni @ 0.6852,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-06-16,1.35,USD,inflow,NVDA Payout,Stacco dividendo 33 azioni @ 0.0409,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2025-06-19,171.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2025-06-23,209.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,1,Stipendio / Compensi,2025-07-01,2818.51,EUR,inflow,Datore di Lavoro / Studio,Accredito stipendio netto mese 7/2025,1,Bonifico Sepa,"stipendio,lavoro_attivo"
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2025-07-07,750.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2025-07-07,120.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2025-07-07,320.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2025-07-07,90.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,19,PAC / Investimenti Titoli,2025-07-08,850.0,EUR,transfer,Directa SIM / Fineco Trading,Giroconto per alimentazione PAC periodico 7/2025,1,Giroconto,"saving_investment,pac"
+Conto Corrente Principale,1,20,Versamento Fondo Pensione,2025-07-13,120.0,EUR,outflow,Amundi SGR,"Contribuzione SecondaPensione Espansione (Deducibilità annua max €5.164,57)",1,Bonifico / SDD,"previdenza,fondo_pensione,deducibile"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2025-07-19,171.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2025-07-23,209.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,1,Stipendio / Compensi,2025-08-01,2828.87,EUR,inflow,Datore di Lavoro / Studio,Accredito stipendio netto mese 8/2025,1,Bonifico Sepa,"stipendio,lavoro_attivo"
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2025-08-07,750.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2025-08-07,120.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2025-08-07,320.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2025-08-07,90.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,19,PAC / Investimenti Titoli,2025-08-08,850.0,EUR,transfer,Directa SIM / Fineco Trading,Giroconto per alimentazione PAC periodico 8/2025,1,Giroconto,"saving_investment,pac"
+Conto Corrente Principale,1,20,Versamento Fondo Pensione,2025-08-13,120.0,EUR,outflow,Amundi SGR,"Contribuzione SecondaPensione Espansione (Deducibilità annua max €5.164,57)",1,Bonifico / SDD,"previdenza,fondo_pensione,deducibile"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-08-18,7.84,USD,inflow,AAPL Payout,Stacco dividendo 32 azioni @ 0.2450,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2025-08-19,171.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2025-08-23,209.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,1,Stipendio / Compensi,2025-09-02,2839.26,EUR,inflow,Datore di Lavoro / Studio,Accredito stipendio netto mese 9/2025,1,Bonifico Sepa,"stipendio,lavoro_attivo"
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2025-09-07,750.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2025-09-07,120.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2025-09-07,320.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2025-09-07,90.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,19,PAC / Investimenti Titoli,2025-09-08,850.0,EUR,transfer,Directa SIM / Fineco Trading,Giroconto per alimentazione PAC periodico 9/2025,1,Giroconto,"saving_investment,pac"
+Conto Corrente Principale,1,20,Versamento Fondo Pensione,2025-09-13,120.0,EUR,outflow,Amundi SGR,"Contribuzione SecondaPensione Espansione (Deducibilità annua max €5.164,57)",1,Bonifico / SDD,"previdenza,fondo_pensione,deducibile"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-09-15,64.87,GBP,inflow,VWRL.L Payout,Stacco dividendo 131 azioni @ 0.4952,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-09-15,21.46,USD,inflow,QQQ Payout,Stacco dividendo 32 azioni @ 0.6706,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-09-15,1.48,USD,inflow,NVDA Payout,Stacco dividendo 36 azioni @ 0.0412,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2025-09-19,171.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2025-09-23,209.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,1,Stipendio / Compensi,2025-10-01,2849.7,EUR,inflow,Datore di Lavoro / Studio,Accredito stipendio netto mese 10/2025,1,Bonifico Sepa,"stipendio,lavoro_attivo"
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2025-10-07,750.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2025-10-07,120.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2025-10-07,320.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2025-10-07,90.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,19,PAC / Investimenti Titoli,2025-10-08,850.0,EUR,transfer,Directa SIM / Fineco Trading,Giroconto per alimentazione PAC periodico 10/2025,1,Giroconto,"saving_investment,pac"
+Conto Corrente Principale,1,20,Versamento Fondo Pensione,2025-10-13,120.0,EUR,outflow,Amundi SGR,"Contribuzione SecondaPensione Espansione (Deducibilità annua max €5.164,57)",1,Bonifico / SDD,"previdenza,fondo_pensione,deducibile"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2025-10-19,171.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2025-10-23,209.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,1,Stipendio / Compensi,2025-11-03,2860.17,EUR,inflow,Datore di Lavoro / Studio,Accredito stipendio netto mese 11/2025,1,Bonifico Sepa,"stipendio,lavoro_attivo"
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2025-11-07,750.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2025-11-07,120.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2025-11-07,320.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2025-11-07,90.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,19,PAC / Investimenti Titoli,2025-11-10,850.0,EUR,transfer,Directa SIM / Fineco Trading,Giroconto per alimentazione PAC periodico 11/2025,1,Giroconto,"saving_investment,pac"
+Conto Corrente Principale,1,20,Versamento Fondo Pensione,2025-11-13,120.0,EUR,outflow,Amundi SGR,"Contribuzione SecondaPensione Espansione (Deducibilità annua max €5.164,57)",1,Bonifico / SDD,"previdenza,fondo_pensione,deducibile"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-11-17,8.61,USD,inflow,AAPL Payout,Stacco dividendo 35 azioni @ 0.2460,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2025-11-19,171.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2025-11-23,209.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,1,Stipendio / Compensi,2025-12-01,2870.68,EUR,inflow,Datore di Lavoro / Studio,Accredito stipendio netto mese 12/2025,1,Bonifico Sepa,"stipendio,lavoro_attivo"
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2025-12-07,750.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2025-12-07,120.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2025-12-07,320.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2025-12-07,90.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,19,PAC / Investimenti Titoli,2025-12-08,850.0,EUR,transfer,Directa SIM / Fineco Trading,Giroconto per alimentazione PAC periodico 12/2025,1,Giroconto,"saving_investment,pac"
+Conto Corrente Principale,1,20,Versamento Fondo Pensione,2025-12-13,120.0,EUR,outflow,Amundi SGR,"Contribuzione SecondaPensione Espansione (Deducibilità annua max €5.164,57)",1,Bonifico / SDD,"previdenza,fondo_pensione,deducibile"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-12-15,67.14,GBP,inflow,VWRL.L Payout,Stacco dividendo 140 azioni @ 0.4796,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-12-15,24.2,USD,inflow,QQQ Payout,Stacco dividendo 35 azioni @ 0.6915,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2025-12-15,1.56,USD,inflow,NVDA Payout,Stacco dividendo 39 azioni @ 0.0401,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2025-12-19,171.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2025-12-23,209.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,1,Stipendio / Compensi,2026-01-02,2881.23,EUR,inflow,Datore di Lavoro / Studio,Accredito stipendio netto mese 1/2026,1,Bonifico Sepa,"stipendio,lavoro_attivo"
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2026-01-07,750.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2026-01-07,120.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2026-01-07,320.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2026-01-07,90.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,19,PAC / Investimenti Titoli,2026-01-08,850.0,EUR,transfer,Directa SIM / Fineco Trading,Giroconto per alimentazione PAC periodico 1/2026,1,Giroconto,"saving_investment,pac"
+Conto Corrente Principale,1,20,Versamento Fondo Pensione,2026-01-13,120.0,EUR,outflow,Amundi SGR,"Contribuzione SecondaPensione Espansione (Deducibilità annua max €5.164,57)",1,Bonifico / SDD,"previdenza,fondo_pensione,deducibile"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2026-01-19,171.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2026-01-23,209.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,1,Stipendio / Compensi,2026-02-02,2891.82,EUR,inflow,Datore di Lavoro / Studio,Accredito stipendio netto mese 2/2026,1,Bonifico Sepa,"stipendio,lavoro_attivo"
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2026-02-07,750.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2026-02-07,120.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2026-02-07,320.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2026-02-07,90.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,19,PAC / Investimenti Titoli,2026-02-09,850.0,EUR,transfer,Directa SIM / Fineco Trading,Giroconto per alimentazione PAC periodico 2/2026,1,Giroconto,"saving_investment,pac"
+Conto Corrente Principale,1,20,Versamento Fondo Pensione,2026-02-13,120.0,EUR,outflow,Amundi SGR,"Contribuzione SecondaPensione Espansione (Deducibilità annua max €5.164,57)",1,Bonifico / SDD,"previdenza,fondo_pensione,deducibile"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2026-02-17,9.77,USD,inflow,AAPL Payout,Stacco dividendo 38 azioni @ 0.2572,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2026-02-19,171.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2026-02-23,209.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,1,Stipendio / Compensi,2026-03-02,2902.45,EUR,inflow,Datore di Lavoro / Studio,Accredito stipendio netto mese 3/2026,1,Bonifico Sepa,"stipendio,lavoro_attivo"
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2026-03-07,750.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2026-03-07,120.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2026-03-07,320.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2026-03-07,90.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,19,PAC / Investimenti Titoli,2026-03-09,850.0,EUR,transfer,Directa SIM / Fineco Trading,Giroconto per alimentazione PAC periodico 3/2026,1,Giroconto,"saving_investment,pac"
+Conto Corrente Principale,1,20,Versamento Fondo Pensione,2026-03-13,120.0,EUR,outflow,Amundi SGR,"Contribuzione SecondaPensione Espansione (Deducibilità annua max €5.164,57)",1,Bonifico / SDD,"previdenza,fondo_pensione,deducibile"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2026-03-16,72.71,GBP,inflow,VWRL.L Payout,Stacco dividendo 149 azioni @ 0.4880,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2026-03-16,25.48,USD,inflow,QQQ Payout,Stacco dividendo 38 azioni @ 0.6705,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2026-03-16,1.75,USD,inflow,NVDA Payout,Stacco dividendo 42 azioni @ 0.0417,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2026-03-19,171.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2026-03-23,209.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,1,Stipendio / Compensi,2026-04-01,2913.11,EUR,inflow,Datore di Lavoro / Studio,Accredito stipendio netto mese 4/2026,1,Bonifico Sepa,"stipendio,lavoro_attivo"
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2026-04-07,750.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2026-04-07,120.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2026-04-07,320.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2026-04-07,90.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,19,PAC / Investimenti Titoli,2026-04-08,850.0,EUR,transfer,Directa SIM / Fineco Trading,Giroconto per alimentazione PAC periodico 4/2026,1,Giroconto,"saving_investment,pac"
+Conto Corrente Principale,1,20,Versamento Fondo Pensione,2026-04-13,120.0,EUR,outflow,Amundi SGR,"Contribuzione SecondaPensione Espansione (Deducibilità annua max €5.164,57)",1,Bonifico / SDD,"previdenza,fondo_pensione,deducibile"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2026-04-19,171.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2026-04-23,209.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,1,Stipendio / Compensi,2026-05-04,2923.82,EUR,inflow,Datore di Lavoro / Studio,Accredito stipendio netto mese 5/2026,1,Bonifico Sepa,"stipendio,lavoro_attivo"
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2026-05-07,750.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2026-05-07,120.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2026-05-07,320.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2026-05-07,90.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,19,PAC / Investimenti Titoli,2026-05-08,850.0,EUR,transfer,Directa SIM / Fineco Trading,Giroconto per alimentazione PAC periodico 5/2026,1,Giroconto,"saving_investment,pac"
+Conto Corrente Principale,1,20,Versamento Fondo Pensione,2026-05-13,120.0,EUR,outflow,Amundi SGR,"Contribuzione SecondaPensione Espansione (Deducibilità annua max €5.164,57)",1,Bonifico / SDD,"previdenza,fondo_pensione,deducibile"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2026-05-15,10.62,USD,inflow,AAPL Payout,Stacco dividendo 41 azioni @ 0.2591,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2026-05-19,171.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2026-05-23,209.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,1,Stipendio / Compensi,2026-06-01,2934.56,EUR,inflow,Datore di Lavoro / Studio,Accredito stipendio netto mese 6/2026,1,Bonifico Sepa,"stipendio,lavoro_attivo"
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2026-06-07,750.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2026-06-07,120.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2026-06-07,320.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2026-06-07,90.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,19,PAC / Investimenti Titoli,2026-06-08,850.0,EUR,transfer,Directa SIM / Fineco Trading,Giroconto per alimentazione PAC periodico 6/2026,1,Giroconto,"saving_investment,pac"
+Conto Corrente Principale,1,20,Versamento Fondo Pensione,2026-06-13,120.0,EUR,outflow,Amundi SGR,"Contribuzione SecondaPensione Espansione (Deducibilità annua max €5.164,57)",1,Bonifico / SDD,"previdenza,fondo_pensione,deducibile"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2026-06-15,76.74,GBP,inflow,VWRL.L Payout,Stacco dividendo 158 azioni @ 0.4857,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2026-06-15,27.36,USD,inflow,QQQ Payout,Stacco dividendo 41 azioni @ 0.6673,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2026-06-15,1.82,USD,inflow,NVDA Payout,Stacco dividendo 45 azioni @ 0.0405,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2026-06-19,171.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2026-06-23,209.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,1,Stipendio / Compensi,2026-07-01,2945.34,EUR,inflow,Datore di Lavoro / Studio,Accredito stipendio netto mese 7/2026,1,Bonifico Sepa,"stipendio,lavoro_attivo"
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2026-07-07,750.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2026-07-07,120.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2026-07-07,320.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2026-07-07,90.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,19,PAC / Investimenti Titoli,2026-07-08,850.0,EUR,transfer,Directa SIM / Fineco Trading,Giroconto per alimentazione PAC periodico 7/2026,1,Giroconto,"saving_investment,pac"
+Conto Corrente Principale,1,20,Versamento Fondo Pensione,2026-07-13,120.0,EUR,outflow,Amundi SGR,"Contribuzione SecondaPensione Espansione (Deducibilità annua max €5.164,57)",1,Bonifico / SDD,"previdenza,fondo_pensione,deducibile"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2026-07-19,171.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2026-07-23,209.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,1,Stipendio / Compensi,2026-08-03,2956.17,EUR,inflow,Datore di Lavoro / Studio,Accredito stipendio netto mese 8/2026,1,Bonifico Sepa,"stipendio,lavoro_attivo"
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2026-08-07,750.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2026-08-07,120.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2026-08-07,320.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2026-08-07,90.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,19,PAC / Investimenti Titoli,2026-08-10,850.0,EUR,transfer,Directa SIM / Fineco Trading,Giroconto per alimentazione PAC periodico 8/2026,1,Giroconto,"saving_investment,pac"
+Conto Corrente Principale,1,20,Versamento Fondo Pensione,2026-08-13,120.0,EUR,outflow,Amundi SGR,"Contribuzione SecondaPensione Espansione (Deducibilità annua max €5.164,57)",1,Bonifico / SDD,"previdenza,fondo_pensione,deducibile"
+Brokerage Cash Liquidità,4,3,Dividendi & Cedole,2026-08-17,11.33,USD,inflow,AAPL Payout,Stacco dividendo 44 azioni @ 0.2576,0,Accredito Cedola,"dividendo,rendita_finanziaria"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2026-08-19,171.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2026-08-23,209.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want
+Conto Corrente Principale,1,1,Stipendio / Compensi,2026-09-01,2967.03,EUR,inflow,Datore di Lavoro / Studio,Accredito stipendio netto mese 9/2026,1,Bonifico Sepa,"stipendio,lavoro_attivo"
+Conto Corrente Principale,1,6,Casa & Mutuo / Affitto,2026-09-07,750.0,EUR,outflow,Proprietario / Condominio,Spese abitative / canone locazione,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,7,Bollette & Utenze (Luce/Gas/Internet),2026-09-07,120.0,EUR,outflow,Enel / Fastweb / A2A,Utenze domestiche bimestrali/mensili,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,8,Spesa Alimentare & Supermercato,2026-09-07,320.0,EUR,outflow,Esselunga / Conad,Spesa alimentare supermercato,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,9,"Trasporti, Carburante & Mezzi",2026-09-07,90.0,EUR,outflow,Eni Station / ATM / Telepass,Carburante e abbonamento trasporti,1,SDD / Carta,"essential_need,spese_fisse"
+Conto Corrente Principale,1,19,PAC / Investimenti Titoli,2026-09-08,850.0,EUR,transfer,Directa SIM / Fineco Trading,Giroconto per alimentazione PAC periodico 9/2026,1,Giroconto,"saving_investment,pac"
+Conto Corrente Principale,1,20,Versamento Fondo Pensione,2026-09-13,120.0,EUR,outflow,Amundi SGR,"Contribuzione SecondaPensione Espansione (Deducibilità annua max €5.164,57)",1,Bonifico / SDD,"previdenza,fondo_pensione,deducibile"
+Conto Corrente Principale,1,12,"Ristoranti, Bar & Delivery",2026-09-19,171.0,EUR,outflow,Ristoranti e Svago,"Cene, ristoranti e convivialità",0,Carta,discretionary_want
+Conto Corrente Principale,1,13,"Viaggi, Vacanze & Weekend",2026-09-23,209.0,EUR,outflow,Hotel & Compagnie Aeree,Vacanze e weekend fuori porta,0,Carta,discretionary_want

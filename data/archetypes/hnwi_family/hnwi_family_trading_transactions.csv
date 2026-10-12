@@ -1,0 +1,340 @@
+tx_date,ticker,tx_type,quantity,price,currency,fees,asset_class,notes
+2023-09-11,AAPL,buy,673.0,222.56,USD,1.5,Stock,Costruzione posizione iniziale di portafoglio
+2023-09-11,ASML.AS,buy,146.0,748.39,EUR,2.0,Stock,Costruzione posizione iniziale di portafoglio
+2023-09-11,BND,buy,1935.0,72.32,USD,1.0,Bond,Costruzione posizione iniziale di portafoglio
+2023-09-11,BND,buy,4.0,72.32,USD,1.0,Bond,PAC Mensile 9/2023
+2023-09-11,JNJ,buy,470.0,159.27,USD,1.5,Stock,Costruzione posizione iniziale di portafoglio
+2023-09-11,KO,buy,1210.0,61.96,USD,1.5,Stock,Costruzione posizione iniziale di portafoglio
+2023-09-11,MSFT,buy,385.0,414.75,USD,1.5,Stock,Costruzione posizione iniziale di portafoglio
+2023-09-11,MSFT,buy,1.0,414.75,USD,1.5,Stock,PAC Mensile 9/2023
+2023-09-11,NVDA,buy,950.0,126.29,USD,1.5,Stock,Costruzione posizione iniziale di portafoglio
+2023-09-11,NVDA,buy,3.0,126.29,USD,1.5,Stock,PAC Mensile 9/2023
+2023-09-11,SPY,buy,443.0,541.4,USD,1.0,ETF,Costruzione posizione iniziale di portafoglio
+2023-09-11,SPY,buy,2.0,541.4,USD,1.0,ETF,PAC Mensile 9/2023
+2023-09-11,VWRL.L,buy,1708.0,105.36,GBP,2.0,ETF,Costruzione posizione iniziale di portafoglio
+2023-09-11,VWRL.L,buy,7.0,105.36,GBP,2.0,ETF,PAC Mensile 9/2023
+2023-09-15,BND,dividend,1.0,430.07,USD,0.0,Bond,Dividendo (1939 quote @ 0.2218 USD)
+2023-09-15,KO,dividend,1.0,599.43,USD,0.0,Stock,Dividendo (1210 quote @ 0.4954 USD)
+2023-09-15,NVDA,dividend,1.0,37.36,USD,0.0,Stock,Dividendo (953 quote @ 0.0392 USD)
+2023-09-15,SPY,dividend,1.0,746.98,USD,0.0,ETF,Dividendo (445 quote @ 1.6786 USD)
+2023-09-15,VWRL.L,dividend,1.0,870.71,GBP,0.0,ETF,Dividendo (1715 quote @ 0.5077 GBP)
+2023-09-21,MSFT,sell,57.0,418.76,USD,1.5,Stock,Ribilanciamento trimestrale Q3 2023
+2023-10-09,BND,buy,4.0,73.77,USD,1.0,Bond,PAC Mensile 10/2023
+2023-10-09,MSFT,buy,1.0,447.54,USD,1.5,Stock,PAC Mensile 10/2023
+2023-10-09,NVDA,buy,3.0,127.73,USD,1.5,Stock,PAC Mensile 10/2023
+2023-10-09,SPY,buy,2.0,557.58,USD,1.0,ETF,PAC Mensile 10/2023
+2023-10-09,VWRL.L,buy,7.0,104.78,GBP,2.0,ETF,PAC Mensile 10/2023
+2023-10-16,BND,dividend,1.0,448.25,USD,0.0,Bond,Dividendo (1943 quote @ 0.2307 USD)
+2023-11-08,BND,buy,4.0,72.37,USD,1.0,Bond,PAC Mensile 11/2023
+2023-11-08,MSFT,buy,1.0,462.23,USD,1.5,Stock,PAC Mensile 11/2023
+2023-11-08,NVDA,buy,3.0,127.23,USD,1.5,Stock,PAC Mensile 11/2023
+2023-11-08,SPY,buy,2.0,545.98,USD,1.0,ETF,PAC Mensile 11/2023
+2023-11-08,VWRL.L,buy,7.0,108.72,GBP,2.0,ETF,PAC Mensile 11/2023
+2023-11-15,AAPL,dividend,1.0,165.02,USD,0.0,Stock,Dividendo (673 quote @ 0.2452 USD)
+2023-11-15,ASML.AS,dividend,1.0,221.12,EUR,0.0,Stock,Dividendo (146 quote @ 1.5145 EUR)
+2023-11-15,BND,dividend,1.0,439.24,USD,0.0,Bond,Dividendo (1947 quote @ 0.2256 USD)
+2023-11-15,JNJ,dividend,1.0,600.05,USD,0.0,Stock,Dividendo (470 quote @ 1.2767 USD)
+2023-11-15,MSFT,dividend,1.0,268.28,USD,0.0,Stock,Dividendo (331 quote @ 0.8105 USD)
+2023-12-08,BND,buy,4.0,70.94,USD,1.0,Bond,PAC Mensile 12/2023
+2023-12-08,MSFT,buy,1.0,470.82,USD,1.5,Stock,PAC Mensile 12/2023
+2023-12-08,NVDA,buy,3.0,128.48,USD,1.5,Stock,PAC Mensile 12/2023
+2023-12-08,SPY,buy,2.0,532.49,USD,1.0,ETF,PAC Mensile 12/2023
+2023-12-08,VWRL.L,buy,7.0,109.98,GBP,2.0,ETF,PAC Mensile 12/2023
+2023-12-15,BND,dividend,1.0,451.07,USD,0.0,Bond,Dividendo (1951 quote @ 0.2312 USD)
+2023-12-15,KO,dividend,1.0,593.87,USD,0.0,Stock,Dividendo (1210 quote @ 0.4908 USD)
+2023-12-15,NVDA,dividend,1.0,39.63,USD,0.0,Stock,Dividendo (962 quote @ 0.0412 USD)
+2023-12-15,SPY,dividend,1.0,755.47,USD,0.0,ETF,Dividendo (451 quote @ 1.6751 USD)
+2023-12-15,VWRL.L,dividend,1.0,877.55,GBP,0.0,ETF,Dividendo (1736 quote @ 0.5055 GBP)
+2023-12-21,MSFT,sell,49.0,483.67,USD,1.5,Stock,Ribilanciamento trimestrale Q4 2023
+2024-01-08,BND,buy,4.0,71.62,USD,1.0,Bond,PAC Mensile 1/2024
+2024-01-08,MSFT,buy,1.0,481.17,USD,1.5,Stock,PAC Mensile 1/2024
+2024-01-08,NVDA,buy,3.0,121.44,USD,1.5,Stock,PAC Mensile 1/2024
+2024-01-08,SPY,buy,2.0,551.36,USD,1.0,ETF,PAC Mensile 1/2024
+2024-01-08,VWRL.L,buy,7.0,109.7,GBP,2.0,ETF,PAC Mensile 1/2024
+2024-01-16,BND,dividend,1.0,450.63,USD,0.0,Bond,Dividendo (1955 quote @ 0.2305 USD)
+2024-02-08,BND,buy,4.0,73.2,USD,1.0,Bond,PAC Mensile 2/2024
+2024-02-08,MSFT,buy,1.0,453.51,USD,1.5,Stock,PAC Mensile 2/2024
+2024-02-08,NVDA,buy,4.0,113.39,USD,1.5,Stock,PAC Mensile 2/2024
+2024-02-08,SPY,buy,1.0,565.45,USD,1.0,ETF,PAC Mensile 2/2024
+2024-02-08,VWRL.L,buy,7.0,104.41,GBP,2.0,ETF,PAC Mensile 2/2024
+2024-02-15,AAPL,dividend,1.0,169.8,USD,0.0,Stock,Dividendo (673 quote @ 0.2523 USD)
+2024-02-15,ASML.AS,dividend,1.0,222.5,EUR,0.0,Stock,Dividendo (146 quote @ 1.5240 EUR)
+2024-02-15,BND,dividend,1.0,435.49,USD,0.0,Bond,Dividendo (1959 quote @ 0.2223 USD)
+2024-02-15,JNJ,dividend,1.0,599.77,USD,0.0,Stock,Dividendo (470 quote @ 1.2761 USD)
+2024-02-15,MSFT,dividend,1.0,231.82,USD,0.0,Stock,Dividendo (285 quote @ 0.8134 USD)
+2024-03-08,BND,buy,4.0,72.81,USD,1.0,Bond,PAC Mensile 3/2024
+2024-03-08,MSFT,buy,1.0,439.34,USD,1.5,Stock,PAC Mensile 3/2024
+2024-03-08,NVDA,buy,4.0,111.6,USD,1.5,Stock,PAC Mensile 3/2024
+2024-03-08,SPY,buy,2.0,557.39,USD,1.0,ETF,PAC Mensile 3/2024
+2024-03-08,VWRL.L,buy,7.0,102.14,GBP,2.0,ETF,PAC Mensile 3/2024
+2024-03-15,BND,dividend,1.0,438.14,USD,0.0,Bond,Dividendo (1963 quote @ 0.2232 USD)
+2024-03-15,KO,dividend,1.0,588.91,USD,0.0,Stock,Dividendo (1210 quote @ 0.4867 USD)
+2024-03-15,NVDA,dividend,1.0,39.8,USD,0.0,Stock,Dividendo (973 quote @ 0.0409 USD)
+2024-03-15,SPY,dividend,1.0,770.82,USD,0.0,ETF,Dividendo (456 quote @ 1.6904 USD)
+2024-03-15,VWRL.L,dividend,1.0,870.42,GBP,0.0,ETF,Dividendo (1757 quote @ 0.4954 GBP)
+2024-03-21,MSFT,sell,42.0,405.18,USD,1.5,Stock,Ribilanciamento trimestrale Q1 2024
+2024-04-08,BND,buy,4.0,72.32,USD,1.0,Bond,PAC Mensile 4/2024
+2024-04-08,MSFT,buy,1.0,395.41,USD,1.5,Stock,PAC Mensile 4/2024
+2024-04-08,NVDA,buy,4.0,112.32,USD,1.5,Stock,PAC Mensile 4/2024
+2024-04-08,SPY,buy,2.0,552.35,USD,1.0,ETF,PAC Mensile 4/2024
+2024-04-08,VWRL.L,buy,7.0,101.63,GBP,2.0,ETF,PAC Mensile 4/2024
+2024-04-15,BND,dividend,1.0,434.71,USD,0.0,Bond,Dividendo (1967 quote @ 0.2210 USD)
+2024-05-08,BND,buy,4.0,72.92,USD,1.0,Bond,PAC Mensile 5/2024
+2024-05-08,MSFT,buy,1.0,383.28,USD,1.5,Stock,PAC Mensile 5/2024
+2024-05-08,NVDA,buy,4.0,117.11,USD,1.5,Stock,PAC Mensile 5/2024
+2024-05-08,SPY,buy,2.0,535.32,USD,1.0,ETF,PAC Mensile 5/2024
+2024-05-08,VWRL.L,buy,8.0,99.64,GBP,2.0,ETF,PAC Mensile 5/2024
+2024-05-15,AAPL,dividend,1.0,164.88,USD,0.0,Stock,Dividendo (673 quote @ 0.2450 USD)
+2024-05-15,ASML.AS,dividend,1.0,229.96,EUR,0.0,Stock,Dividendo (146 quote @ 1.5751 EUR)
+2024-05-15,BND,dividend,1.0,449.19,USD,0.0,Bond,Dividendo (1971 quote @ 0.2279 USD)
+2024-05-15,JNJ,dividend,1.0,602.45,USD,0.0,Stock,Dividendo (470 quote @ 1.2818 USD)
+2024-05-15,MSFT,dividend,1.0,204.97,USD,0.0,Stock,Dividendo (246 quote @ 0.8332 USD)
+2024-06-10,BND,buy,4.0,73.31,USD,1.0,Bond,PAC Mensile 6/2024
+2024-06-10,MSFT,buy,1.0,348.0,USD,1.5,Stock,PAC Mensile 6/2024
+2024-06-10,NVDA,buy,4.0,112.38,USD,1.5,Stock,PAC Mensile 6/2024
+2024-06-10,SPY,buy,1.0,568.27,USD,1.0,ETF,PAC Mensile 6/2024
+2024-06-10,VWRL.L,buy,7.0,103.57,GBP,2.0,ETF,PAC Mensile 6/2024
+2024-06-17,BND,dividend,1.0,444.77,USD,0.0,Bond,Dividendo (1975 quote @ 0.2252 USD)
+2024-06-17,KO,dividend,1.0,576.93,USD,0.0,Stock,Dividendo (1210 quote @ 0.4768 USD)
+2024-06-17,NVDA,dividend,1.0,40.09,USD,0.0,Stock,Dividendo (985 quote @ 0.0407 USD)
+2024-06-17,SPY,dividend,1.0,783.38,USD,0.0,ETF,Dividendo (461 quote @ 1.6993 USD)
+2024-06-17,VWRL.L,dividend,1.0,865.13,GBP,0.0,ETF,Dividendo (1779 quote @ 0.4863 GBP)
+2024-06-21,MSFT,sell,37.0,333.39,USD,1.5,Stock,Ribilanciamento trimestrale Q2 2024
+2024-07-08,BND,buy,4.0,73.19,USD,1.0,Bond,PAC Mensile 7/2024
+2024-07-08,MSFT,buy,1.0,332.99,USD,1.5,Stock,PAC Mensile 7/2024
+2024-07-08,NVDA,buy,4.0,111.84,USD,1.5,Stock,PAC Mensile 7/2024
+2024-07-08,SPY,buy,1.0,584.52,USD,1.0,ETF,PAC Mensile 7/2024
+2024-07-08,VWRL.L,buy,7.0,105.59,GBP,2.0,ETF,PAC Mensile 7/2024
+2024-07-15,BND,dividend,1.0,430.23,USD,0.0,Bond,Dividendo (1979 quote @ 0.2174 USD)
+2024-08-08,BND,buy,4.0,72.22,USD,1.0,Bond,PAC Mensile 8/2024
+2024-08-08,MSFT,buy,1.0,358.34,USD,1.5,Stock,PAC Mensile 8/2024
+2024-08-08,NVDA,buy,4.0,105.25,USD,1.5,Stock,PAC Mensile 8/2024
+2024-08-08,SPY,buy,1.0,604.24,USD,1.0,ETF,PAC Mensile 8/2024
+2024-08-08,VWRL.L,buy,7.0,106.9,GBP,2.0,ETF,PAC Mensile 8/2024
+2024-08-16,AAPL,dividend,1.0,171.55,USD,0.0,Stock,Dividendo (673 quote @ 0.2549 USD)
+2024-08-16,ASML.AS,dividend,1.0,219.91,EUR,0.0,Stock,Dividendo (146 quote @ 1.5062 EUR)
+2024-08-16,BND,dividend,1.0,457.28,USD,0.0,Bond,Dividendo (1983 quote @ 0.2306 USD)
+2024-08-16,JNJ,dividend,1.0,594.6,USD,0.0,Stock,Dividendo (470 quote @ 1.2651 USD)
+2024-08-16,MSFT,dividend,1.0,183.13,USD,0.0,Stock,Dividendo (212 quote @ 0.8638 USD)
+2024-09-09,BND,buy,4.0,72.35,USD,1.0,Bond,PAC Mensile 9/2024
+2024-09-09,MSFT,buy,1.0,338.41,USD,1.5,Stock,PAC Mensile 9/2024
+2024-09-09,NVDA,buy,4.0,106.02,USD,1.5,Stock,PAC Mensile 9/2024
+2024-09-09,SPY,buy,1.0,596.4,USD,1.0,ETF,PAC Mensile 9/2024
+2024-09-09,VWRL.L,buy,7.0,101.44,GBP,2.0,ETF,PAC Mensile 9/2024
+2024-09-16,BND,dividend,1.0,454.23,USD,0.0,Bond,Dividendo (1987 quote @ 0.2286 USD)
+2024-09-16,KO,dividend,1.0,612.62,USD,0.0,Stock,Dividendo (1210 quote @ 0.5063 USD)
+2024-09-16,NVDA,dividend,1.0,41.28,USD,0.0,Stock,Dividendo (997 quote @ 0.0414 USD)
+2024-09-16,SPY,dividend,1.0,820.82,USD,0.0,ETF,Dividendo (464 quote @ 1.7690 USD)
+2024-09-16,VWRL.L,dividend,1.0,891.0,GBP,0.0,ETF,Dividendo (1800 quote @ 0.4950 GBP)
+2024-09-23,MSFT,sell,31.0,339.82,USD,1.5,Stock,Ribilanciamento trimestrale Q3 2024
+2024-10-08,BND,buy,4.0,72.37,USD,1.0,Bond,PAC Mensile 10/2024
+2024-10-08,MSFT,buy,1.0,309.15,USD,1.5,Stock,PAC Mensile 10/2024
+2024-10-08,NVDA,buy,4.0,113.04,USD,1.5,Stock,PAC Mensile 10/2024
+2024-10-08,SPY,buy,1.0,564.35,USD,1.0,ETF,PAC Mensile 10/2024
+2024-10-08,VWRL.L,buy,7.0,101.93,GBP,2.0,ETF,PAC Mensile 10/2024
+2024-10-15,BND,dividend,1.0,459.52,USD,0.0,Bond,Dividendo (1991 quote @ 0.2308 USD)
+2024-11-08,BND,buy,4.0,70.31,USD,1.0,Bond,PAC Mensile 11/2024
+2024-11-08,MSFT,buy,1.0,296.29,USD,1.5,Stock,PAC Mensile 11/2024
+2024-11-08,NVDA,buy,4.0,111.24,USD,1.5,Stock,PAC Mensile 11/2024
+2024-11-08,SPY,buy,1.0,567.76,USD,1.0,ETF,PAC Mensile 11/2024
+2024-11-08,VWRL.L,buy,7.0,105.76,GBP,2.0,ETF,PAC Mensile 11/2024
+2024-11-15,AAPL,dividend,1.0,173.16,USD,0.0,Stock,Dividendo (673 quote @ 0.2573 USD)
+2024-11-15,ASML.AS,dividend,1.0,218.26,EUR,0.0,Stock,Dividendo (146 quote @ 1.4949 EUR)
+2024-11-15,BND,dividend,1.0,439.5,USD,0.0,Bond,Dividendo (1995 quote @ 0.2203 USD)
+2024-11-15,JNJ,dividend,1.0,571.76,USD,0.0,Stock,Dividendo (470 quote @ 1.2165 USD)
+2024-11-15,MSFT,dividend,1.0,156.47,USD,0.0,Stock,Dividendo (184 quote @ 0.8504 USD)
+2024-12-09,BND,buy,4.0,70.4,USD,1.0,Bond,PAC Mensile 12/2024
+2024-12-09,MSFT,buy,1.0,327.21,USD,1.5,Stock,PAC Mensile 12/2024
+2024-12-09,NVDA,buy,4.0,114.3,USD,1.5,Stock,PAC Mensile 12/2024
+2024-12-09,SPY,buy,2.0,542.58,USD,1.0,ETF,PAC Mensile 12/2024
+2024-12-09,VWRL.L,buy,7.0,108.71,GBP,2.0,ETF,PAC Mensile 12/2024
+2024-12-16,BND,dividend,1.0,455.97,USD,0.0,Bond,Dividendo (1999 quote @ 0.2281 USD)
+2024-12-16,KO,dividend,1.0,599.43,USD,0.0,Stock,Dividendo (1210 quote @ 0.4954 USD)
+2024-12-16,NVDA,dividend,1.0,42.38,USD,0.0,Stock,Dividendo (1009 quote @ 0.0420 USD)
+2024-12-16,SPY,dividend,1.0,815.63,USD,0.0,ETF,Dividendo (468 quote @ 1.7428 USD)
+2024-12-16,VWRL.L,dividend,1.0,876.27,GBP,0.0,ETF,Dividendo (1821 quote @ 0.4812 GBP)
+2024-12-23,MSFT,sell,27.0,329.43,USD,1.5,Stock,Ribilanciamento trimestrale Q4 2024
+2025-01-08,BND,buy,4.0,70.12,USD,1.0,Bond,PAC Mensile 1/2025
+2025-01-08,MSFT,buy,1.0,311.74,USD,1.5,Stock,PAC Mensile 1/2025
+2025-01-08,NVDA,buy,4.0,112.36,USD,1.5,Stock,PAC Mensile 1/2025
+2025-01-08,SPY,buy,1.0,565.52,USD,1.0,ETF,PAC Mensile 1/2025
+2025-01-08,VWRL.L,buy,7.0,113.88,GBP,2.0,ETF,PAC Mensile 1/2025
+2025-01-15,BND,dividend,1.0,453.08,USD,0.0,Bond,Dividendo (2003 quote @ 0.2262 USD)
+2025-02-10,BND,buy,4.0,69.62,USD,1.0,Bond,PAC Mensile 2/2025
+2025-02-10,MSFT,buy,1.0,326.84,USD,1.5,Stock,PAC Mensile 2/2025
+2025-02-10,NVDA,buy,4.0,115.54,USD,1.5,Stock,PAC Mensile 2/2025
+2025-02-10,SPY,buy,2.0,552.02,USD,1.0,ETF,PAC Mensile 2/2025
+2025-02-10,VWRL.L,buy,7.0,112.27,GBP,2.0,ETF,PAC Mensile 2/2025
+2025-02-18,AAPL,dividend,1.0,171.48,USD,0.0,Stock,Dividendo (673 quote @ 0.2548 USD)
+2025-02-18,ASML.AS,dividend,1.0,224.27,EUR,0.0,Stock,Dividendo (146 quote @ 1.5361 EUR)
+2025-02-18,BND,dividend,1.0,438.13,USD,0.0,Bond,Dividendo (2007 quote @ 0.2183 USD)
+2025-02-18,JNJ,dividend,1.0,597.89,USD,0.0,Stock,Dividendo (470 quote @ 1.2721 USD)
+2025-02-18,MSFT,dividend,1.0,135.97,USD,0.0,Stock,Dividendo (160 quote @ 0.8498 USD)
+2025-03-10,BND,buy,4.0,70.94,USD,1.0,Bond,PAC Mensile 3/2025
+2025-03-10,MSFT,buy,1.0,323.49,USD,1.5,Stock,PAC Mensile 3/2025
+2025-03-10,NVDA,buy,4.0,104.46,USD,1.5,Stock,PAC Mensile 3/2025
+2025-03-10,SPY,buy,2.0,512.74,USD,1.0,ETF,PAC Mensile 3/2025
+2025-03-10,VWRL.L,buy,6.0,117.57,GBP,2.0,ETF,PAC Mensile 3/2025
+2025-03-17,BND,dividend,1.0,443.22,USD,0.0,Bond,Dividendo (2011 quote @ 0.2204 USD)
+2025-03-17,KO,dividend,1.0,601.01,USD,0.0,Stock,Dividendo (1210 quote @ 0.4967 USD)
+2025-03-17,NVDA,dividend,1.0,40.13,USD,0.0,Stock,Dividendo (1021 quote @ 0.0393 USD)
+2025-03-17,SPY,dividend,1.0,841.04,USD,0.0,ETF,Dividendo (473 quote @ 1.7781 USD)
+2025-03-17,VWRL.L,dividend,1.0,920.87,GBP,0.0,ETF,Dividendo (1841 quote @ 0.5002 GBP)
+2025-03-21,MSFT,sell,24.0,335.13,USD,1.5,Stock,Ribilanciamento trimestrale Q1 2025
+2025-04-08,BND,buy,4.0,73.13,USD,1.0,Bond,PAC Mensile 4/2025
+2025-04-08,MSFT,buy,1.0,336.46,USD,1.5,Stock,PAC Mensile 4/2025
+2025-04-08,NVDA,buy,4.0,101.6,USD,1.5,Stock,PAC Mensile 4/2025
+2025-04-08,SPY,buy,2.0,521.97,USD,1.0,ETF,PAC Mensile 4/2025
+2025-04-08,VWRL.L,buy,7.0,114.1,GBP,2.0,ETF,PAC Mensile 4/2025
+2025-04-15,BND,dividend,1.0,442.09,USD,0.0,Bond,Dividendo (2015 quote @ 0.2194 USD)
+2025-05-08,BND,buy,4.0,72.66,USD,1.0,Bond,PAC Mensile 5/2025
+2025-05-08,MSFT,buy,1.0,318.3,USD,1.5,Stock,PAC Mensile 5/2025
+2025-05-08,NVDA,buy,4.0,104.23,USD,1.5,Stock,PAC Mensile 5/2025
+2025-05-08,SPY,buy,2.0,506.86,USD,1.0,ETF,PAC Mensile 5/2025
+2025-05-08,VWRL.L,buy,7.0,110.02,GBP,2.0,ETF,PAC Mensile 5/2025
+2025-05-15,AAPL,dividend,1.0,173.03,USD,0.0,Stock,Dividendo (673 quote @ 0.2571 USD)
+2025-05-15,ASML.AS,dividend,1.0,227.22,EUR,0.0,Stock,Dividendo (146 quote @ 1.5563 EUR)
+2025-05-15,BND,dividend,1.0,441.76,USD,0.0,Bond,Dividendo (2019 quote @ 0.2188 USD)
+2025-05-15,JNJ,dividend,1.0,596.1,USD,0.0,Stock,Dividendo (470 quote @ 1.2683 USD)
+2025-05-15,MSFT,dividend,1.0,117.76,USD,0.0,Stock,Dividendo (139 quote @ 0.8472 USD)
+2025-06-09,BND,buy,4.0,71.73,USD,1.0,Bond,PAC Mensile 6/2025
+2025-06-09,MSFT,buy,1.0,317.79,USD,1.5,Stock,PAC Mensile 6/2025
+2025-06-09,NVDA,buy,4.0,101.28,USD,1.5,Stock,PAC Mensile 6/2025
+2025-06-09,SPY,buy,2.0,509.6,USD,1.0,ETF,PAC Mensile 6/2025
+2025-06-09,VWRL.L,buy,7.0,109.8,GBP,2.0,ETF,PAC Mensile 6/2025
+2025-06-16,BND,dividend,1.0,458.21,USD,0.0,Bond,Dividendo (2023 quote @ 0.2265 USD)
+2025-06-16,KO,dividend,1.0,593.26,USD,0.0,Stock,Dividendo (1210 quote @ 0.4903 USD)
+2025-06-16,NVDA,dividend,1.0,42.25,USD,0.0,Stock,Dividendo (1033 quote @ 0.0409 USD)
+2025-06-16,SPY,dividend,1.0,821.87,USD,0.0,ETF,Dividendo (479 quote @ 1.7158 USD)
+2025-06-16,VWRL.L,dividend,1.0,898.04,GBP,0.0,ETF,Dividendo (1862 quote @ 0.4823 GBP)
+2025-06-23,MSFT,sell,21.0,308.83,USD,1.5,Stock,Ribilanciamento trimestrale Q2 2025
+2025-07-08,BND,buy,4.0,72.92,USD,1.0,Bond,PAC Mensile 7/2025
+2025-07-08,MSFT,buy,1.0,329.9,USD,1.5,Stock,PAC Mensile 7/2025
+2025-07-08,NVDA,buy,5.0,95.8,USD,1.5,Stock,PAC Mensile 7/2025
+2025-07-08,SPY,buy,2.0,485.18,USD,1.0,ETF,PAC Mensile 7/2025
+2025-07-08,VWRL.L,buy,6.0,115.82,GBP,2.0,ETF,PAC Mensile 7/2025
+2025-07-15,BND,dividend,1.0,465.8,USD,0.0,Bond,Dividendo (2027 quote @ 0.2298 USD)
+2025-08-08,BND,buy,4.0,72.25,USD,1.0,Bond,PAC Mensile 8/2025
+2025-08-08,MSFT,buy,1.0,313.53,USD,1.5,Stock,PAC Mensile 8/2025
+2025-08-08,NVDA,buy,4.0,104.35,USD,1.5,Stock,PAC Mensile 8/2025
+2025-08-08,SPY,buy,2.0,509.48,USD,1.0,ETF,PAC Mensile 8/2025
+2025-08-08,VWRL.L,buy,7.0,112.91,GBP,2.0,ETF,PAC Mensile 8/2025
+2025-08-18,AAPL,dividend,1.0,164.88,USD,0.0,Stock,Dividendo (673 quote @ 0.2450 USD)
+2025-08-18,ASML.AS,dividend,1.0,232.1,EUR,0.0,Stock,Dividendo (146 quote @ 1.5897 EUR)
+2025-08-18,BND,dividend,1.0,470.58,USD,0.0,Bond,Dividendo (2031 quote @ 0.2317 USD)
+2025-08-18,JNJ,dividend,1.0,596.1,USD,0.0,Stock,Dividendo (470 quote @ 1.2683 USD)
+2025-08-18,MSFT,dividend,1.0,103.2,USD,0.0,Stock,Dividendo (121 quote @ 0.8529 USD)
+2025-09-08,BND,buy,4.0,73.2,USD,1.0,Bond,PAC Mensile 9/2025
+2025-09-08,MSFT,buy,1.0,323.91,USD,1.5,Stock,PAC Mensile 9/2025
+2025-09-08,NVDA,buy,4.0,107.12,USD,1.5,Stock,PAC Mensile 9/2025
+2025-09-08,SPY,buy,2.0,557.65,USD,1.0,ETF,PAC Mensile 9/2025
+2025-09-08,VWRL.L,buy,6.0,118.94,GBP,2.0,ETF,PAC Mensile 9/2025
+2025-09-15,BND,dividend,1.0,447.09,USD,0.0,Bond,Dividendo (2035 quote @ 0.2197 USD)
+2025-09-15,KO,dividend,1.0,590.48,USD,0.0,Stock,Dividendo (1210 quote @ 0.4880 USD)
+2025-09-15,NVDA,dividend,1.0,43.1,USD,0.0,Stock,Dividendo (1046 quote @ 0.0412 USD)
+2025-09-15,SPY,dividend,1.0,831.68,USD,0.0,ETF,Dividendo (485 quote @ 1.7148 USD)
+2025-09-15,VWRL.L,dividend,1.0,931.47,GBP,0.0,ETF,Dividendo (1881 quote @ 0.4952 GBP)
+2025-09-22,MSFT,sell,18.0,364.87,USD,1.5,Stock,Ribilanciamento trimestrale Q3 2025
+2025-10-08,BND,buy,4.0,74.29,USD,1.0,Bond,PAC Mensile 10/2025
+2025-10-08,MSFT,buy,1.0,360.95,USD,1.5,Stock,PAC Mensile 10/2025
+2025-10-08,NVDA,buy,4.0,113.54,USD,1.5,Stock,PAC Mensile 10/2025
+2025-10-08,SPY,buy,2.0,541.54,USD,1.0,ETF,PAC Mensile 10/2025
+2025-10-08,VWRL.L,buy,6.0,114.59,GBP,2.0,ETF,PAC Mensile 10/2025
+2025-10-15,BND,dividend,1.0,462.45,USD,0.0,Bond,Dividendo (2039 quote @ 0.2268 USD)
+2025-11-10,BND,buy,4.0,73.79,USD,1.0,Bond,PAC Mensile 11/2025
+2025-11-10,MSFT,buy,1.0,346.39,USD,1.5,Stock,PAC Mensile 11/2025
+2025-11-10,NVDA,buy,4.0,111.76,USD,1.5,Stock,PAC Mensile 11/2025
+2025-11-10,SPY,buy,2.0,539.6,USD,1.0,ETF,PAC Mensile 11/2025
+2025-11-10,VWRL.L,buy,7.0,113.07,GBP,2.0,ETF,PAC Mensile 11/2025
+2025-11-17,AAPL,dividend,1.0,165.56,USD,0.0,Stock,Dividendo (673 quote @ 0.2460 USD)
+2025-11-17,ASML.AS,dividend,1.0,218.81,EUR,0.0,Stock,Dividendo (146 quote @ 1.4987 EUR)
+2025-11-17,BND,dividend,1.0,444.56,USD,0.0,Bond,Dividendo (2043 quote @ 0.2176 USD)
+2025-11-17,JNJ,dividend,1.0,582.61,USD,0.0,Stock,Dividendo (470 quote @ 1.2396 USD)
+2025-11-17,MSFT,dividend,1.0,88.94,USD,0.0,Stock,Dividendo (106 quote @ 0.8391 USD)
+2025-12-08,BND,buy,4.0,76.05,USD,1.0,Bond,PAC Mensile 12/2025
+2025-12-08,MSFT,buy,1.0,365.71,USD,1.5,Stock,PAC Mensile 12/2025
+2025-12-08,NVDA,buy,4.0,110.07,USD,1.5,Stock,PAC Mensile 12/2025
+2025-12-08,SPY,buy,2.0,534.35,USD,1.0,ETF,PAC Mensile 12/2025
+2025-12-08,VWRL.L,buy,7.0,112.71,GBP,2.0,ETF,PAC Mensile 12/2025
+2025-12-15,BND,dividend,1.0,450.54,USD,0.0,Bond,Dividendo (2047 quote @ 0.2201 USD)
+2025-12-15,KO,dividend,1.0,577.05,USD,0.0,Stock,Dividendo (1210 quote @ 0.4769 USD)
+2025-12-15,NVDA,dividend,1.0,42.43,USD,0.0,Stock,Dividendo (1058 quote @ 0.0401 USD)
+2025-12-15,SPY,dividend,1.0,834.36,USD,0.0,ETF,Dividendo (491 quote @ 1.6993 USD)
+2025-12-15,VWRL.L,dividend,1.0,911.72,GBP,0.0,ETF,Dividendo (1901 quote @ 0.4796 GBP)
+2025-12-22,MSFT,sell,16.0,374.41,USD,1.5,Stock,Ribilanciamento trimestrale Q4 2025
+2026-01-08,BND,buy,4.0,79.58,USD,1.0,Bond,PAC Mensile 1/2026
+2026-01-08,MSFT,buy,1.0,390.6,USD,1.5,Stock,PAC Mensile 1/2026
+2026-01-08,NVDA,buy,4.0,103.4,USD,1.5,Stock,PAC Mensile 1/2026
+2026-01-08,SPY,buy,2.0,545.0,USD,1.0,ETF,PAC Mensile 1/2026
+2026-01-08,VWRL.L,buy,7.0,111.2,GBP,2.0,ETF,PAC Mensile 1/2026
+2026-01-15,BND,dividend,1.0,470.7,USD,0.0,Bond,Dividendo (2051 quote @ 0.2295 USD)
+2026-02-09,BND,buy,3.0,81.59,USD,1.0,Bond,PAC Mensile 2/2026
+2026-02-09,MSFT,buy,1.0,351.41,USD,1.5,Stock,PAC Mensile 2/2026
+2026-02-09,NVDA,buy,4.0,107.97,USD,1.5,Stock,PAC Mensile 2/2026
+2026-02-09,SPY,buy,1.0,563.4,USD,1.0,ETF,PAC Mensile 2/2026
+2026-02-09,VWRL.L,buy,7.0,107.72,GBP,2.0,ETF,PAC Mensile 2/2026
+2026-02-17,AAPL,dividend,1.0,173.1,USD,0.0,Stock,Dividendo (673 quote @ 0.2572 USD)
+2026-02-17,ASML.AS,dividend,1.0,223.41,EUR,0.0,Stock,Dividendo (146 quote @ 1.5302 EUR)
+2026-02-17,BND,dividend,1.0,474.47,USD,0.0,Bond,Dividendo (2054 quote @ 0.2310 USD)
+2026-02-17,JNJ,dividend,1.0,575.14,USD,0.0,Stock,Dividendo (470 quote @ 1.2237 USD)
+2026-02-17,MSFT,dividend,1.0,80.48,USD,0.0,Stock,Dividendo (93 quote @ 0.8654 USD)
+2026-03-09,BND,buy,3.0,81.47,USD,1.0,Bond,PAC Mensile 3/2026
+2026-03-09,MSFT,buy,1.0,357.06,USD,1.5,Stock,PAC Mensile 3/2026
+2026-03-09,NVDA,buy,4.0,114.12,USD,1.5,Stock,PAC Mensile 3/2026
+2026-03-09,SPY,buy,2.0,556.57,USD,1.0,ETF,PAC Mensile 3/2026
+2026-03-09,VWRL.L,buy,7.0,106.29,GBP,2.0,ETF,PAC Mensile 3/2026
+2026-03-16,BND,dividend,1.0,475.99,USD,0.0,Bond,Dividendo (2057 quote @ 0.2314 USD)
+2026-03-16,KO,dividend,1.0,582.01,USD,0.0,Stock,Dividendo (1210 quote @ 0.4810 USD)
+2026-03-16,NVDA,dividend,1.0,44.62,USD,0.0,Stock,Dividendo (1070 quote @ 0.0417 USD)
+2026-03-16,SPY,dividend,1.0,852.18,USD,0.0,ETF,Dividendo (496 quote @ 1.7181 USD)
+2026-03-16,VWRL.L,dividend,1.0,937.94,GBP,0.0,ETF,Dividendo (1922 quote @ 0.4880 GBP)
+2026-03-23,MSFT,sell,14.0,336.92,USD,1.5,Stock,Ribilanciamento trimestrale Q1 2026
+2026-04-08,BND,buy,4.0,79.84,USD,1.0,Bond,PAC Mensile 4/2026
+2026-04-08,MSFT,buy,1.0,349.85,USD,1.5,Stock,PAC Mensile 4/2026
+2026-04-08,NVDA,buy,4.0,118.57,USD,1.5,Stock,PAC Mensile 4/2026
+2026-04-08,SPY,buy,1.0,584.37,USD,1.0,ETF,PAC Mensile 4/2026
+2026-04-08,VWRL.L,buy,7.0,106.36,GBP,2.0,ETF,PAC Mensile 4/2026
+2026-04-15,BND,dividend,1.0,460.84,USD,0.0,Bond,Dividendo (2061 quote @ 0.2236 USD)
+2026-05-08,BND,buy,3.0,80.48,USD,1.0,Bond,PAC Mensile 5/2026
+2026-05-08,MSFT,buy,1.0,324.13,USD,1.5,Stock,PAC Mensile 5/2026
+2026-05-08,NVDA,buy,3.0,123.85,USD,1.5,Stock,PAC Mensile 5/2026
+2026-05-08,SPY,buy,1.0,574.52,USD,1.0,ETF,PAC Mensile 5/2026
+2026-05-08,VWRL.L,buy,7.0,105.7,GBP,2.0,ETF,PAC Mensile 5/2026
+2026-05-15,AAPL,dividend,1.0,174.37,USD,0.0,Stock,Dividendo (673 quote @ 0.2591 USD)
+2026-05-15,ASML.AS,dividend,1.0,231.54,EUR,0.0,Stock,Dividendo (146 quote @ 1.5859 EUR)
+2026-05-15,BND,dividend,1.0,470.18,USD,0.0,Bond,Dividendo (2064 quote @ 0.2278 USD)
+2026-05-15,JNJ,dividend,1.0,578.85,USD,0.0,Stock,Dividendo (470 quote @ 1.2316 USD)
+2026-05-15,MSFT,dividend,1.0,69.18,USD,0.0,Stock,Dividendo (82 quote @ 0.8436 USD)
+2026-06-08,BND,buy,3.0,80.97,USD,1.0,Bond,PAC Mensile 6/2026
+2026-06-08,MSFT,buy,1.0,291.82,USD,1.5,Stock,PAC Mensile 6/2026
+2026-06-08,NVDA,buy,3.0,128.44,USD,1.5,Stock,PAC Mensile 6/2026
+2026-06-08,SPY,buy,2.0,556.81,USD,1.0,ETF,PAC Mensile 6/2026
+2026-06-08,VWRL.L,buy,7.0,105.7,GBP,2.0,ETF,PAC Mensile 6/2026
+2026-06-15,BND,dividend,1.0,459.08,USD,0.0,Bond,Dividendo (2067 quote @ 0.2221 USD)
+2026-06-15,KO,dividend,1.0,592.54,USD,0.0,Stock,Dividendo (1210 quote @ 0.4897 USD)
+2026-06-15,NVDA,dividend,1.0,43.74,USD,0.0,Stock,Dividendo (1080 quote @ 0.0405 USD)
+2026-06-15,SPY,dividend,1.0,880.05,USD,0.0,ETF,Dividendo (500 quote @ 1.7601 USD)
+2026-06-15,VWRL.L,dividend,1.0,943.72,GBP,0.0,ETF,Dividendo (1943 quote @ 0.4857 GBP)
+2026-06-22,MSFT,sell,12.0,290.52,USD,1.5,Stock,Ribilanciamento trimestrale Q2 2026
+2026-07-08,BND,buy,3.0,81.82,USD,1.0,Bond,PAC Mensile 7/2026
+2026-07-08,MSFT,buy,1.0,272.58,USD,1.5,Stock,PAC Mensile 7/2026
+2026-07-08,NVDA,buy,3.0,126.83,USD,1.5,Stock,PAC Mensile 7/2026
+2026-07-08,SPY,buy,1.0,590.9,USD,1.0,ETF,PAC Mensile 7/2026
+2026-07-08,VWRL.L,buy,7.0,100.22,GBP,2.0,ETF,PAC Mensile 7/2026
+2026-07-15,BND,dividend,1.0,470.51,USD,0.0,Bond,Dividendo (2070 quote @ 0.2273 USD)
+2026-08-10,BND,buy,3.0,82.27,USD,1.0,Bond,PAC Mensile 8/2026
+2026-08-10,MSFT,buy,1.0,260.53,USD,1.5,Stock,PAC Mensile 8/2026
+2026-08-10,NVDA,buy,3.0,134.98,USD,1.5,Stock,PAC Mensile 8/2026
+2026-08-10,SPY,buy,1.0,669.34,USD,1.0,ETF,PAC Mensile 8/2026
+2026-08-10,VWRL.L,buy,8.0,94.92,GBP,2.0,ETF,PAC Mensile 8/2026
+2026-08-17,AAPL,dividend,1.0,173.36,USD,0.0,Stock,Dividendo (673 quote @ 0.2576 USD)
+2026-08-17,ASML.AS,dividend,1.0,229.31,EUR,0.0,Stock,Dividendo (146 quote @ 1.5706 EUR)
+2026-08-17,BND,dividend,1.0,453.57,USD,0.0,Bond,Dividendo (2073 quote @ 0.2188 USD)
+2026-08-17,JNJ,dividend,1.0,579.98,USD,0.0,Stock,Dividendo (470 quote @ 1.2340 USD)
+2026-08-17,MSFT,dividend,1.0,61.68,USD,0.0,Stock,Dividendo (73 quote @ 0.8449 USD)
+2026-09-08,BND,buy,3.0,80.71,USD,1.0,Bond,PAC Mensile 9/2026
+2026-09-08,MSFT,buy,1.0,281.93,USD,1.5,Stock,PAC Mensile 9/2026
+2026-09-08,NVDA,buy,3.0,128.59,USD,1.5,Stock,PAC Mensile 9/2026
+2026-09-08,SPY,buy,1.0,687.59,USD,1.0,ETF,PAC Mensile 9/2026
+2026-09-08,VWRL.L,buy,8.0,94.94,GBP,2.0,ETF,PAC Mensile 9/2026
+2026-09-09,MSFT,sell,11.0,278.91,USD,1.5,Stock,Ribilanciamento trimestrale Q3 2026
