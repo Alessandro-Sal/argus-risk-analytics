@@ -90,3 +90,42 @@ def test_switch_to_page_clean_navigation():
         # Verifica che switch_page sia stato invocato
         assert mock_switch_page.called
 
+
+def test_risk_to_wealth_transition_auto_profile_selection():
+    """Verifica che la transizione da modulo Risk a modulo Wealth auto-selezioni il profilo predefinito."""
+    from unittest.mock import patch
+
+    import pandas as pd
+
+    from core.ui_utils import ensure_portal_context
+
+    st.session_state["offline_mode"] = True
+    st.session_state["argus_portal_mode"] = "🏛️ Wealth Management"
+    st.session_state["wealth_active_portfolio_id"] = None
+    st.session_state.pop("wealth_active_profile_name", None)
+    st.session_state["argus_auth_personal_profile_id"] = 1
+
+    mock_df_prof = pd.DataFrame([
+        {"portfolio_id": 1, "name": "Famiglia Rossi", "owner": "Marco Rossi", "base_currency": "EUR"},
+        {"portfolio_id": 2, "name": "Holding Alpha", "owner": "Alpha Ltd", "base_currency": "EUR"}
+    ])
+
+    with patch("core.fetcher.get_engine") as mock_eng, \
+         patch("core.wealth.wealth_db.init_wealth_db"), \
+         patch("core.wealth.wealth_db.get_wealth_portfolios", return_value=mock_df_prof), \
+         patch("core.wealth.wealth_engine.compute_consolidated_net_worth") as mock_nw:
+
+        from collections import namedtuple
+        NW = namedtuple("NW", ["total_net_worth", "liquid_cash"])
+        mock_nw.return_value = NW(total_net_worth=500000.0, liquid_cash=50000.0)
+
+        ctx = ensure_portal_context(module="wealth")
+
+        assert ctx["is_wealth"] is True
+        assert ctx["portfolio_id"] == 1
+        assert ctx["profile_name"] == "Famiglia Rossi"
+        assert st.session_state["wealth_active_portfolio_id"] == 1
+        assert st.session_state["wealth_active_profile_name"] == "Famiglia Rossi"
+        assert st.session_state["sb_wealth_profile_selector"] == 1
+        assert ctx["net_worth"] is not None
+

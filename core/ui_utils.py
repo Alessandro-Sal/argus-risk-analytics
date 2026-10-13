@@ -8056,7 +8056,11 @@ def render_splash_screen(force_show: bool = False) -> bool:
         if st.button("💎 ENTRA IN WEALTH MANAGEMENT →", key="btn_splash_wealth", use_container_width=True):
             st.session_state.splash_dismissed = True
             st.session_state.argus_portal_mode = "🏛️ Wealth Management"
-            st.switch_page("pages/12_🎛️_Wealth_Control_Room.py")
+            if not st.session_state.get("wealth_active_portfolio_id"):
+                auth_pid = st.session_state.get("argus_auth_personal_profile_id")
+                st.session_state["wealth_active_portfolio_id"] = auth_pid or 1
+            from core.sidebar import switch_to_page
+            switch_to_page("pages/12_🎛️_Wealth_Control_Room.py")
 
     return True
 
@@ -9166,6 +9170,22 @@ def ensure_portal_context(module: str = "risk") -> dict:
                 if str(p) == str(pid):
                     matched_pid = p
                     break
+
+        # Fallback automatico: se nessun profilo è ancora stato selezionato o matchato,
+        # auto-seleziona determiniscamente il profilo personale dell'utente autenticato se presente
+        if matched_pid is None and prof_map:
+            auth_pid = st.session_state.get("argus_auth_personal_profile_id")
+            if auth_pid is not None:
+                for p in prof_map.keys():
+                    if p == auth_pid or str(p) == str(auth_pid):
+                        matched_pid = p
+                        break
+                    try:
+                        if int(p) == int(auth_pid):
+                            matched_pid = p
+                            break
+                    except (ValueError, TypeError):
+                        pass
 
         if matched_pid is not None:
             pid = matched_pid

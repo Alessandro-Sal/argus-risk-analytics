@@ -913,15 +913,6 @@ def render_splash_screen(
     Restituisce True se il Login Gate o lo Splash e' attivo (bloccando l'esecuzione sottostante con st.stop()).
     Restituisce False se lo splash e' completato/bypassato (permettendo il caricamento immediato della dashboard).
     """
-    try:
-        from core.supabase_cloud import render_cloud_auth_gate
-
-        if not render_cloud_auth_gate():
-            auto_collapse_sidebar()
-            return True
-    except Exception:
-        pass
-
     # Se splash_dismissed e' esplicitamente False (es. click su 'Schermata di Avvio' nella sidebar)
     if st.session_state.get("splash_dismissed") is False:
         force_show = True
@@ -937,6 +928,15 @@ def render_splash_screen(
         st.session_state["splash_dismissed"] = True
         st.session_state["splash_completed"] = True
         return False
+
+    try:
+        from core.supabase_cloud import render_cloud_auth_gate
+
+        if not render_cloud_auth_gate():
+            auto_collapse_sidebar()
+            return True
+    except Exception:
+        pass
 
     # Assicura che all'avvio la sidebar rimanga chiusa e le freccette nascoste
     auto_collapse_sidebar()
@@ -1034,6 +1034,9 @@ def render_splash_screen(
         st.markdown(wealth_card_html, unsafe_allow_html=True)
         if st.button("💎 ENTRA NELLA SUITE WEALTH ADVISORY →", key="btn_splash_wealth", use_container_width=True, on_click=_on_click_enter_wealth):
             _on_click_enter_wealth()
+            if not st.session_state.get("wealth_active_portfolio_id"):
+                auth_pid = st.session_state.get("argus_auth_personal_profile_id")
+                st.session_state["wealth_active_portfolio_id"] = auth_pid or 1
             from core.sidebar import switch_to_page
             switch_to_page("pages/12_🎛️_Wealth_Control_Room.py")
 

@@ -84,6 +84,9 @@ if render_argus_splash(app_version=APP_VERSION):
 # Reindirizzamento garantito al desk Wealth se selezionato (dallo splash o da switch rapido)
 if st.session_state.get("argus_portal_mode") == "🏛️ Wealth Management":
     from core.sidebar import switch_to_page
+    if not st.session_state.get("wealth_active_portfolio_id"):
+        auth_pid = st.session_state.get("argus_auth_personal_profile_id")
+        st.session_state["wealth_active_portfolio_id"] = auth_pid or 1
     switch_to_page("pages/12_🎛️_Wealth_Control_Room.py")
     st.stop()
 

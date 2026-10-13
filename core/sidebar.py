@@ -1987,9 +1987,26 @@ def render_sidebar():
                                 matched_pid = p
                                 break
 
+                    # Auto-fallback deterministico al profilo personale o al primo profilo disponibile
+                    if matched_pid is None and pids:
+                        cand_pids = []
+                        auth_pid = st.session_state.get("argus_auth_personal_profile_id")
+                        if auth_pid is not None:
+                            cand_pids.append(auth_pid)
+                        cand_pids.extend([1, pids[0]])
+                        for cand in cand_pids:
+                            for p in pids:
+                                if p == cand or str(p) == str(cand):
+                                    matched_pid = p
+                                    break
+                            if matched_pid is not None:
+                                break
+
                     active_w_pid = matched_pid
                     if active_w_pid is not None:
                         st.session_state["wealth_active_portfolio_id"] = active_w_pid
+                        if active_w_pid in w_names:
+                            st.session_state["wealth_active_profile_name"] = w_names[active_w_pid]
 
                     # Sincronizzazione bi-direzionale garantita con la chiave Streamlit
                     if active_w_pid in w_opts:
@@ -2092,6 +2109,9 @@ def render_sidebar():
         else:
             if st.button("🏛️ Passa a Wealth Management", key="sb_btn_switch_to_wealth", use_container_width=True):
                 st.session_state.argus_portal_mode = "🏛️ Wealth Management"
+                if not st.session_state.get("wealth_active_portfolio_id"):
+                    auth_pid = st.session_state.get("argus_auth_personal_profile_id")
+                    st.session_state["wealth_active_portfolio_id"] = auth_pid or 1
                 switch_to_page("pages/12_🎛️_Wealth_Control_Room.py")
 
         active_nav_modules = NAV_MODULES_WEALTH if is_wealth_mode else NAV_MODULES_RISK

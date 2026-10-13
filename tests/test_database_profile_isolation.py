@@ -362,6 +362,8 @@ class TestDatabaseProfileIsolation:
         pid_b = create_wealth_portfolio(engine_b, name="Beta Profile Identical ID")
         save_wealth_account(engine_b, {"portfolio_id": pid_b, "name": "Account Beta", "balance": 111000.0})
 
+        assert pid_a == pid_b  # Verifica che gli ID di business siano identici tra i due database
+
         # Definiamo una funzione con caching identica a quelle del sistema
         call_tracker = {"calls": 0}
 
@@ -371,25 +373,25 @@ class TestDatabaseProfileIsolation:
             nw = compute_consolidated_net_worth(_engine, portfolio_id=target_pid)
             return float(nw.total_net_worth)
 
-        # Esecuzione query 1 su DB_A con target_pid=1
-        res_a1 = _get_cached_net_worth_metric(engine_a, 1, db_key=key_a)
+        # Esecuzione query 1 su DB_A con target_pid=pid_a
+        res_a1 = _get_cached_net_worth_metric(engine_a, pid_a, db_key=key_a)
         assert res_a1 == 999000.0
         assert call_tracker["calls"] == 1
 
         # Seconda esecuzione identica su DB_A -> deve restituire la cache (call_tracker non incrementa)
-        res_a2 = _get_cached_net_worth_metric(engine_a, 1, db_key=key_a)
+        res_a2 = _get_cached_net_worth_metric(engine_a, pid_a, db_key=key_a)
         assert res_a2 == 999000.0
         assert call_tracker["calls"] == 1
 
-        # Esecuzione su DB_B con IDENTICI parametri di business (target_pid=1) ma diverso db_key
-        res_b1 = _get_cached_net_worth_metric(engine_b, 1, db_key=key_b)
+        # Esecuzione su DB_B con IDENTICI parametri di business (target_pid=pid_b) ma diverso db_key
+        res_b1 = _get_cached_net_worth_metric(engine_b, pid_b, db_key=key_b)
         assert res_b1 == 111000.0
         assert res_b1 != res_a1
         # La chiamata deve aver calcolato il dato di DB_B senza poisoning da DB_A
         assert call_tracker["calls"] == 2
 
         # Ri-lettura su DB_A -> il dato di DB_A non deve essere stato sovrascritto
-        res_a3 = _get_cached_net_worth_metric(engine_a, 1, db_key=key_a)
+        res_a3 = _get_cached_net_worth_metric(engine_a, pid_a, db_key=key_a)
         assert res_a3 == 999000.0
         assert call_tracker["calls"] == 2
 

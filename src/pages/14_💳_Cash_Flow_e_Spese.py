@@ -69,6 +69,8 @@ from core.wealth.wealth_engine import (
 # ── CONFIGURAZIONE PAGINA & SIDEBAR ─────────────────────────
 st.set_page_config(page_title="Cash Flow & Spese | ARGUS Wealth", page_icon="💳", layout="wide")
 st.session_state.argus_portal_mode = "🏛️ Wealth Management"
+inject_custom_css()
+render_sidebar()
 
 ctx = ensure_portal_context(module="wealth")
 ensure_portfolio_loaded(module_type="wealth")

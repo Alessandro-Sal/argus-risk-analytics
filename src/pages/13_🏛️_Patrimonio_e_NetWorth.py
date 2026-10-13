@@ -228,9 +228,25 @@ else:
     prof_map = {row["portfolio_id"]: row["name"] for _, row in df_prof.iterrows()}
     current_pid = st.session_state.get("wealth_active_portfolio_id")
 
-    if current_pid is None or current_pid not in prof_map:
-        current_pid = None
-        st.session_state["wealth_active_portfolio_id"] = None
+    matched_pid = None
+    if current_pid is not None:
+        for p in prof_map.keys():
+            if p == current_pid or str(p) == str(current_pid):
+                matched_pid = p
+                break
+
+    if matched_pid is None and prof_map:
+        auth_pid = st.session_state.get("argus_auth_personal_profile_id")
+        if auth_pid is not None:
+            for p in prof_map.keys():
+                if p == auth_pid or str(p) == str(auth_pid):
+                    matched_pid = p
+                    break
+
+    current_pid = matched_pid
+    st.session_state["wealth_active_portfolio_id"] = current_pid
+    if current_pid in prof_map:
+        st.session_state["wealth_active_profile_name"] = prof_map[current_pid]
 
     if current_pid is None:
         render_omni_command_bar(portal="wealth", context_name="Nessun Profilo", key_suffix="p13")

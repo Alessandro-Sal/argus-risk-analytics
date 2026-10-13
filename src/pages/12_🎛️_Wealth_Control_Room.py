@@ -84,6 +84,8 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 st.session_state.argus_portal_mode = "🏛️ Wealth Management"
+inject_custom_css()
+render_sidebar()
 
 ctx = ensure_portal_context(module="wealth")
 engine = ctx["engine"]
