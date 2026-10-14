@@ -277,6 +277,72 @@ class TestAuthHardeningAndUX:
         assert st.session_state.offline_mode is True
         assert st.session_state.active_archetype_code == "hnwi_family"
 
+    def test_prevent_duplicate_email_registration(self, monkeypatch):
+        st.session_state.clear()
+        from sqlalchemy import create_engine
+
+        from core.supabase_cloud import SupabaseAuthManager
+
+        test_eng = create_engine("sqlite:///:memory:")
+        SupabaseAuthManager.ensure_users_table(test_eng)
+
+        # 1. Registra un primo utente
+        res1 = SupabaseAuthManager.create_or_update_user(
+            engine=test_eng,
+            username="investitore_alpha",
+            password="ArgusEnterprise#2026",
+            display_name="Mario Rossi",
+            email="mario.rossi@argus.cloud",
+            allow_update=False,
+        )
+        assert res1["ok"] is True
+
+        # 2. Tentativo con la STESSA email ma username diverso: deve essere bloccato
+        res_dup_email = SupabaseAuthManager.create_or_update_user(
+            engine=test_eng,
+            username="investitore_beta",
+            password="ArgusEnterprise#2026",
+            display_name="Mario Clone",
+            email="mario.rossi@argus.cloud",
+            allow_update=False,
+        )
+        assert res_dup_email["ok"] is False
+        assert "già associato" in res_dup_email["error"].lower()
+
+        # 3. Tentativo con lo STESSO username ma email diversa: deve essere bloccato
+        res_dup_user = SupabaseAuthManager.create_or_update_user(
+            engine=test_eng,
+            username="investitore_alpha",
+            password="ArgusEnterprise#2026",
+            display_name="Nuovo Mario",
+            email="nuova.email@argus.cloud",
+            allow_update=False,
+        )
+        assert res_dup_user["ok"] is False
+        assert "già in uso" in res_dup_user["error"].lower()
+
+        # 4. Verifica anti-duplicato GoTrue Auth (identities vuoto o eccezione already registered)
+        class MockUserDup:
+            identities = []  # GoTrue returns empty identities for duplicate emails
+
+        class MockAuthDup:
+            def sign_up(self, params):
+                class MockRes:
+                    user = MockUserDup()
+                    session = None
+                return MockRes()
+
+        class MockClientDup:
+            auth = MockAuthDup()
+
+        monkeypatch.setattr(AuthManager, "get_supabase_client", lambda access_token=None: MockClientDup())
+        monkeypatch.setattr("core.config_manager.get_supabase_anon_key", lambda: "mock_anon_key_valid")
+        monkeypatch.setattr("core.config_manager.get_supabase_url", lambda: "https://mock.supabase.co")
+
+        res_gotrue_dup = AuthManager.sign_up("mario.rossi@argus.cloud", "ArgusEnterprise#2026", "Mario Rossi")
+        assert res_gotrue_dup["ok"] is False
+        assert "già registrato" in res_gotrue_dup["error"].lower()
+
     def test_logout_flow_and_landing_on_login_gate(self):
         from core.config_manager import is_auth_required
         from core.supabase_cloud import logout_argus_user

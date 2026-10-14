@@ -1671,12 +1671,15 @@ class SupabaseAuthManager:
         display_name: Optional[str] = None,
         email: Optional[str] = None,
         custom_db_url: Optional[str] = None,
+        allow_update: bool = True,
     ) -> Dict[str, Any]:
         """
         Registra o aggiorna un utente in `argus_users` e, se `role == 'user'`,
         inizializza automaticamente il suo profilo patrimoniale isolato in `wealth_profiles`.
+        Se allow_update=False, impedisce categoricamente la registrazione se l'email o lo username esistono già.
         """
         uname = (username or "").strip().lower()
+        clean_email = (email or "").strip().lower()
         if not uname or len(uname) < 2:
             return {"ok": False, "error": "Username troppo corto (minimo 2 caratteri)."}
         if not password or len(password) < 4:
@@ -1689,11 +1692,32 @@ class SupabaseAuthManager:
         clean_custom_db = normalize_supabase_db_url(custom_db_url) if custom_db_url else ""
 
         with engine.begin() as conn:
+            # 1. Verifica unicità dell'indirizzo email
+            if clean_email:
+                row_email = conn.execute(
+                    sqlt("SELECT username FROM argus_users WHERE LOWER(email) = :e"),
+                    {"e": clean_email},
+                ).fetchone()
+                if row_email:
+                    existing_u = str(row_email[0])
+                    if not allow_update or existing_u.lower() != uname:
+                        return {
+                            "ok": False,
+                            "error": f"L'indirizzo email '{clean_email}' è già associato a un account esistente (@{existing_u}). Effettua il login o richiedi il recupero password.",
+                        }
+
+            # 2. Verifica unicità dello username
             existing = conn.execute(
                 sqlt("SELECT user_id FROM argus_users WHERE LOWER(username) = :u"),
                 {"u": uname},
             ).scalar()
+
             if existing:
+                if not allow_update:
+                    return {
+                        "ok": False,
+                        "error": f"Il nome utente '@{uname}' è già in uso. Scegli un altro username o accedi con la tua password.",
+                    }
                 conn.execute(
                     sqlt("""
                         UPDATE argus_users
@@ -1707,7 +1731,7 @@ class SupabaseAuthManager:
                     """),
                     {
                         "d": disp,
-                        "e": (email or "").strip(),
+                        "e": clean_email,
                         "p": pwd_hash,
                         "r": clean_role,
                         "c": clean_custom_db,
@@ -1722,7 +1746,7 @@ class SupabaseAuthManager:
                     """),
                     {
                         "u": uname,
-                        "e": (email or "").strip(),
+                        "e": clean_email,
                         "d": disp,
                         "p": pwd_hash,
                         "r": clean_role,

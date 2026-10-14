@@ -577,6 +577,42 @@ class AuthManager:
         if "@" not in email:
             email = f"{email.lower()}@argus.cloud"
 
+        # 1. Verifica preventiva di unicità su tabella applicativa argus_users
+        try:
+            from sqlalchemy import inspect
+            from sqlalchemy import text as sqlt
+
+            from core.fetcher import get_engine
+            from core.supabase_cloud import create_supabase_engine, get_supabase_config
+
+            cfg_chk = get_supabase_config()
+            eng_chk = create_supabase_engine(cfg_chk["db_url"], use_cache=True) if cfg_chk.get("is_configured") else None
+            if eng_chk is None:
+                eng_chk = get_engine(offline=True)
+            if eng_chk is not None:
+                insp = inspect(eng_chk)
+                if "argus_users" in insp.get_table_names():
+                    uname_chk = raw_identity if "@" not in raw_identity else email.split("@")[0].lower()
+                    with eng_chk.connect() as conn:
+                        row_existing = conn.execute(
+                            sqlt("SELECT username, email FROM argus_users WHERE LOWER(email) = :e OR LOWER(username) = :u"),
+                            {"e": email.lower(), "u": uname_chk},
+                        ).fetchone()
+                        if row_existing:
+                            eu, ee = str(row_existing[0]), str(row_existing[1] or "")
+                            if ee.lower() == email.lower():
+                                return {
+                                    "ok": False,
+                                    "error": f"L'indirizzo email '{email}' risulta già registrato (@{eu}). Effettua il login o richiedi il recupero password.",
+                                }
+                            return {
+                                "ok": False,
+                                "error": f"Il nome utente '@{uname_chk}' è già in uso. Scegli un altro username o accedi con la tua password.",
+                            }
+        except Exception as ex_dup_chk:
+            logger.debug("Verifica unicità argus_users non bloccante: %s", ex_dup_chk)
+
+        # 2. Registrazione su Supabase Auth nativo (GoTrue)
         client = cls.get_supabase_client()
         anon_key = get_supabase_anon_key()
         supa_url = get_supabase_url()
@@ -592,6 +628,14 @@ class AuthManager:
                 )
                 if sign_res and sign_res.user:
                     u = sign_res.user
+                    identities = getattr(u, "identities", None)
+                    # Verifica anti-duplicato Supabase GoTrue: se l'email esiste già, identities è vuoto ([])
+                    if identities is not None and len(identities) == 0:
+                        return {
+                            "ok": False,
+                            "error": f"L'indirizzo email '{email}' risulta già registrato su Supabase. Effettua l'accesso o reimposta la password.",
+                        }
+
                     sess = sign_res.session
                     session_data = {
                         "ok": True,
@@ -604,7 +648,7 @@ class AuthManager:
                         "refresh_token": getattr(sess, "refresh_token", "") if sess else "",
                         "expires_at": getattr(sess, "expires_at", int(time.time()) + 3600) if sess else 0,
                     }
-                    # Mirror/Sync opzionale su tabella applicativa argus_users
+                    # Mirror/Sync su tabella applicativa argus_users (allow_update=False per evitare duplicati)
                     try:
                         from core.fetcher import get_engine
                         from core.supabase_cloud import (
@@ -625,6 +669,7 @@ class AuthManager:
                                 role="user",
                                 display_name=name,
                                 email=email,
+                                allow_update=False,
                             )
                     except Exception as ex_sync_reg:
                         logger.debug("Sync sign_up su argus_users non bloccante: %s", ex_sync_reg)
@@ -633,9 +678,18 @@ class AuthManager:
                         cls.apply_session(session_data)
                     return session_data
             except Exception as ex_reg:
-                logger.warning("Supabase Auth sign_up exception: %s", ex_reg)
+                err_msg = str(ex_reg)
+                logger.warning("Supabase Auth sign_up exception: %s", err_msg)
+                if any(
+                    dup_word in err_msg.lower()
+                    for dup_word in ("already registered", "already exists", "user already", "email address is already in use")
+                ):
+                    return {
+                        "ok": False,
+                        "error": f"L'indirizzo email '{email}' risulta già registrato. Effettua il login o richiedi il recupero password.",
+                    }
 
-        # Fallback registrazione su DB SQL locale/cloud (argus_users)
+        # 3. Fallback registrazione su DB SQL locale/cloud (argus_users)
         try:
             from core.fetcher import get_engine
             from core.supabase_cloud import SupabaseAuthManager, create_supabase_engine, get_supabase_config
@@ -651,6 +705,8 @@ class AuthManager:
                 password=pwd,
                 role="user",
                 display_name=name,
+                email=email,
+                allow_update=False,
             )
             if c_res.get("ok"):
                 sess_info = {
