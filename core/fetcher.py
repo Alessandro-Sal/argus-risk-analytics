@@ -261,7 +261,11 @@ def get_engine(
                 except Exception:
                     pass
 
-    engine_key = str(getattr(engine, "url", id(engine)))
+    db_name = getattr(getattr(engine, "url", None), "database", None)
+    if not db_name or db_name == ":memory:":
+        engine_key = f"sqlite:memory:{id(engine)}"
+    else:
+        engine_key = str(getattr(engine, "url", id(engine)))
     with _BOOTSTRAP_LOCK:
         if engine_key in _BOOTSTRAPPED_ENGINES:
             return engine

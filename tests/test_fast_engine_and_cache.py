@@ -27,8 +27,9 @@ def test_engine_schema_bootstrap_only_runs_once():
 
 def test_wealth_portfolios_in_memory_caching():
     """Verifica che get_wealth_portfolios memorizzi i profili in cache e si invalidi alle modifiche."""
+    from sqlalchemy.pool import StaticPool
     clear_wealth_portfolios_cache()
-    eng = create_engine("sqlite:///:memory:")
+    eng = create_engine("sqlite:///:memory:", poolclass=StaticPool, connect_args={"check_same_thread": False})
 
     # First fetch: populates cache
     df1 = get_wealth_portfolios(eng)

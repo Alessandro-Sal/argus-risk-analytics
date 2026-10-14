@@ -479,8 +479,101 @@ with st.expander(f"📚 Storico Snapshot & Recall Analisi ({st.session_state.get
                         except Exception:
                             pass
 
+                        results = None
+                        ex_calc = None
                         try:
                             results = compute_risk(target_pid, engine_sidebar, benchmark_ticker=benchmark, risk_free_rate=rf_val, base_currency=base_curr)
+                        except Exception as e_calc:
+                            ex_calc = e_calc
+                            # Fallback di ripristino ad alta fedelta dalle tabelle snapshot del database
+                            try:
+                                from core.db_exporter import get_snapshot_positions_by_id
+                                df_pos = get_snapshot_positions_by_id(engine_sidebar, sel_row.snapshot_id)
+                                if df_pos is not None and not df_pos.empty:
+                                    with engine_sidebar.connect() as conn:
+                                        snap_row = conn.execute(
+                                            sqlt("SELECT * FROM portfolio_snapshots WHERE snapshot_id = :sid"),
+                                            {"sid": int(sel_row.snapshot_id)}
+                                        ).mappings().fetchone()
+
+                                    snap_d = dict(snap_row) if snap_row else {}
+                                    tot_val = float(snap_d.get("total_value") or sel_row.total_value or 0.0)
+                                    cagr_v = float(snap_d.get("cagr_pct") or sel_row.cagr_pct or 0.0)
+                                    sharpe_v = float(snap_d.get("sharpe_ratio") or sel_row.sharpe_ratio or 0.0)
+                                    max_dd_v = float(snap_d.get("max_drawdown_pct") or sel_row.max_drawdown_pct or 0.0)
+                                    var_95_v = float(snap_d.get("var_95_pct") or sel_row.var_95_pct or 0.0)
+                                    vol_ann_v = float(snap_d.get("volatility_annual_pct") or 0.0)
+                                    cvar_95_v = float(snap_d.get("cvar_95_pct") or 0.0)
+
+                                    if "weight_pct" in df_pos.columns and "weight" not in df_pos.columns:
+                                        df_pos["weight"] = df_pos["weight_pct"] / 100.0
+
+                                    reconstructed_metrics = {
+                                        "returns": {
+                                            "total_value": tot_val,
+                                            "cagr_pct": cagr_v,
+                                            "sharpe_ratio": sharpe_v,
+                                            "total_pnl": float(snap_d.get("total_pnl") or 0.0),
+                                            "cost_basis_total": float(snap_d.get("cost_basis_total") or 0.0),
+                                            "unrealized_pnl_total": float(snap_d.get("unrealized_pnl_total") or 0.0),
+                                            "realized_pnl_total": float(snap_d.get("realized_pnl_total") or 0.0),
+                                            "dividends_total": float(snap_d.get("dividends_total") or 0.0),
+                                            "sortino_ratio": float(snap_d.get("sortino_ratio") or 0.0),
+                                            "calmar_ratio": float(snap_d.get("calmar_ratio") or 0.0),
+                                            "alpha_pct": float(snap_d.get("alpha_pct") or 0.0),
+                                            "information_ratio": float(snap_d.get("information_ratio") or 0.0),
+                                        },
+                                        "market_risk": {
+                                            "volatility_annual_pct": vol_ann_v,
+                                            "max_drawdown_pct": max_dd_v,
+                                            "var_95": var_95_v,
+                                            "var_parametric_95": var_95_v,
+                                            "cvar_95": cvar_95_v,
+                                            "beta": float(snap_d.get("ff_beta_mkt") or 1.0),
+                                            "sharpe_ratio": sharpe_v,
+                                            "omega_ratio": float(snap_d.get("omega_ratio") or 0.0),
+                                            "tail_ratio": float(snap_d.get("tail_ratio") or 0.0),
+                                            "gain_loss_ratio": float(snap_d.get("gain_loss_ratio") or 0.0),
+                                            "ulcer_index": float(snap_d.get("ulcer_index") or 0.0),
+                                        },
+                                        "concentration": {
+                                            "hhi": float(snap_d.get("hhi_index") or 0.0),
+                                            "hhi_index": float(snap_d.get("hhi_index") or 0.0),
+                                            "diversification_ratio": float(snap_d.get("diversification_ratio") or 1.0),
+                                        },
+                                        "var_models": {
+                                            "var_param_95": var_95_v,
+                                            "cvar_param_95": cvar_95_v,
+                                            "var_hist_95": var_95_v,
+                                            "var_cf_95": float(snap_d.get("var_cf_95_pct") or var_95_v),
+                                            "cvar_cf_95": float(snap_d.get("cvar_cf_95_pct") or cvar_95_v),
+                                        },
+                                        "ai_insights": {
+                                            "montecarlo": {
+                                                "expected_return_1y": float(snap_d.get("mc_expected_return_1y") or 0.0),
+                                                "var_95": float(snap_d.get("mc_var_95") or 0.0),
+                                            }
+                                        }
+                                    }
+
+                                    results = {
+                                        "portfolio_id": target_pid,
+                                        "computed_at": str(snap_d.get("calc_date") or datetime.datetime.now()),
+                                        "total_value": tot_val,
+                                        "portfolio_value": tot_val,
+                                        "positions": df_pos,
+                                        "returns": pd.DataFrame(),
+                                        "portfolio_return": pd.Series(dtype=float),
+                                        "benchmark_return": pd.Series(dtype=float),
+                                        "df_prices": pd.DataFrame(),
+                                        "metrics": reconstructed_metrics,
+                                        "risk_free": {"rate_pct": float(snap_d.get("risk_free_rate_pct") or 3.0)},
+                                        "warnings": [f"Snapshot ripristinato dallo storico #{sel_row.snapshot_id}"],
+                                    }
+                            except Exception:
+                                pass
+
+                        if results is not None:
                             st.session_state["pipeline_done"]  = True
                             st.session_state["portfolio_id"]   = target_pid
                             st.session_state["portfolio_name"] = sel_row.port_name
@@ -488,6 +581,25 @@ with st.expander(f"📚 Storico Snapshot & Recall Analisi ({st.session_state.get
                             st.session_state["results"]        = results
                             st.session_state["run_id"]         = sel_row.run_id
                             st.session_state["fetch_report"]   = {"success": [], "skipped": [], "rows_written": 0, "errors": []}
+                            st.session_state.pop("session_cleared", None)
+                            st.session_state["session_cleared"] = False
+
+                            try:
+                                ws_ctx = WorkspaceContext.get_current()
+                                ws_ctx.risk.results = results
+                                ws_ctx.risk.portfolio_id = target_pid
+                                ws_ctx.risk.portfolio_name = sel_row.port_name
+                                ws_ctx.risk.run_id = sel_row.run_id
+                                ws_ctx.risk.pipeline_done = True
+                                ws_ctx.risk.is_live_active = True
+                                ws_ctx.risk.benchmark = benchmark
+                                if rf_val is not None:
+                                    ws_ctx.risk.risk_free_rate = float(rf_val)
+                                ws_ctx.risk.base_currency = base_curr
+                                ws_ctx.version += 1
+                            except Exception:
+                                pass
+
                             from core.workspace_manager import save_session_snapshot_to_cache
                             save_session_snapshot_to_cache()
                             st.success(f"Analisi {sel_row.run_id} ricaricata con successo!")
@@ -495,8 +607,8 @@ with st.expander(f"📚 Storico Snapshot & Recall Analisi ({st.session_state.get
                                 st.switch_page("pages/1_📈_Dashboard_Generale.py")
                             except Exception:
                                 st.rerun()
-                        except Exception as ex_calc:
-                            st.error(f"Impossibile ricalcolare l'analisi per il portafoglio #{target_pid}: {ex_calc}")
+                        else:
+                            st.error(f"Impossibile ricalcolare o ripristinare l'analisi per il portafoglio #{target_pid}: {ex_calc}")
                 
                 if btn_del:
                     from core.confirm_dialogs import confirm_delete_snapshot_dialog
@@ -813,6 +925,19 @@ with tab_ingest:
                         st.session_state["run_id"] = run_id_sync
                         st.session_state["fetch_report"] = f_rep
                         st.session_state.pop("session_cleared", None)
+                        st.session_state["session_cleared"] = False
+
+                        try:
+                            from core.workspace_context import WorkspaceContext
+                            ws_ctx = WorkspaceContext.get_current()
+                            ws_ctx.risk.results = res_sync
+                            ws_ctx.risk.portfolio_name = p_name_sync or "Google Sheets Portfolio"
+                            ws_ctx.risk.run_id = run_id_sync
+                            ws_ctx.risk.pipeline_done = True
+                            ws_ctx.risk.is_live_active = True
+                            ws_ctx.version += 1
+                        except Exception:
+                            pass
 
                         # Preservazione consistenza DataFrame transazioni per l'intera sessione
                         df_tx_sync = None
@@ -1195,6 +1320,25 @@ with tab_ingest:
                     st.session_state["fetch_report"]   = fetch_report
                     st.session_state["results"]        = results
                     st.session_state["run_id"]         = run_id
+                    st.session_state.pop("session_cleared", None)
+                    st.session_state["session_cleared"] = False
+
+                    try:
+                        ws_ctx = WorkspaceContext.get_current()
+                        ws_ctx.risk.results = results
+                        ws_ctx.risk.portfolio_id = portfolio_id
+                        ws_ctx.risk.portfolio_name = p_name_final
+                        ws_ctx.risk.run_id = run_id
+                        ws_ctx.risk.pipeline_done = True
+                        ws_ctx.risk.is_live_active = True
+                        ws_ctx.risk.benchmark = benchmark
+                        if rf_val is not None:
+                            ws_ctx.risk.risk_free_rate = float(rf_val)
+                        ws_ctx.risk.base_currency = base_curr
+                        ws_ctx.version += 1
+                    except Exception:
+                        pass
+
                     from core.workspace_manager import save_session_snapshot_to_cache
                     save_session_snapshot_to_cache()
                     st.rerun()

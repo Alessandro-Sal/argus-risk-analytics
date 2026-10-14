@@ -388,3 +388,48 @@ def test_render_wealth_profile_picker_click_does_not_modify_instantiated_widget_
         assert st.session_state.get("wealth_active_profile_name") == "Profilo Alpha"
         assert mock_rerun.called
 
+
+def test_historical_analysis_reload_clears_session_cleared_and_unblocks_guard():
+    """
+    Verifica che il richiamo di un'analisi storica dal database o il ricaricamento di un bundle
+    ripulisca automaticamente il flag 'session_cleared' (impostato da sanitize_risk_portfolio_state)
+    e consenta a tutte le pagine analitiche di caricare i dati senza cadere nell'Empty State.
+    """
+    from core.workspace_context import WorkspaceContext
+
+    st.session_state.clear()
+
+    # 1. Simula l'esecuzione di sanitize_risk_portfolio_state (es. all'avvio del caricamento)
+    WorkspaceContext.sanitize_risk_portfolio_state(preserve_db_creds=True)
+    assert st.session_state.get("session_cleared") is True
+    assert st.session_state.get("results") is None
+
+    # Verifica che in questo stato intermedio la guard blocchi correttamente
+    with patch("streamlit.stop", side_effect=StreamlitStopInvoked):
+        with pytest.raises(StreamlitStopInvoked):
+            ensure_portfolio_loaded(module_type="risk")
+
+    # 2. Simula il completamento del ricaricamento dello snapshot
+    df_pos = pd.DataFrame([
+        {"ticker": "AAPL", "current_value": 50000.0, "weight_pct": 50.0},
+        {"ticker": "MSFT", "current_value": 50000.0, "weight_pct": 50.0},
+    ])
+    reloaded_bundle = {
+        "portfolio_id": 99,
+        "positions": df_pos,
+        "metrics": {"returns": {"cagr_pct": 12.5, "sharpe_ratio": 1.4}, "market_risk": {}},
+        "is_sandbox": False,
+    }
+    st.session_state["results"] = reloaded_bundle
+    st.session_state["pipeline_done"] = True
+    st.session_state["portfolio_id"] = 99
+    st.session_state["portfolio_name"] = "Portafoglio Ricaricato"
+
+    # 3. Invoca ensure_portfolio_loaded: la guard deve auto-guarire, rimuovere session_cleared e restituire il bundle
+    with patch("streamlit.stop", side_effect=StreamlitStopInvoked):
+        res, has_real = ensure_portfolio_loaded(module_type="risk")
+        assert res is not None
+        assert has_real is True
+        assert len(res["positions"]) == 2
+        assert st.session_state.get("session_cleared") is False
+

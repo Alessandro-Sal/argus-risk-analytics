@@ -206,10 +206,11 @@ def clear_wealth_db_init_cache() -> None:
 
 def init_wealth_db(engine: Engine) -> None:
     """Inizializza automaticamente le tabelle del Wealth Management se non presenti (SQLite, PostgreSQL, MySQL)."""
-    if engine is None:
-        return
-
-    engine_key = str(getattr(engine, "url", id(engine)))
+    db_name = getattr(getattr(engine, "url", None), "database", None)
+    if not db_name or db_name == ":memory:":
+        engine_key = f"sqlite:memory:{id(engine)}"
+    else:
+        engine_key = str(getattr(engine, "url", id(engine)))
     with _INITIALIZED_WEALTH_LOCK:
         if engine_key in _INITIALIZED_WEALTH_ENGINES:
             return
@@ -1349,29 +1350,61 @@ def get_wealth_portfolios(engine: Engine) -> pd.DataFrame:
             if (now - ts) < 30.0:  # 30s cache TTL
                 return df_cached.copy()
 
-    with engine.connect() as conn:
-        if enforce_owner:
-            df = pd.read_sql(
-                sqlt("""
+    try:
+        with engine.connect() as conn:
+            if enforce_owner:
+                df = pd.read_sql(
+                    sqlt("""
+                        SELECT profile_id AS portfolio_id, name, owner, base_currency, created_at, description 
+                        FROM wealth_profiles 
+                        WHERE name IS NOT NULL AND TRIM(name) != ''
+                          AND LOWER(TRIM(owner)) = LOWER(TRIM(:owner))
+                        ORDER BY profile_id ASC
+                    """),
+                    conn,
+                    params={"owner": curr_user},
+                )
+            else:
+                df = pd.read_sql(
+                    """
                     SELECT profile_id AS portfolio_id, name, owner, base_currency, created_at, description 
                     FROM wealth_profiles 
                     WHERE name IS NOT NULL AND TRIM(name) != ''
-                      AND LOWER(TRIM(owner)) = LOWER(TRIM(:owner))
                     ORDER BY profile_id ASC
-                """),
-                conn,
-                params={"owner": curr_user},
-            )
+                """,
+                    conn,
+                )
+    except Exception as e_sql:
+        if "no such table" in str(e_sql).lower() or "doesn't exist" in str(e_sql).lower() or "does not exist" in str(e_sql).lower():
+            try:
+                init_wealth_db(engine)
+                with engine.connect() as conn:
+                    if enforce_owner:
+                        df = pd.read_sql(
+                            sqlt("""
+                                SELECT profile_id AS portfolio_id, name, owner, base_currency, created_at, description 
+                                FROM wealth_profiles 
+                                WHERE name IS NOT NULL AND TRIM(name) != ''
+                                  AND LOWER(TRIM(owner)) = LOWER(TRIM(:owner))
+                                ORDER BY profile_id ASC
+                            """),
+                            conn,
+                            params={"owner": curr_user},
+                        )
+                    else:
+                        df = pd.read_sql(
+                            """
+                            SELECT profile_id AS portfolio_id, name, owner, base_currency, created_at, description 
+                            FROM wealth_profiles 
+                            WHERE name IS NOT NULL AND TRIM(name) != ''
+                            ORDER BY profile_id ASC
+                        """,
+                            conn,
+                        )
+            except Exception:
+                df = pd.DataFrame(columns=["portfolio_id", "name", "owner", "base_currency", "created_at", "description"])
         else:
-            df = pd.read_sql(
-                """
-                SELECT profile_id AS portfolio_id, name, owner, base_currency, created_at, description 
-                FROM wealth_profiles 
-                WHERE name IS NOT NULL AND TRIM(name) != ''
-                ORDER BY profile_id ASC
-            """,
-                conn,
-            )
+            df = pd.DataFrame(columns=["portfolio_id", "name", "owner", "base_currency", "created_at", "description"])
 
     if df.empty:
         default_prof_name = f"Patrimonio {curr_disp}" if enforce_owner else "Personale"

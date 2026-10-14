@@ -215,16 +215,53 @@ def ensure_portfolio_loaded(
     results = st.session_state.get("results")
     pipeline_done = bool(st.session_state.get("pipeline_done", False))
 
-    if session_cleared:
+    # Self-healing: se results non è in session_state e non c'è stato reset esplicito, prova a ripristinarlo da WorkspaceContext o cache
+    if (results is None or not isinstance(results, dict)) and not session_cleared:
+        try:
+            from core.workspace_context import WorkspaceContext
+            ws = WorkspaceContext.get_current()
+            if ws.risk.results is not None:
+                results = ws.risk.results
+                st.session_state["results"] = results
+                if ws.risk.portfolio_id:
+                    st.session_state["portfolio_id"] = ws.risk.portfolio_id
+                if ws.risk.portfolio_name:
+                    st.session_state["portfolio_name"] = ws.risk.portfolio_name
+                if ws.risk.run_id:
+                    st.session_state["run_id"] = ws.risk.run_id
+                if ws.risk.pipeline_done:
+                    st.session_state["pipeline_done"] = True
+                    pipeline_done = True
+        except Exception:
+            pass
+
+        if (results is None or not isinstance(results, dict)):
+            try:
+                from core.workspace_manager import try_restore_session_from_cache
+                if try_restore_session_from_cache(force=False):
+                    results = st.session_state.get("results")
+                    pipeline_done = bool(st.session_state.get("pipeline_done", False))
+            except Exception:
+                pass
+
+    has_valid_positions = (
+        results is not None
+        and isinstance(results, dict)
+        and bool(results.get("positions") is not None and not results.get("positions").empty)
+    )
+
+    if has_valid_positions:
+        session_cleared = False
+        st.session_state.pop("session_cleared", None)
+        st.session_state["session_cleared"] = False
+        has_risk = True
+    elif session_cleared:
         has_risk = False
         has_wealth = False
     else:
-        has_risk = (
-            results is not None
-            and isinstance(results, dict)
-            and bool(results.get("positions") is not None and not results.get("positions").empty)
-        )
+        has_risk = False
 
+    if not session_cleared:
         has_wealth = False
         if results is not None and isinstance(results, dict) and results.get("wealth_snapshot"):
             ws = results.get("wealth_snapshot")

@@ -387,6 +387,11 @@ class WorkspaceContext:
             if "results" in st_state and st_state["results"] is not None:
                 self.risk.results = st_state["results"]
                 self.risk.is_live_active = True
+                if isinstance(st_state["results"], dict):
+                    pos = st_state["results"].get("positions")
+                    if pos is not None and not (hasattr(pos, "empty") and pos.empty):
+                        st_state.pop("session_cleared", None)
+                        st_state["session_cleared"] = False
             elif "results" in st_state and st_state["results"] is None and not self.risk.results:
                 self.risk.results = None
                 self.risk.is_live_active = False
@@ -437,6 +442,12 @@ class WorkspaceContext:
             st_state["active_rf_rate"] = self.risk.risk_free_rate
             st_state["pipeline_done"] = self.risk.pipeline_done
             st_state["fetch_report"] = self.risk.fetch_report
+
+            if self.risk.results is not None and isinstance(self.risk.results, dict):
+                pos = self.risk.results.get("positions")
+                if pos is not None and not (hasattr(pos, "empty") and pos.empty):
+                    st_state.pop("session_cleared", None)
+                    st_state["session_cleared"] = False
 
             st_state["wealth_active_portfolio_id"] = self.wealth.profile_id
             st_state["wealth_active_profile_name"] = self.wealth.profile_name
