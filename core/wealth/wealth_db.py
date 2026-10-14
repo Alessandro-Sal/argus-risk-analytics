@@ -1305,19 +1305,17 @@ def _get_active_user_isolation_context() -> Tuple[str, str, bool]:
                     disp = disp or str(getattr(user_obj, "display_name", None) or getattr(user_obj, "username", None) or "").strip()
                     role = role or str(getattr(user_obj, "role", None) or "").strip().lower()
 
-            is_auth = bool(
-                ss.get("authenticated", False)
-                or ss.get("argus_auth_verified", False)
-                or ss.get("argus_session")
-            )
-            # If no authenticated user session exists, do NOT enforce owner filtering (e.g. tests or unauthenticated CLI/offline)
-            if not is_auth or not uname:
-                return uname or "user", disp or "Personale", False
+            # If no role or user identity is defined in session, treat as owner/unrestricted (e.g. tests or unauthenticated CLI/offline)
+            if not uname and not role:
+                return "user", "Personale", False
+
+            uname = uname or "user"
+            disp = disp or uname.capitalize()
+            role = role or "user"
 
             has_custom_db = bool(str(ss.get("argus_user_custom_db_url", "") or "").strip())
-            is_admin_or_guest = role in ("admin", "guest_demo", "demo")
-            enforce = (not is_admin_or_guest and not has_custom_db)
-            return uname, disp or uname.capitalize(), enforce
+            enforce = (role == "user" and not has_custom_db)
+            return uname, disp, enforce
     except Exception:
         pass
     return "user", "Personale", False
