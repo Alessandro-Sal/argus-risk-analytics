@@ -2298,10 +2298,15 @@ def render_sidebar():
             use_container_width=True,
             help=f"Disconnette {acct_badge['display_name']} (@{acct_badge['username']}), pulisce la cache in RAM e apre il terminale di Login ARGUS.",
         ):
+            from core.auth_manager import AuthManager
             from core.supabase_cloud import SupabaseAuthManager, logout_argus_user
 
             SupabaseAuthManager.set_security_settings(require_login=True)
             logout_argus_user()
+            AuthManager.logout()
+            st.session_state["splash_dismissed"] = True
+            st.session_state["auth_view"] = "LOGIN"
+            st.session_state["require_login_forced"] = True
             try:
                 st.switch_page("0_Control_Room.py")
             except Exception:

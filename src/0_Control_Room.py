@@ -28,9 +28,9 @@ _qp = getattr(st, "query_params", None)
 _is_splash = not st.session_state.get("_app_initialized", False) and not st.session_state.get("splash_dismissed", False)
 _is_auth_locked = False
 try:
-    from core.supabase_cloud import get_supabase_config
+    from core.auth_manager import AuthManager
 
-    if get_supabase_config().get("require_login", False) and not st.session_state.get("argus_auth_verified", False):
+    if not AuthManager.is_authenticated():
         _is_auth_locked = True
 except Exception:
     pass
@@ -66,6 +66,13 @@ if _qp is not None:
             del st.query_params["splash"]
         except Exception:
             pass
+
+# ── Blocco di Navigazione Pre-Autenticazione (Login Gate Obbligatorio) ──
+from core.auth_manager import AuthManager, require_auth
+
+if not AuthManager.is_authenticated():
+    require_auth()
+    st.stop()
 
 # ── Splash Screen & Bootloader Istituzionale (All'avvio) ──────
 import components.splash as _splash_mod

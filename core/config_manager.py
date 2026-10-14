@@ -177,8 +177,17 @@ def get_supabase_db_url() -> str:
 def is_auth_required() -> bool:
     """
     Determina se il login è obbligatorio all'avvio.
-    Ritorna True se `ARGUS_REQUIRE_LOGIN` è impostato a 'true' (o su Streamlit Cloud con credenziali attive).
+    Ritorna True se `ARGUS_REQUIRE_LOGIN` è impostato a 'true' (o su Streamlit Cloud con credenziali attive),
+    oppure se è stato forzato un logout esplicito da sessione.
     """
+    try:
+        import streamlit as st
+
+        if st.session_state.get("require_login_forced", False):
+            return True
+    except Exception:
+        pass
+
     req = get_setting("ARGUS_REQUIRE_LOGIN", default=None)
     if req is not None:
         return str(req).strip().lower() in ("true", "1", "yes", "y")

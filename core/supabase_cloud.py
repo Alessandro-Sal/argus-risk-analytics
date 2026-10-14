@@ -2176,16 +2176,37 @@ def apply_authenticated_user_session(auth_res: Dict[str, Any]) -> None:
 
 
 def logout_argus_user() -> None:
-    """Effettua il logout sicuro dell'utente corrente, resetta lo splash e pulisce tutti i dati in RAM."""
+    """Effettua il logout sicuro dell'utente corrente, pulisce tutti i dati in RAM e ripristina la vista di Login."""
     import streamlit as st
 
-    for k in list(st.session_state.keys()):
-        if k.startswith("argus_auth_") or k in _USER_SESSION_ISOLATED_KEYS:
-            st.session_state.pop(k, None)
-    st.session_state["splash_dismissed"] = False
+    try:
+        from core.auth_manager import AuthManager
+
+        AuthManager.logout()
+    except Exception:
+        for k in list(st.session_state.keys()):
+            if (
+                k.startswith("argus_auth_")
+                or k.startswith("argus_session")
+                or k in _USER_SESSION_ISOLATED_KEYS
+            ):
+                st.session_state.pop(k, None)
+        st.session_state["authenticated"] = False
+        st.session_state["argus_auth_verified"] = False
+        st.session_state["auth_view"] = "LOGIN"
+
+    st.session_state["splash_dismissed"] = True
     st.session_state["_app_initialized"] = False
-    st.cache_data.clear()
-    st.cache_resource.clear()
+    st.session_state["require_login_forced"] = True
+    import os
+
+    os.environ["ARGUS_REQUIRE_LOGIN"] = "true"
+
+    try:
+        st.cache_data.clear()
+        st.cache_resource.clear()
+    except Exception:
+        pass
 
 
 def get_active_account_badge_info() -> Dict[str, str]:

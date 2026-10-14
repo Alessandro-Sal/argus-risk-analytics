@@ -277,3 +277,21 @@ class TestAuthHardeningAndUX:
         assert st.session_state.offline_mode is True
         assert st.session_state.active_archetype_code == "hnwi_family"
 
+    def test_logout_flow_and_landing_on_login_gate(self):
+        from core.config_manager import is_auth_required
+        from core.supabase_cloud import logout_argus_user
+
+        # 1. Autentica una sessione
+        AuthManager.login_sandbox_archetype("hnwi_family")
+        assert AuthManager.is_authenticated() is True
+
+        # 2. Esegui il logout
+        logout_argus_user()
+
+        # 3. Verifica che lo stato sia completamente resettato alla vista LOGIN
+        assert AuthManager.is_authenticated() is False
+        assert st.session_state.get("auth_view") == "LOGIN"
+        assert st.session_state.get("splash_dismissed") is True
+        assert st.session_state.get("require_login_forced") is True
+        assert is_auth_required() is True
+

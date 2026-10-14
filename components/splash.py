@@ -1052,8 +1052,14 @@ def render_splash_screen(
                 use_container_width=True,
                 help="Disconnette la sessione corrente e riapre il terminale di Login ARGUS.",
             ):
+                from core.auth_manager import AuthManager
+
                 SupabaseAuthManager.set_security_settings(require_login=True)
                 logout_argus_user()
+                AuthManager.logout()
+                st.session_state["splash_dismissed"] = True
+                st.session_state["auth_view"] = "LOGIN"
+                st.session_state["require_login_forced"] = True
                 st.rerun()
     except Exception:
         pass
