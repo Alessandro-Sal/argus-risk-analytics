@@ -495,6 +495,31 @@ class AuthManager:
                         "expires_at": getattr(sess, "expires_at", int(time.time()) + (86400 * 30 if remember_session else 7200)),
                         "remember_session": remember_session,
                     }
+                    # Mirror/Sync opzionale su tabella applicativa argus_users
+                    try:
+                        from core.fetcher import get_engine
+                        from core.supabase_cloud import (
+                            SupabaseAuthManager,
+                            create_supabase_engine,
+                            get_supabase_config,
+                        )
+
+                        cfg = get_supabase_config()
+                        eng = create_supabase_engine(cfg["db_url"], use_cache=True) if cfg.get("is_configured") else None
+                        if eng is None:
+                            eng = get_engine(offline=True)
+                        if eng is not None:
+                            SupabaseAuthManager.create_or_update_user(
+                                engine=eng,
+                                username=raw_identity if "@" not in raw_identity else email.split("@")[0],
+                                password=pwd,
+                                role=role,
+                                display_name=disp_name,
+                                email=email,
+                            )
+                    except Exception as ex_sync_login:
+                        logger.debug("Sync login su argus_users non bloccante: %s", ex_sync_login)
+
                     cls.apply_session(session_data, remember_session=remember_session)
                     return session_data
             except Exception as ex_supa:
@@ -579,6 +604,31 @@ class AuthManager:
                         "refresh_token": getattr(sess, "refresh_token", "") if sess else "",
                         "expires_at": getattr(sess, "expires_at", int(time.time()) + 3600) if sess else 0,
                     }
+                    # Mirror/Sync opzionale su tabella applicativa argus_users
+                    try:
+                        from core.fetcher import get_engine
+                        from core.supabase_cloud import (
+                            SupabaseAuthManager,
+                            create_supabase_engine,
+                            get_supabase_config,
+                        )
+
+                        cfg = get_supabase_config()
+                        eng = create_supabase_engine(cfg["db_url"], use_cache=True) if cfg.get("is_configured") else None
+                        if eng is None:
+                            eng = get_engine(offline=True)
+                        if eng is not None:
+                            SupabaseAuthManager.create_or_update_user(
+                                engine=eng,
+                                username=raw_identity if "@" not in raw_identity else email.split("@")[0],
+                                password=pwd,
+                                role="user",
+                                display_name=name,
+                                email=email,
+                            )
+                    except Exception as ex_sync_reg:
+                        logger.debug("Sync sign_up su argus_users non bloccante: %s", ex_sync_reg)
+
                     if sess:
                         cls.apply_session(session_data)
                     return session_data
