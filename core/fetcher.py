@@ -362,7 +362,8 @@ def fetch_and_store(df_clean: pd.DataFrame, engine, portfolio_id: int = None, be
 
     # ── Forzatura Tassi di Cambio (FX Risk) ──────────────────
     common_currencies = ["USD", "DKK", "GBP", "CHF", "SEK", "CAD", "JPY", "MXN"]
-    unique_currencies = list(set(df_clean["currency"].dropna().unique().tolist() + common_currencies))
+    cur_list = df_clean["currency"].dropna().unique().tolist() if "currency" in df_clean.columns else []
+    unique_currencies = list(set(cur_list + common_currencies))
     for c in unique_currencies:
         c_upper = str(c).upper()
         if c_upper not in ["EUR", "XXX", "CRYPTO", "NAN", "NONE", "NULL"] and len(c_upper) == 3:
@@ -526,11 +527,11 @@ def _upsert_asset(ticker: str, yf_ticker, df_clean: pd.DataFrame, engine, info: 
             pass
 
     # asset_class: dal CSV se presente, altrimenti da yfinance
-    asset_class_from_csv = (
-        df_clean.loc[df_clean["ticker"] == ticker, "asset_class"].dropna().iloc[0]
-        if not df_clean.loc[(df_clean["ticker"] == ticker) & df_clean["asset_class"].notna()].empty
-        else None
-    )
+    asset_class_from_csv = None
+    if "asset_class" in df_clean.columns:
+        match_ac = df_clean.loc[(df_clean["ticker"] == ticker) & df_clean["asset_class"].notna(), "asset_class"].dropna()
+        if not match_ac.empty:
+            asset_class_from_csv = match_ac.iloc[0]
 
     asset_class = asset_class_from_csv or _infer_asset_class(info, ticker)
     currency = info.get("currency", "USD")
@@ -784,20 +785,39 @@ def _store_prices(hist: pd.DataFrame, asset_id: int, engine, ticker: str = None)
         return df_p[["ticker", "price_date", "close", "volume"]]
 
     dialect_name = getattr(getattr(engine, "dialect", None), "name", "")
+    if dialect_name == "postgresql":
+        chunk_size = 500
+        with engine.begin() as conn:
+            for i in range(0, len(records), chunk_size):
+                chunk = records[i : i + chunk_size]
+                val_clauses = []
+                params = {}
+                for idx, r in enumerate(chunk):
+                    p_aid = f"aid_{idx}"
+                    p_pdate = f"pdate_{idx}"
+                    p_close = f"close_{idx}"
+                    p_vol = f"vol_{idx}"
+                    p_src = f"src_{idx}"
+                    val_clauses.append(f"(:{p_aid}, :{p_pdate}, :{p_close}, :{p_vol}, :{p_src})")
+                    params[p_aid] = r["asset_id"]
+                    params[p_pdate] = r["price_date"]
+                    params[p_close] = r["close"]
+                    params[p_vol] = r["volume"]
+                    params[p_src] = r["source"]
+                batch_sql = text(f"""
+                    INSERT INTO market_prices (asset_id, price_date, close, volume, source)
+                    VALUES {', '.join(val_clauses)}
+                    ON CONFLICT (asset_id, price_date) DO NOTHING
+                """)
+                conn.execute(batch_sql, params)
+        return len(records)
+
     if dialect_name == "sqlite":
         sql = text("""
             INSERT OR IGNORE INTO market_prices
                 (asset_id, price_date, close, volume, source)
             VALUES
                 (:asset_id, :price_date, :close, :volume, :source)
-        """)
-    elif dialect_name == "postgresql":
-        sql = text("""
-            INSERT INTO market_prices
-                (asset_id, price_date, close, volume, source)
-            VALUES
-                (:asset_id, :price_date, :close, :volume, :source)
-            ON CONFLICT (asset_id, price_date) DO NOTHING
         """)
     else:
         sql = text("""
@@ -825,8 +845,10 @@ def _store_isin_price(ticker: str, df_clean: pd.DataFrame, engine, report: dict)
     rows = df_clean[df_clean["ticker"] == ticker]
 
     # asset_class dal CSV, default bond per ISIN
-    asset_class = rows["asset_class"].dropna().iloc[0] if not rows["asset_class"].dropna().empty else "bond"
-    currency = rows["currency"].iloc[0] if not rows.empty else "EUR"
+    asset_class = "bond"
+    if "asset_class" in rows.columns and not rows["asset_class"].dropna().empty:
+        asset_class = rows["asset_class"].dropna().iloc[0]
+    currency = rows["currency"].iloc[0] if ("currency" in rows.columns and not rows.empty) else "EUR"
 
     if engine is None:
         adict = {"ticker": ticker, "name": ticker, "asset_class": asset_class, "currency": currency[:3]}

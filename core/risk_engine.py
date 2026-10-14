@@ -13,6 +13,7 @@
 #     (rimosso il "fix" del validator che li azzerava)
 # ============================================================
 
+import logging
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -23,6 +24,8 @@ import scipy.stats as stats
 from sklearn.cluster import KMeans
 from sklearn.covariance import LedoitWolf
 from sqlalchemy import text
+
+logger = logging.getLogger("risk_engine")
 
 # ── Costanti ────────────────────────────────────────────────
 
@@ -54,10 +57,28 @@ def compute_risk(
         if df_prices is not None and not df_prices.empty:
             df_prices = df_prices[pd.to_datetime(df_prices["price_date"]) <= as_of_dt].copy()
 
-    if df_tx.empty:
-        raise ValueError(f"Nessuna transazione per portfolio_id={portfolio_id}")
-    if df_prices.empty:
-        raise ValueError("Nessun prezzo storico — esegui fetcher.py prima")
+    if df_tx is None or df_tx.empty:
+        raise ValueError(f"Nessuna transazione trovata per portfolio_id={portfolio_id}")
+
+    if df_prices is None or df_prices.empty:
+        if engine is not None and not df_tx.empty:
+            try:
+                logger.info(
+                    "Prezzi storici assenti nel database per portfolio_id=%s. Avvio auto-fetch dei prezzi da Yahoo Finance...",
+                    portfolio_id,
+                )
+                from core.fetcher import fetch_and_store
+
+                fetch_and_store(df_tx, engine, portfolio_id=portfolio_id, benchmark_ticker=benchmark_ticker)
+                _, df_prices = _load_data(portfolio_id, engine, benchmark_ticker, as_of_date=as_of_date)
+                if as_of_date is not None and df_prices is not None and not df_prices.empty:
+                    as_of_dt = pd.to_datetime(as_of_date)
+                    df_prices = df_prices[pd.to_datetime(df_prices["price_date"]) <= as_of_dt].copy()
+            except Exception as e_fetch:
+                logger.warning("Auto-fetch dei prezzi storici non riuscito: %s", e_fetch)
+
+    if df_prices is None or df_prices.empty:
+        raise ValueError("Nessun prezzo storico disponibile per i titoli del portafoglio. Verifica la connessione a Yahoo Finance o riesegui il caricamento dei prezzi.")
 
     # Assicurati che price_date sia un tipo datetime (cruciale per in-memory mode)
     df_prices["price_date"] = pd.to_datetime(df_prices["price_date"])

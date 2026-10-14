@@ -479,21 +479,24 @@ with st.expander(f"📚 Storico Snapshot & Recall Analisi ({st.session_state.get
                         except Exception:
                             pass
 
-                        results = compute_risk(target_pid, engine_sidebar, benchmark_ticker=benchmark, risk_free_rate=rf_val, base_currency=base_curr)
-                        st.session_state["pipeline_done"]  = True
-                        st.session_state["portfolio_id"]   = target_pid
-                        st.session_state["portfolio_name"] = sel_row.port_name
-                        st.session_state["engine"]         = engine_sidebar
-                        st.session_state["results"]        = results
-                        st.session_state["run_id"]         = sel_row.run_id
-                        st.session_state["fetch_report"]   = {"success": [], "skipped": [], "rows_written": 0, "errors": []}
-                        from core.workspace_manager import save_session_snapshot_to_cache
-                        save_session_snapshot_to_cache()
-                    st.success(f"Analisi {sel_row.run_id} ricaricata con successo!")
-                    try:
-                        st.switch_page("pages/1_📈_Dashboard_Generale.py")
-                    except Exception:
-                        st.rerun()
+                        try:
+                            results = compute_risk(target_pid, engine_sidebar, benchmark_ticker=benchmark, risk_free_rate=rf_val, base_currency=base_curr)
+                            st.session_state["pipeline_done"]  = True
+                            st.session_state["portfolio_id"]   = target_pid
+                            st.session_state["portfolio_name"] = sel_row.port_name
+                            st.session_state["engine"]         = engine_sidebar
+                            st.session_state["results"]        = results
+                            st.session_state["run_id"]         = sel_row.run_id
+                            st.session_state["fetch_report"]   = {"success": [], "skipped": [], "rows_written": 0, "errors": []}
+                            from core.workspace_manager import save_session_snapshot_to_cache
+                            save_session_snapshot_to_cache()
+                            st.success(f"Analisi {sel_row.run_id} ricaricata con successo!")
+                            try:
+                                st.switch_page("pages/1_📈_Dashboard_Generale.py")
+                            except Exception:
+                                st.rerun()
+                        except Exception as ex_calc:
+                            st.error(f"Impossibile ricalcolare l'analisi per il portafoglio #{target_pid}: {ex_calc}")
                 
                 if btn_del:
                     from core.confirm_dialogs import confirm_delete_snapshot_dialog
