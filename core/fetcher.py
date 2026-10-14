@@ -13,6 +13,8 @@ import logging
 import math
 import os
 import re
+import socket
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
@@ -25,6 +27,17 @@ import yfinance as yf
 from sqlalchemy import create_engine, event, text
 
 logger = logging.getLogger("argus.fetcher")
+
+_BOOTSTRAPPED_ENGINES: set = set()
+_BOOTSTRAP_LOCK = threading.RLock()
+_FETCHER_ENGINE_CACHE: dict = {}
+
+
+def clear_engine_caches() -> None:
+    """Resetta i cache interni di engine e bootstrap schema (per suite di test)."""
+    with _BOOTSTRAP_LOCK:
+        _BOOTSTRAPPED_ENGINES.clear()
+        _FETCHER_ENGINE_CACHE.clear()
 
 
 def _set_sqlite_pragmas(dbapi_connection, connection_record):
@@ -157,7 +170,9 @@ def get_engine(
         # SUPABASE_DB_URL (in modalità Auto o Supabase Cloud) e non è richiesto un host MySQL custom,
         # usa Supabase PostgreSQL con connection pool warm.
         engine = None
-        custom_mysql_requested = (host and host not in ("localhost", "127.0.0.1")) or (user and user != "root")
+        custom_mysql_requested = (host and host not in ("localhost", "127.0.0.1")) or (
+            session_data_env in ("MySQL (Locale/Docker)", "MySQL (Remoto)")
+        )
         if not custom_mysql_requested:
             try:
                 from core.supabase_cloud import (
@@ -206,10 +221,17 @@ def get_engine(
                 db = os.getenv("MYSQL_DATABASE") or os.getenv("STREAMLIT_DB_NAME") or db
 
             try:
+                if host in ("localhost", "127.0.0.1"):
+                    try:
+                        with socket.create_connection((host, int(port)), timeout=0.2):
+                            pass
+                    except OSError:
+                        raise ConnectionError(f"MySQL non attivo su {host}:{port}")
+
                 import pymysql
 
                 sys_url = f"mysql+pymysql://{user}:{password}@{host}:{port}/"
-                sys_engine = create_engine(sys_url, connect_args={"connect_timeout": 3})
+                sys_engine = create_engine(sys_url, connect_args={"connect_timeout": 1})
                 try:
                     with sys_engine.begin() as conn:
                         conn.execute(
@@ -227,8 +249,8 @@ def get_engine(
                     echo=False,
                     pool_pre_ping=True,
                     pool_recycle=3600,
-                    pool_timeout=15,
-                    connect_args={"connect_timeout": 5},
+                    pool_timeout=5,
+                    connect_args={"connect_timeout": 1},
                 )
             except Exception:
                 os.makedirs("data", exist_ok=True)
@@ -238,6 +260,12 @@ def get_engine(
                     event.listen(engine, "connect", _set_sqlite_pragmas)
                 except Exception:
                     pass
+
+    engine_key = str(getattr(engine, "url", id(engine)))
+    with _BOOTSTRAP_LOCK:
+        if engine_key in _BOOTSTRAPPED_ENGINES:
+            return engine
+        _BOOTSTRAPPED_ENGINES.add(engine_key)
 
     if engine.dialect.name == "sqlite":
         try:

@@ -6,6 +6,7 @@
 
 import json
 import threading
+import time
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -186,12 +187,21 @@ DEFAULT_SYSTEM_CATEGORIES = [
 
 _INITIALIZED_WEALTH_ENGINES: set = set()
 _INITIALIZED_WEALTH_LOCK = threading.Lock()
+_WEALTH_PROFILES_CACHE: Dict[str, Tuple[float, pd.DataFrame]] = {}
+_WEALTH_PROFILES_LOCK = threading.RLock()
+
+
+def clear_wealth_portfolios_cache() -> None:
+    """Svuota la cache in memoria dei profili patrimoniali."""
+    with _WEALTH_PROFILES_LOCK:
+        _WEALTH_PROFILES_CACHE.clear()
 
 
 def clear_wealth_db_init_cache() -> None:
     """Svuota la cache di inizializzazione DDL per forzare una nuova verifica se necessario."""
     with _INITIALIZED_WEALTH_LOCK:
         _INITIALIZED_WEALTH_ENGINES.clear()
+    clear_wealth_portfolios_cache()
 
 
 def init_wealth_db(engine: Engine) -> None:
@@ -1328,6 +1338,17 @@ def get_wealth_portfolios(engine: Engine) -> pd.DataFrame:
     init_wealth_db(engine)
     curr_user, curr_disp, enforce_owner = _get_active_user_isolation_context()
 
+    engine_key = str(getattr(engine, "url", id(engine)))
+    cache_key = f"{engine_key}::{curr_user}::{enforce_owner}"
+    now = time.time()
+
+    with _WEALTH_PROFILES_LOCK:
+        cached = _WEALTH_PROFILES_CACHE.get(cache_key)
+        if cached is not None:
+            ts, df_cached = cached
+            if (now - ts) < 30.0:  # 30s cache TTL
+                return df_cached.copy()
+
     with engine.connect() as conn:
         if enforce_owner:
             df = pd.read_sql(
@@ -1386,6 +1407,9 @@ def get_wealth_portfolios(engine: Engine) -> pd.DataFrame:
                 """,
                     conn2,
                 )
+
+    with _WEALTH_PROFILES_LOCK:
+        _WEALTH_PROFILES_CACHE[cache_key] = (now, df.copy())
     return df
 
 
@@ -1396,6 +1420,7 @@ def cleanup_empty_wealth_portfolios(engine: Engine) -> int:
         res = conn.execute(
             sqlt("DELETE FROM wealth_profiles WHERE (name IS NULL OR TRIM(name) = '') AND profile_id != 1")
         )
+        clear_wealth_portfolios_cache()
         return res.rowcount if hasattr(res, "rowcount") else 0
 
 
@@ -1428,7 +1453,9 @@ def create_wealth_portfolio(
         """),
             {"name": clean_name, "owner": effective_owner, "bcurr": base_currency or "EUR", "desc": description or ""},
         )
-        return _get_last_insert_id(conn, engine)
+        res_id = _get_last_insert_id(conn, engine)
+        clear_wealth_portfolios_cache()
+        return res_id
 
 
 def delete_wealth_portfolio(engine: Engine, portfolio_id: int) -> bool:
@@ -1459,6 +1486,7 @@ def delete_wealth_portfolio(engine: Engine, portfolio_id: int) -> bool:
             conn.execute(sqlt("DELETE FROM wealth_profiles WHERE profile_id = :pid"), {"pid": portfolio_id})
         except Exception:
             pass
+    clear_wealth_portfolios_cache()
     return True
 
 

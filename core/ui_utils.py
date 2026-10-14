@@ -9110,38 +9110,53 @@ def ensure_portal_context(module: str = "risk") -> dict:
     st.session_state.wealth_db_name = db_name
     st.session_state.risk_db_name = db_name
 
-    engine = get_engine(db_user, db_pass, db_host, db_port, db_name, database=db_name, offline=offline_mode)
-    st.session_state["engine"] = engine
-    st.session_state["db_engine"] = engine
+    engine = st.session_state.get("engine") or st.session_state.get("db_engine")
+    if engine is None:
+        engine = get_engine(db_user, db_pass, db_host, db_port, db_name, database=db_name, offline=offline_mode)
+        st.session_state["engine"] = engine
+        st.session_state["db_engine"] = engine
 
     if is_wealth:
+        from datetime import datetime
+
         from core.wealth.wealth_db import create_wealth_portfolio, get_wealth_portfolios, init_wealth_db
         from core.wealth.wealth_engine import compute_consolidated_net_worth
         from core.workspace_context import WorkspaceContext
 
-        init_wealth_db(engine)
-        df_prof = get_wealth_portfolios(engine)
-        if df_prof.empty:
-            if offline_mode:
-                # Se siamo passati ad offline e SQLite locale è vuoto, sincronizza al volo da MySQL se raggiungibile
-                try:
-                    from core.wealth.wealth_db import sync_mysql_to_sqlite
-
-                    sync_mysql_to_sqlite(
-                        db_user=db_user, db_pass=db_pass, db_host=db_host, db_port=db_port, db_name=db_name
-                    )
-                    df_prof = get_wealth_portfolios(engine)
-                except Exception:
-                    pass
-
+        ws_ctx = WorkspaceContext.get_current()
+        cached_prof_map = (
+            ws_ctx.wealth.profile_map if (ws_ctx and ws_ctx.wealth and ws_ctx.wealth.profile_map) else None
+        )
+        if cached_prof_map and not offline_mode:
+            prof_map = dict(cached_prof_map)
+            df_prof = pd.DataFrame([{"portfolio_id": k, "name": v} for k, v in prof_map.items()])
+        else:
+            init_wealth_db(engine)
+            df_prof = get_wealth_portfolios(engine)
             if df_prof.empty:
-                pid = create_wealth_portfolio(
-                    engine, name="Marco Rossi (Family Office)", owner="Family Office Principal", base_currency="EUR"
-                )
-                st.session_state["wealth_active_portfolio_id"] = None
-                df_prof = get_wealth_portfolios(engine)
+                if offline_mode:
+                    # Se siamo passati ad offline e SQLite locale è vuoto, sincronizza al volo da MySQL se raggiungibile
+                    try:
+                        from core.wealth.wealth_db import sync_mysql_to_sqlite
 
-        prof_map = {row["portfolio_id"]: row["name"] for _, row in df_prof.iterrows()}
+                        sync_mysql_to_sqlite(
+                            db_user=db_user, db_pass=db_pass, db_host=db_host, db_port=db_port, db_name=db_name
+                        )
+                        df_prof = get_wealth_portfolios(engine)
+                    except Exception:
+                        pass
+
+                if df_prof.empty:
+                    pid = create_wealth_portfolio(
+                        engine, name="Marco Rossi (Family Office)", owner="Family Office Principal", base_currency="EUR"
+                    )
+                    st.session_state["wealth_active_portfolio_id"] = None
+                    df_prof = get_wealth_portfolios(engine)
+
+            prof_map = {row["portfolio_id"]: row["name"] for _, row in df_prof.iterrows()}
+            if ws_ctx and ws_ctx.wealth:
+                ws_ctx.wealth.profile_map = prof_map
+
         pid = st.session_state.get("wealth_active_portfolio_id")
         if pid is None:
             try:
@@ -9191,7 +9206,20 @@ def ensure_portal_context(module: str = "risk") -> dict:
             # Sincronizza anche la chiave del selettore in sidebar se necessario
             if st.session_state.get("sb_wealth_profile_selector") != pid:
                 st.session_state["sb_wealth_profile_selector"] = pid
-            nw = compute_consolidated_net_worth(engine, portfolio_id=pid)
+
+            now = datetime.now()
+            if (
+                ws_ctx
+                and ws_ctx.wealth.profile_id == pid
+                and ws_ctx.wealth.net_worth_cached is not None
+                and ws_ctx.wealth.last_consolidated_at is not None
+                and (now - ws_ctx.wealth.last_consolidated_at).total_seconds() < 60
+            ):
+                nw = ws_ctx.wealth.net_worth_cached
+            else:
+                nw = compute_consolidated_net_worth(engine, portfolio_id=pid)
+                if ws_ctx and ws_ctx.wealth:
+                    ws_ctx.wealth.last_consolidated_at = now
         else:
             pid = None
             prof_name = None

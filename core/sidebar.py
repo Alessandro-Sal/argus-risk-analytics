@@ -1969,26 +1969,51 @@ def render_sidebar():
             try:
                 from core.fetcher import get_engine
                 from core.wealth.wealth_db import get_wealth_portfolios
+                from core.workspace_context import WorkspaceContext
 
-                db_user = st.session_state.get("db_user", "root")
-                db_pass = st.session_state.get("db_pass", "root")
-                db_host = st.session_state.get("db_host", "localhost")
+                ws_ctx = None
                 try:
-                    db_port = int(st.session_state.get("db_port", 3306))
+                    ws_ctx = WorkspaceContext.get_current()
                 except Exception:
-                    db_port = 3306
-                raw_db = st.session_state.get("wealth_db_name") or st.session_state.get("db_name") or "wealth"
-                w_eng = get_engine(db_user, db_pass, db_host, db_port, raw_db, database=raw_db, offline=is_offline)
-                df_wports = get_wealth_portfolios(w_eng)
-                if not df_wports.empty and len(df_wports) >= 1:
-                    col_id = (
-                        "portfolio_id"
-                        if "portfolio_id" in df_wports.columns
-                        else ("id" if "id" in df_wports.columns else df_wports.columns[0])
-                    )
-                    pids = df_wports[col_id].tolist()
+                    pass
+
+                cached_prof_map = (
+                    ws_ctx.wealth.profile_map if (ws_ctx and ws_ctx.wealth and ws_ctx.wealth.profile_map) else None
+                )
+                if cached_prof_map:
+                    pids = list(cached_prof_map.keys())
                     w_opts = [None] + pids
-                    w_names = dict(zip(df_wports[col_id], df_wports["name"]))
+                    w_names = dict(cached_prof_map)
+                else:
+                    w_eng = st.session_state.get("engine") or st.session_state.get("db_engine")
+                    if w_eng is None:
+                        db_user = st.session_state.get("db_user", "root")
+                        db_pass = st.session_state.get("db_pass", "root")
+                        db_host = st.session_state.get("db_host", "localhost")
+                        try:
+                            db_port = int(st.session_state.get("db_port", 3306))
+                        except Exception:
+                            db_port = 3306
+                        raw_db = st.session_state.get("wealth_db_name") or st.session_state.get("db_name") or "wealth"
+                        w_eng = get_engine(db_user, db_pass, db_host, db_port, raw_db, database=raw_db, offline=is_offline)
+                    df_wports = get_wealth_portfolios(w_eng)
+                    if not df_wports.empty and len(df_wports) >= 1:
+                        col_id = (
+                            "portfolio_id"
+                            if "portfolio_id" in df_wports.columns
+                            else ("id" if "id" in df_wports.columns else df_wports.columns[0])
+                        )
+                        pids = df_wports[col_id].tolist()
+                        w_opts = [None] + pids
+                        w_names = dict(zip(df_wports[col_id], df_wports["name"]))
+                        if ws_ctx and ws_ctx.wealth:
+                            ws_ctx.wealth.profile_map = w_names
+                    else:
+                        pids = []
+                        w_opts = [None]
+                        w_names = {}
+
+                if len(pids) >= 1:
 
                     active_w_pid = st.session_state.get("wealth_active_portfolio_id")
                     if active_w_pid is None:
