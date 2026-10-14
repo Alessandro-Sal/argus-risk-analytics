@@ -206,14 +206,20 @@ def clear_wealth_db_init_cache() -> None:
 
 def init_wealth_db(engine: Engine) -> None:
     """Inizializza automaticamente le tabelle del Wealth Management se non presenti (SQLite, PostgreSQL, MySQL)."""
+    if getattr(engine, "_wealth_db_initialized", False):
+        return
+
     db_name = getattr(getattr(engine, "url", None), "database", None)
-    if not db_name or db_name == ":memory:":
-        engine_key = f"sqlite:memory:{id(engine)}"
-    else:
+    is_in_memory = not db_name or db_name == ":memory:"
+
+    if not is_in_memory:
         engine_key = str(getattr(engine, "url", id(engine)))
-    with _INITIALIZED_WEALTH_LOCK:
-        if engine_key in _INITIALIZED_WEALTH_ENGINES:
-            return
+        with _INITIALIZED_WEALTH_LOCK:
+            if engine_key in _INITIALIZED_WEALTH_ENGINES:
+                engine._wealth_db_initialized = True
+                return
+    else:
+        engine_key = None
 
     dialect_name = getattr(getattr(engine, "dialect", None), "name", "")
     is_sqlite = dialect_name == "sqlite"
@@ -1197,8 +1203,10 @@ def init_wealth_db(engine: Engine) -> None:
             pass
 
     seed_default_categories(engine)
-    with _INITIALIZED_WEALTH_LOCK:
-        _INITIALIZED_WEALTH_ENGINES.add(engine_key)
+    engine._wealth_db_initialized = True
+    if engine_key:
+        with _INITIALIZED_WEALTH_LOCK:
+            _INITIALIZED_WEALTH_ENGINES.add(engine_key)
 
 
 def seed_default_categories(engine: Engine) -> None:
