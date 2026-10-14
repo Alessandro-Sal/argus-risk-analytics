@@ -1432,6 +1432,18 @@ def render_settings_sidebar(current_module: str = "risk") -> None:
 
 def render_sidebar():
     """Renderizza la Sidebar Istituzionale v9.0.0 con Modalità Esecuzione in alto e Navigation Rail ad albero."""
+    # Prevenzione esecuzione multipla nello stesso script run (StreamlitDuplicateElementKey guard)
+    try:
+        from streamlit.runtime.scriptrunner import get_script_run_ctx
+
+        ctx = get_script_run_ctx(suppress_warning=True)
+        if ctx is not None and hasattr(ctx, "cursors") and isinstance(ctx.cursors, dict):
+            if ctx.cursors.get("_argus_sidebar_rendered"):
+                return
+            ctx.cursors["_argus_sidebar_rendered"] = True
+    except Exception:
+        pass
+
     ensure_session_restored()
     try:
         from core.auth_manager import AuthManager

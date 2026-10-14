@@ -9086,10 +9086,6 @@ def ensure_portal_context(module: str = "risk") -> dict:
 
     inject_custom_css()
 
-    from core.sidebar import render_sidebar
-
-    render_sidebar()
-
     from core.fetcher import get_engine
 
     is_wealth = module.lower() == "wealth"
