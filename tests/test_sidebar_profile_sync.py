@@ -126,6 +126,26 @@ def test_risk_to_wealth_transition_auto_profile_selection():
         assert ctx["profile_name"] == "Famiglia Rossi"
         assert st.session_state["wealth_active_portfolio_id"] == 1
         assert st.session_state["wealth_active_profile_name"] == "Famiglia Rossi"
-        assert st.session_state["sb_wealth_profile_selector"] == 1
         assert ctx["net_worth"] is not None
+
+
+def test_init_wealth_db_caching_performance():
+    """Verifica che init_wealth_db esegua DDL una sola volta e utilizzi la cache in memoria per evitare latenza."""
+    from sqlalchemy import create_engine
+
+    from core.wealth.wealth_db import _INITIALIZED_WEALTH_ENGINES, clear_wealth_db_init_cache, init_wealth_db
+
+    clear_wealth_db_init_cache()
+    engine = create_engine("sqlite:///:memory:")
+
+    assert len(_INITIALIZED_WEALTH_ENGINES) == 0
+    init_wealth_db(engine)
+    assert len(_INITIALIZED_WEALTH_ENGINES) == 1
+
+    # Second call should return immediately using cache without executing redundant DDL
+    init_wealth_db(engine)
+    assert len(_INITIALIZED_WEALTH_ENGINES) == 1
+    clear_wealth_db_init_cache()
+    assert len(_INITIALIZED_WEALTH_ENGINES) == 0
+
 

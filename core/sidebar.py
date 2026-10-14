@@ -1438,8 +1438,9 @@ def render_sidebar():
 
         ctx = get_script_run_ctx(suppress_warning=True)
         if ctx is not None and hasattr(ctx, "cursors") and isinstance(ctx.cursors, dict):
-            if ctx.cursors.get("_argus_sidebar_rendered"):
+            if -999999 in ctx.cursors or ctx.cursors.get("_argus_sidebar_rendered"):
                 return
+            ctx.cursors[-999999] = True
             ctx.cursors["_argus_sidebar_rendered"] = True
     except Exception:
         pass

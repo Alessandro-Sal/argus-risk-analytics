@@ -5,6 +5,7 @@
 # ============================================================
 
 import json
+import threading
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -183,8 +184,26 @@ DEFAULT_SYSTEM_CATEGORIES = [
 ]
 
 
+_INITIALIZED_WEALTH_ENGINES: set = set()
+_INITIALIZED_WEALTH_LOCK = threading.Lock()
+
+
+def clear_wealth_db_init_cache() -> None:
+    """Svuota la cache di inizializzazione DDL per forzare una nuova verifica se necessario."""
+    with _INITIALIZED_WEALTH_LOCK:
+        _INITIALIZED_WEALTH_ENGINES.clear()
+
+
 def init_wealth_db(engine: Engine) -> None:
     """Inizializza automaticamente le tabelle del Wealth Management se non presenti (SQLite, PostgreSQL, MySQL)."""
+    if engine is None:
+        return
+
+    engine_key = str(getattr(engine, "url", id(engine)))
+    with _INITIALIZED_WEALTH_LOCK:
+        if engine_key in _INITIALIZED_WEALTH_ENGINES:
+            return
+
     dialect_name = getattr(getattr(engine, "dialect", None), "name", "")
     is_sqlite = dialect_name == "sqlite"
     is_postgres = dialect_name == "postgresql"
@@ -1167,6 +1186,8 @@ def init_wealth_db(engine: Engine) -> None:
             pass
 
     seed_default_categories(engine)
+    with _INITIALIZED_WEALTH_LOCK:
+        _INITIALIZED_WEALTH_ENGINES.add(engine_key)
 
 
 def seed_default_categories(engine: Engine) -> None:

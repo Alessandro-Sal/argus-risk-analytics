@@ -10,7 +10,7 @@ headless = true
 enableCORS = false
 enableXsrfProtection = false
 maxMessageSize = 500
-fileWatcherType = "none"
+fileWatcherType = "auto"
 folderWatchBlacklist = ["data", "logs", "exports", "cache"]
 
 [theme]
