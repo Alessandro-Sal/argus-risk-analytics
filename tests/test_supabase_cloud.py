@@ -58,6 +58,8 @@ def test_normalize_and_mask_supabase_url():
 
 
 def test_supabase_config_from_env(monkeypatch):
+    import streamlit as st
+    monkeypatch.setattr(st, "secrets", {}, raising=False)
     monkeypatch.delenv("SUPABASE_DB_URL", raising=False)
     monkeypatch.setenv("SUPABASE_DB_PASSWORD", "OnlyPasswordNeeded99")
     cfg_pw = get_supabase_config()

@@ -570,9 +570,12 @@ def get_supabase_config() -> Dict[str, Any]:
 
     normalized_db_url = normalize_supabase_db_url(raw_db_url)
     default_api_url = f"https://{project_ref}.supabase.co" if project_ref else DEFAULT_SUPABASE_URL
-    supabase_url = (
+    raw_supa_url = (
         session_supa_url or _read_secret_or_env("SUPABASE_URL", default_api_url)
     ).rstrip("/")
+    if raw_supa_url.endswith("/rest/v1"):
+        raw_supa_url = raw_supa_url[:-8].rstrip("/")
+    supabase_url = raw_supa_url
     supabase_anon_key = (
         session_anon_key
         or _read_secret_or_env("SUPABASE_ANON_KEY")

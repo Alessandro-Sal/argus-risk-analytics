@@ -135,7 +135,10 @@ def get_supabase_url() -> str:
     """Restituisce l'URL del progetto Supabase (es. 'https://qsexxzbhtocxvyaijngb.supabase.co')."""
     url = get_setting("SUPABASE_URL", "")
     if url:
-        return str(url).strip().rstrip("/")
+        clean = str(url).strip().rstrip("/")
+        if clean.endswith("/rest/v1"):
+            clean = clean[:-8].rstrip("/")
+        return clean
     ref = get_setting("SUPABASE_PROJECT_REF", DEFAULT_SUPABASE_PROJECT_REF)
     return f"https://{ref}.supabase.co"
 
