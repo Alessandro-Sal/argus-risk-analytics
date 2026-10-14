@@ -152,3 +152,128 @@ class TestUserIntegrationsAndGSheets:
         creds, source = resolve_google_credentials(creds_dict=direct_creds)
         assert creds == direct_creds
         assert "In-Memory" in source
+
+
+class TestAuthHardeningAndUX:
+    def test_validate_password_strength(self):
+        from core.auth_manager import validate_password_strength
+
+        # Troppo corta (< 10 caratteri)
+        ok, msg, score = validate_password_strength("Short1!")
+        assert ok is False
+        assert score < 100
+
+        # Manca maiuscola
+        ok, msg, score = validate_password_strength("lowercase123!@#")
+        assert ok is False
+        assert "maiuscola" in msg
+
+        # Manca minuscola
+        ok, msg, score = validate_password_strength("UPPERCASE123!@#")
+        assert ok is False
+        assert "minuscola" in msg
+
+        # Manca numero
+        ok, msg, score = validate_password_strength("NoNumbersHere!@#")
+        assert ok is False
+        assert "numero" in msg
+
+        # Manca carattere speciale
+        ok, msg, score = validate_password_strength("PlainAlphaNumeric2026")
+        assert ok is False
+        assert "speciale" in msg
+
+        # Password valida conforme enterprise
+        ok, msg, score = validate_password_strength("ArgusEnterprise#2026")
+        assert ok is True
+        assert score == 100
+
+    def test_auth_rate_limiter_exponential_backoff(self):
+        from core.security_engine import AuthRateLimiter
+
+        identity = "test_brute_force_user@argus.cloud"
+        AuthRateLimiter.reset(identity)
+
+        # 4 tentativi non causano lockout
+        for _ in range(4):
+            fails, lock_sec = AuthRateLimiter.record_failure(identity)
+            assert lock_sec == 0
+
+        allowed, rem, msg = AuthRateLimiter.check_rate_limit(identity)
+        assert allowed is True
+
+        # Il 5° tentativo innesca il blocco temporale (lockout >= 30s)
+        fails, lock_sec = AuthRateLimiter.record_failure(identity)
+        assert fails == 5
+        assert lock_sec >= 30
+
+        allowed, rem, msg = AuthRateLimiter.check_rate_limit(identity)
+        assert allowed is False
+        assert rem > 0
+
+        # Il successo azzera il lockout
+        AuthRateLimiter.record_success(identity)
+        allowed, rem, msg = AuthRateLimiter.check_rate_limit(identity)
+        assert allowed is True
+
+    def test_auth_view_state_machine(self):
+        from core.auth_manager import get_auth_view, set_auth_view
+
+        st.session_state.clear()
+        assert get_auth_view() == "LOGIN"
+
+        set_auth_view("FORGOT_PASSWORD")
+        assert get_auth_view() == "FORGOT_PASSWORD"
+
+        set_auth_view("RESET_CONFIRM")
+        assert get_auth_view() == "RESET_CONFIRM"
+
+        set_auth_view("REGISTER")
+        assert get_auth_view() == "REGISTER"
+
+    def test_password_reset_flow(self, monkeypatch):
+        st.session_state.clear()
+        res_req = AuthManager.request_password_reset("client@institutional.bank")
+        assert res_req["ok"] is True
+        assert "riceverai" in res_req["message"].lower()
+
+        # Rifiuta password debole nel reset confirm
+        res_bad = AuthManager.confirm_password_reset("client@institutional.bank", "123456", "weak")
+        assert res_bad["ok"] is False
+
+        # Verifica che un token fittizio venga rifiutato con messaggio opportuno
+        res_invalid = AuthManager.confirm_password_reset("client@institutional.bank", "invalid_fake_token", "ArgusSecure#2026")
+        assert res_invalid["ok"] is False
+        assert "non valido" in res_invalid["error"].lower() or "scaduto" in res_invalid["error"].lower()
+
+        # Verifica il flusso completo di conferma con token validato da Supabase Auth
+        class MockAuth:
+            def verify_otp(self, params):
+                class MockSession:
+                    access_token = "mock-tok"
+                class MockAuthResponse:
+                    session = MockSession()
+                    user = {"id": "mock-user"}
+                return MockAuthResponse()
+
+            def update_user(self, attributes):
+                return {"ok": True}
+
+        class MockClient:
+            auth = MockAuth()
+
+        from core import supabase_cloud
+        monkeypatch.setattr(AuthManager, "get_supabase_client", lambda access_token=None: MockClient())
+        monkeypatch.setattr(supabase_cloud, "get_supabase_client", lambda access_token=None: MockClient())
+
+        res_ok = AuthManager.confirm_password_reset("client@institutional.bank", "123456", "ArgusSecure#2026")
+        assert res_ok["ok"] is True
+
+    def test_sandbox_archetype_launch(self):
+        st.session_state.clear()
+        AuthManager.login_sandbox_archetype("hnwi_family")
+        assert AuthManager.is_authenticated() is True
+        assert st.session_state.argus_auth_role == "guest_demo"
+        assert st.session_state.offline_mode is True
+        assert st.session_state.active_archetype_code == "hnwi_family"
+

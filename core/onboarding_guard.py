@@ -108,8 +108,7 @@ def render_empty_state_screen(
         "Cockpit Quantitativo & Risk Analytics" if portal == "risk" else "Total Wealth & Family Office Hub"
     )
     desc = custom_desc or (
-        "Benvenuto in <b>ARGUS</b>. Per sbloccare l'intera potenza del motore di calcolo, esplora subito "
-        "lo scenario dimostrativo a 5 pilastri patrimoniali oppure carica le transazioni dei tuoi broker."
+        "Nessun dato o portafoglio presente per questo account. Crea un portafoglio o importa le tue posizioni."
     )
     portal_slug = portal.lower().replace(" ", "_")
 
@@ -132,8 +131,8 @@ def render_empty_state_screen(
     col_demo, col_upload = st.columns([1, 1], gap="large")
 
     with col_demo:
-        st.markdown("### ⚡ Opzione 1: One-Click Demo Istituzionale")
-        st.caption("Esplora istantaneamente entrambi i moduli con dati sintetici realistici pre-calcolati:")
+        st.markdown("### ⚡ Opzione 1: Popola con Dati Demo")
+        st.caption("Inietta uno scenario sintetico istituzionale completo direttamente nel tuo account personale:")
 
         st.markdown("""
             - 💼 **Liquidità & Depositi**: €95.000 (Cassa operativa + Conto 3%)
@@ -145,7 +144,7 @@ def render_empty_state_screen(
 
         st.markdown('<div style="height: 10px;"></div>', unsafe_allow_html=True)
         if st.button(
-            "🚀 Carica Portafoglio Demo (5 Pilastri)",
+            "🚀 Popola con dati demo nel mio account",
             type="primary",
             use_container_width=True,
             key=f"btn_onboarding_seed_demo_{portal_slug}",

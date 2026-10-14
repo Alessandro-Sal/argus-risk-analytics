@@ -17,6 +17,13 @@ import pandas as pd
 from sqlalchemy import Engine
 from sqlalchemy import text as sqlt
 
+try:
+    import gspread
+    from google.oauth2.service_account import Credentials
+except ImportError:
+    gspread = None
+    Credentials = None
+
 from core.wealth.wealth_db import (
     get_wealth_accounts,
     get_wealth_categories,
@@ -1062,6 +1069,157 @@ def _sync_net_worth_oggi_tab(engine: Engine, spreadsheet: Any, portfolio_id: int
     return {}
 
 
+def get_gspread_client(
+    creds_dict: Optional[Dict[str, Any]] = None,
+    user_id: Optional[str] = None,
+    access_token: Optional[str] = None,
+    engine: Optional[Any] = None,
+):
+    """
+    Inizializzazione In-Memory del client gspread (Zero-Disk Cloud Dependency).
+    Risoluzione a 3 Livelli delle Credenziali:
+    1. creds_dict esplicito o Streamlit Secrets [gcp_service_account]
+    2. Supabase Cloud Vault (tabella public.user_integrations con user_id == current_user.id)
+    3. Fallback su gsheets_sync_subproject resolver
+    """
+    scopes = [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive",
+    ]
+
+    # Parametro in-memory esplicito
+    if isinstance(creds_dict, dict) and creds_dict:
+        if Credentials is None or gspread is None:
+            raise ImportError("gspread e google-auth sono richiesti. Esegui: pip install gspread google-auth")
+        credentials = Credentials.from_service_account_info(creds_dict, scopes=scopes)
+        return gspread.authorize(credentials)
+
+    # Livello 1: Streamlit Secrets
+    try:
+        import streamlit as st
+
+        if hasattr(st, "secrets") and "gcp_service_account" in st.secrets:
+            sec_data = dict(st.secrets["gcp_service_account"])
+            if Credentials is not None and gspread is not None:
+                credentials = Credentials.from_service_account_info(sec_data, scopes=scopes)
+                return gspread.authorize(credentials)
+    except Exception:
+        pass
+
+    # Livello 2: Supabase User Integrations
+    try:
+        from core.supabase_cloud import get_user_integration
+
+        eff_uid = user_id
+        eff_tok = access_token
+        try:
+            import streamlit as st
+
+            if not eff_uid and hasattr(st, "session_state"):
+                eff_uid = (
+                    st.session_state.get("user_id")
+                    or getattr(st.session_state.get("user"), "id", None)
+                    or st.session_state.get("argus_auth_user_id")
+                )
+            if not eff_tok and hasattr(st, "session_state"):
+                eff_tok = getattr(st.session_state.get("user"), "access_token", None) or st.session_state.get(
+                    "argus_session", {}
+                ).get("access_token")
+        except Exception:
+            pass
+
+        integ = get_user_integration(provider="google_sheets", user_id=eff_uid, access_token=eff_tok, engine=engine)
+        if integ and isinstance(integ.get("config_data"), dict):
+            c_dict = integ["config_data"]
+            if Credentials is not None and gspread is not None:
+                credentials = Credentials.from_service_account_info(c_dict, scopes=scopes)
+                return gspread.authorize(credentials)
+    except Exception:
+        pass
+
+    # Livello 3: Fallback delegato
+    from gsheets_sync_subproject.sync_google_sheets import get_gspread_client as _sub_client
+
+    return _sub_client(creds_dict=creds_dict, user_id=user_id, access_token=access_token, engine=engine)
+
+
+def render_google_credentials_ui():
+    """
+    Componente UI interattivo per la gestione e salvataggio delle credenziali Google Service Account.
+    Permette all'utente di caricare o incollare il JSON del Service Account e salvarlo
+    direttamente in Supabase public.user_integrations senza toccare il filesystem locale.
+    """
+    try:
+        import streamlit as st
+        from core.supabase_cloud import get_user_integration, save_user_integration
+
+        st.markdown("#### 🔑 Credenziali Google Sheets (In-Memory & Supabase Vault)")
+
+        uid = st.session_state.get("user_id") or getattr(st.session_state.get("user"), "id", None)
+        tok = getattr(st.session_state.get("user"), "access_token", None)
+
+        has_secrets = False
+        try:
+            has_secrets = hasattr(st, "secrets") and "gcp_service_account" in st.secrets
+        except Exception:
+            pass
+
+        existing_integ = None
+        try:
+            existing_integ = get_user_integration(provider="google_sheets", user_id=uid, access_token=tok)
+        except Exception:
+            pass
+
+        if has_secrets:
+            st.success("✅ Credenziali attive da **Streamlit Secrets** (`[gcp_service_account]`).")
+        elif existing_integ and existing_integ.get("config_data"):
+            c_email = existing_integ["config_data"].get("client_email", "Configurato")
+            st.success(f"✅ Credenziali attive dal **Cloud Vault Supabase** (`{c_email}`).")
+        else:
+            st.info("ℹ️ Nessuna credenziale rilevata nei Secrets o nel Vault. Puoi caricarla qui sotto.")
+
+        with st.expander(
+            "⚙️ Gestione Credenziali Google Service Account (Zero-Disk)",
+            expanded=not (has_secrets or (existing_integ and existing_integ.get("config_data"))),
+        ):
+            st.caption("Carica il file JSON del Service Account scaricato da Google Cloud Console:")
+            up_file = st.file_uploader("Carica File JSON", type=["json"], key="ui_gsheet_sa_json_upload")
+            pasted_txt = st.text_area("Oppure incolla il contenuto JSON qui:", height=100, key="ui_gsheet_sa_json_text")
+
+            if st.button("💾 Salva Credenziali in Supabase Vault", type="primary", key="btn_save_gsheet_vault"):
+                raw = None
+                if up_file is not None:
+                    raw = up_file.getvalue().decode("utf-8")
+                elif pasted_txt and pasted_txt.strip():
+                    raw = pasted_txt.strip()
+
+                if raw:
+                    try:
+                        cfg = json.loads(raw)
+                        if "private_key" in cfg and "client_email" in cfg:
+                            ok = save_user_integration(
+                                provider="google_sheets",
+                                config_data=cfg,
+                                user_id=uid,
+                                access_token=tok,
+                            )
+                            if ok:
+                                st.success("✅ Credenziali salvate con successo nel tuo Vault Supabase!")
+                                st.rerun()
+                            else:
+                                st.error("Errore durante il salvataggio su Supabase.")
+                        else:
+                            st.error(
+                                "Il JSON fornito non contiene i campi obbligatori ('private_key', 'client_email')."
+                            )
+                    except Exception as ex_json:
+                        st.error(f"Formato JSON non valido: {ex_json}")
+                else:
+                    st.warning("Seleziona un file o incolla il testo prima di cliccare Salva.")
+    except Exception as ex_ui:
+        logger.debug("Render Google credentials UI notice: %s", ex_ui)
+
+
 def sync_all_historical_expenses_from_gsheets(
     engine: Engine,
     spreadsheet_name: str = "My All financial Statements",
@@ -1075,9 +1233,33 @@ def sync_all_historical_expenses_from_gsheets(
     Sincronizza in blocco tutti gli anni storici delle spese (2021, 2022, 2023, 2024, 2025, 2026).
     Supporta risoluzione credenziali in memoria e Supabase user_integrations.
     """
-    from gsheets_sync_subproject.sync_google_sheets import get_gspread_client
-
     init_wealth_db(engine)
+
+    # Risoluzione automatica utente e token dalla sessione se non passati
+    if user_id is None:
+        try:
+            import streamlit as st
+
+            if hasattr(st, "session_state"):
+                user_id = (
+                    st.session_state.get("user_id")
+                    or getattr(st.session_state.get("user"), "id", None)
+                    or st.session_state.get("argus_auth_user_id")
+                )
+        except Exception:
+            pass
+
+    if access_token is None:
+        try:
+            import streamlit as st
+
+            if hasattr(st, "session_state"):
+                access_token = getattr(st.session_state.get("user"), "access_token", None) or st.session_state.get(
+                    "argus_session", {}
+                ).get("access_token")
+        except Exception:
+            pass
+
     client = get_gspread_client(
         creds_dict=creds_dict,
         user_id=user_id,

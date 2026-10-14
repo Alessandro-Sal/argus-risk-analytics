@@ -57,6 +57,16 @@ def main() -> int:
         default=None,
         help="Salva solo lo schema SQL su file ed esce (es. sql/supabase_schema.sql)",
     )
+    parser.add_argument(
+        "--user-id",
+        default=None,
+        help="UUID dell'utente Supabase proprietario dei dati migrati (per RLS auth.uid())",
+    )
+    parser.add_argument(
+        "--owner",
+        default=None,
+        help="Username o email dell'owner dei dati migrati",
+    )
     args = parser.parse_args()
 
     if args.export_schema:
@@ -107,6 +117,8 @@ def main() -> int:
         sqlite_path=args.sqlite,
         target_db_url=target_url,
         include_market_prices=args.include_prices,
+        user_id=args.user_id,
+        owner=args.owner,
     )
 
     print(f"  Totale Righe Migrate : {res.get('total_rows_migrated', 0)}")

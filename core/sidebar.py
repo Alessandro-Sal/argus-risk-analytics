@@ -1447,9 +1447,9 @@ def render_sidebar():
 
     ensure_session_restored()
     try:
-        from core.auth_manager import AuthManager
+        from core.auth_manager import require_auth
 
-        AuthManager.auth_guard(show_login_if_unauth=True)
+        require_auth()
     except Exception as ex_auth:
         logger.debug("Sidebar auth guard exception: %s", ex_auth)
 
@@ -1767,6 +1767,13 @@ def render_sidebar():
         except Exception as _e_cp:
             import logging
             logging.getLogger(__name__).warning("Command Palette injection notice: %s", _e_cp)
+
+        # ── 0.1 SINGLE SOURCE OF TRUTH: PORTFOLIO SELECTOR ──
+        try:
+            from core.workspace_context import render_portfolio_selector
+            render_portfolio_selector(key="sb_unified_portfolio_selector", label="💼 Portafoglio Attivo")
+        except Exception as _e_psel:
+            logger.debug("Sidebar portfolio selector notice: %s", _e_psel)
 
         # ── 1. MODALITÀ DI ESECUZIONE & ENGINE PARAMETERS (IN ALTO) ─────
         init_settings_session_state(is_wealth_mode=is_wealth_mode)

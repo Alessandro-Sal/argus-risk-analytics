@@ -398,6 +398,13 @@ class WorkspaceContext:
 
             if "portfolio_id" in st_state:
                 self.risk.portfolio_id = st_state.get("portfolio_id")
+            elif "active_portfolio_id" in st_state and st_state["active_portfolio_id"]:
+                self.risk.portfolio_id = st_state.get("active_portfolio_id")
+
+            if "active_portfolio_data" in st_state and st_state["active_portfolio_data"] is not None and not self.risk.results:
+                self.risk.results = st_state["active_portfolio_data"]
+                self.risk.is_live_active = True
+
             if "portfolio_name" in st_state:
                 self.risk.portfolio_name = st_state.get("portfolio_name", "Nessun Portafoglio")
             if "run_id" in st_state:
@@ -435,6 +442,8 @@ class WorkspaceContext:
         with self._LOCK:
             st_state["results"] = self.risk.results
             st_state["portfolio_id"] = self.risk.portfolio_id
+            st_state["active_portfolio_id"] = str(self.risk.portfolio_id) if self.risk.portfolio_id is not None else None
+            st_state["active_portfolio_data"] = self.risk.results
             st_state["portfolio_name"] = self.risk.portfolio_name
             st_state["run_id"] = self.risk.run_id
             st_state["base_currency"] = self.risk.base_currency
@@ -470,6 +479,8 @@ class WorkspaceContext:
                 for key in [
                     "results",
                     "portfolio_id",
+                    "active_portfolio_id",
+                    "active_portfolio_data",
                     "portfolio_name",
                     "run_id",
                     "pipeline_done",
@@ -1200,6 +1211,287 @@ def prune_stale_session_caches(max_age_hours: int = 24):
             pass
 
 
+def set_active_portfolio(portfolio_id: Union[str, int], engine: Optional[Any] = None) -> bool:
+    """
+    Imposta e sincronizza il portafoglio attivo come Single Source of Truth globale
+    condivisa istantaneamente da tutti i motori applicativi (Risk Engine, Live Terminal, Wealth Engine).
+    1. Recupera metadati, transazioni e posizioni del portafoglio per l'utente loggato.
+    2. Popola atomicamente st.session_state['active_portfolio_id'], ['active_portfolio_data'],
+       ['portfolio_id'], ['portfolio_name'], ['results'], e WorkspaceContext.
+    3. Invalida le cache di calcolo per forzare il ricalcolo immediato su tutti i moduli.
+    """
+    try:
+        import streamlit as st
+    except ImportError:
+        st = None
+
+    if portfolio_id is None:
+        return False
+
+    # 1. Risoluzione engine
+    if engine is None and st is not None:
+        engine = st.session_state.get("engine")
+    if engine is None:
+        try:
+            from core.fetcher import get_engine
+
+            offline = bool(st.session_state.get("offline_mode", False)) if st else False
+            db_name = st.session_state.get("db_name", "wealth") if st else "wealth"
+            engine = get_engine(database=db_name, offline=offline)
+        except Exception as e_eng:
+            logger.error("Impossibile ottenere l'engine DB in set_active_portfolio: %s", e_eng)
+            return False
+
+    # 2. Query del portafoglio su DB (con isolamento utente)
+    from sqlalchemy import text as sqlt
+
+    port_meta = None
+    target_pid = int(portfolio_id) if str(portfolio_id).isdigit() else portfolio_id
+
+    try:
+        with engine.connect() as conn:
+            p_row = conn.execute(
+                sqlt("SELECT * FROM portfolios WHERE portfolio_id = :pid"),
+                {"pid": target_pid},
+            ).mappings().fetchone()
+            if p_row:
+                port_meta = dict(p_row)
+    except Exception as e_q:
+        logger.warning("Query portafoglio %s fallita: %s", portfolio_id, e_q)
+
+    port_name = port_meta.get("name", f"Portafoglio #{portfolio_id}") if port_meta else f"Portafoglio #{portfolio_id}"
+    base_curr = port_meta.get("base_currency", "EUR") if port_meta else "EUR"
+
+    # 3. Calcolo o recupero posizioni & metriche
+    results_bundle = None
+    try:
+        from core.risk_engine import compute_risk
+
+        rf_val = st.session_state.get("active_rf_rate", 0.03) if st else 0.03
+        bm = st.session_state.get("benchmark", "SPY") if st else "SPY"
+        results_bundle = compute_risk(
+            target_pid, engine, benchmark_ticker=bm, risk_free_rate=rf_val, base_currency=base_curr
+        )
+    except Exception as e_calc:
+        logger.info("compute_risk su portafoglio %s ha richiesto fallback snapshot: %s", target_pid, e_calc)
+        try:
+            from core.db_exporter import get_snapshot_positions_by_id
+
+            with engine.connect() as conn:
+                snap_row = conn.execute(
+                    sqlt(
+                        "SELECT * FROM portfolio_snapshots WHERE portfolio_id = :pid ORDER BY calc_date DESC, snapshot_id DESC LIMIT 1"
+                    ),
+                    {"pid": target_pid},
+                ).mappings().fetchone()
+            if snap_row:
+                sid = snap_row.get("snapshot_id")
+                df_pos = get_snapshot_positions_by_id(engine, sid)
+                tot_val = float(snap_row.get("total_value") or 0.0)
+                results_bundle = {
+                    "portfolio_id": target_pid,
+                    "portfolio_name": port_name,
+                    "base_currency": base_curr,
+                    "computed_at": str(snap_row.get("calc_date")),
+                    "total_value": tot_val,
+                    "portfolio_value": tot_val,
+                    "positions": df_pos if df_pos is not None else pd.DataFrame(),
+                    "metrics": {
+                        "returns": {
+                            "total_value": tot_val,
+                            "cagr_pct": float(snap_row.get("cagr_pct") or 0.0),
+                            "sharpe_ratio": float(snap_row.get("sharpe_ratio") or 0.0),
+                            "total_pnl": float(snap_row.get("total_pnl") or 0.0),
+                        },
+                        "market_risk": {
+                            "volatility_annual_pct": float(snap_row.get("volatility_annual_pct") or 0.0),
+                            "max_drawdown_pct": float(snap_row.get("max_drawdown_pct") or 0.0),
+                            "var_95": float(snap_row.get("var_95_pct") or 0.0),
+                            "cvar_95": float(snap_row.get("cvar_95_pct") or 0.0),
+                            "beta": float(snap_row.get("ff_beta_mkt") or 1.0),
+                        },
+                    },
+                }
+        except Exception as e_snap:
+            logger.debug("Recupero snapshot fallito: %s", e_snap)
+
+    if results_bundle is None:
+        results_bundle = {
+            "portfolio_id": target_pid,
+            "portfolio_name": port_name,
+            "base_currency": base_curr,
+            "total_value": 0.0,
+            "portfolio_value": 0.0,
+            "positions": pd.DataFrame(),
+            "metrics": {"returns": {"total_value": 0.0}, "market_risk": {}},
+        }
+
+    # 4. Aggiornamento unificato Single Source of Truth
+    if st is not None:
+        st.session_state["active_portfolio_id"] = str(portfolio_id)
+        st.session_state["active_portfolio_data"] = results_bundle
+        st.session_state["portfolio_id"] = target_pid
+        st.session_state["portfolio_name"] = port_name
+        st.session_state["results"] = results_bundle
+        st.session_state["pipeline_done"] = True
+        st.session_state["session_cleared"] = False
+        st.session_state["base_currency"] = base_curr
+
+        try:
+            from core.session_manager import ArgusSessionManager
+
+            ArgusSessionManager.set_portfolio_id(target_pid if isinstance(target_pid, int) else 1)
+            pos_df = results_bundle.get("positions")
+            if isinstance(pos_df, pd.DataFrame):
+                ArgusSessionManager.set_active_positions(pos_df)
+        except Exception:
+            pass
+
+    # 5. Sincronizzazione WorkspaceContext
+    ws_ctx = WorkspaceContext.get_current()
+    ws_ctx.risk.portfolio_id = target_pid
+    ws_ctx.risk.portfolio_name = port_name
+    ws_ctx.risk.results = results_bundle
+    ws_ctx.risk.pipeline_done = True
+    ws_ctx.risk.is_live_active = True
+    ws_ctx.risk.base_currency = base_curr
+    ws_ctx.wealth.linked_risk_ids = [target_pid] if isinstance(target_pid, int) else []
+    ws_ctx.version += 1
+    ws_ctx.is_dirty = True
+
+    try:
+        from core.workspace_manager import save_session_snapshot_to_cache
+
+        save_session_snapshot_to_cache()
+    except Exception:
+        pass
+
+    # 6. Invalidazione deterministica cache
+    if st is not None:
+        try:
+            st.cache_data.clear()
+        except Exception:
+            pass
+
+    return True
+
+
+def render_portfolio_selector(
+    key: str = "global_active_portfolio_selector",
+    label: str = "💼 Portafoglio Attivo",
+    help_text: str = "Seleziona il portafoglio: sincronizza istantaneamente Risk Engine, Live Terminal e Wealth Engine.",
+) -> Optional[Any]:
+    """
+    Componente UI universale per la selezione del portafoglio attivo (Single Source of Truth).
+    Mostra i soli portafogli appartenenti all'utente loggato.
+    Un cambio di selezione qui allinea istantaneamente Risk Engine, Live Terminal e Wealth Engine.
+    """
+    try:
+        import streamlit as st
+    except ImportError:
+        return None
+
+    # Recupera l'elenco dei portafogli appartenenti all'utente
+    from sqlalchemy import text as sqlt
+
+    engine = st.session_state.get("engine")
+    if engine is None:
+        try:
+            from core.fetcher import get_engine
+
+            offline = bool(st.session_state.get("offline_mode", False))
+            db_name = st.session_state.get("db_name", "wealth")
+            engine = get_engine(database=db_name, offline=offline)
+        except Exception:
+            engine = None
+
+    portfolios_list = []
+    if engine is not None:
+        try:
+            user = st.session_state.get("user")
+            uid = user.id if user and hasattr(user, "id") else st.session_state.get("argus_auth_user_id")
+            uname = (
+                user.username
+                if user and hasattr(user, "username")
+                else st.session_state.get("argus_auth_user", "alessandro")
+            )
+            role = user.role if user and hasattr(user, "role") else st.session_state.get("argus_auth_role", "owner")
+
+            with engine.connect() as conn:
+                cols_raw = conn.execute(sqlt("SELECT * FROM portfolios LIMIT 0")).keys()
+                has_uid = "user_id" in cols_raw
+                has_owner = "owner" in cols_raw
+
+                if role == "owner" or (not has_uid and not has_owner):
+                    q = "SELECT portfolio_id, name, base_currency FROM portfolios ORDER BY portfolio_id ASC"
+                    rows = conn.execute(sqlt(q)).mappings().fetchall()
+                elif has_uid and uid and uid != "local-owner":
+                    q = "SELECT portfolio_id, name, base_currency FROM portfolios WHERE user_id = :uid ORDER BY portfolio_id ASC"
+                    rows = conn.execute(sqlt(q), {"uid": uid}).mappings().fetchall()
+                    if not rows and has_owner:
+                        q = "SELECT portfolio_id, name, base_currency FROM portfolios WHERE LOWER(TRIM(owner)) = LOWER(TRIM(:u)) ORDER BY portfolio_id ASC"
+                        rows = conn.execute(sqlt(q), {"u": uname}).mappings().fetchall()
+                elif has_owner:
+                    q = "SELECT portfolio_id, name, base_currency FROM portfolios WHERE LOWER(TRIM(owner)) = LOWER(TRIM(:u)) ORDER BY portfolio_id ASC"
+                    rows = conn.execute(sqlt(q), {"u": uname}).mappings().fetchall()
+                else:
+                    rows = []
+                portfolios_list = [dict(r) for r in rows]
+        except Exception as e_fetch:
+            logger.debug("Fetch portfolio list in selector notice: %s", e_fetch)
+
+    # Se nessun portafoglio presente nel database
+    if not portfolios_list:
+        current_pid = st.session_state.get("active_portfolio_id") or st.session_state.get("portfolio_id")
+        current_name = st.session_state.get("portfolio_name", "Nessun portafoglio")
+        if current_pid:
+            portfolios_list = [
+                {
+                    "portfolio_id": current_pid,
+                    "name": current_name,
+                    "base_currency": st.session_state.get("base_currency", "EUR"),
+                }
+            ]
+
+    if not portfolios_list:
+        st.markdown(
+            f"""
+            <div style="font-size:11.5px; color:#94a3b8; padding:6px 8px; border-radius:6px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08);">
+                <b>{label}</b>: <span style="color:#f59e0b;">Nessun portafoglio caricato</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        return None
+
+    # Mappatura e selezione
+    p_options = [p["portfolio_id"] for p in portfolios_list]
+    p_format = {p["portfolio_id"]: f"💼 {p['name']} (#{p['portfolio_id']})" for p in portfolios_list}
+
+    active_id = st.session_state.get("active_portfolio_id") or st.session_state.get("portfolio_id")
+    cur_idx = 0
+    if active_id is not None:
+        for idx, pid in enumerate(p_options):
+            if str(pid) == str(active_id):
+                cur_idx = idx
+                break
+
+    selected_pid = st.selectbox(
+        label,
+        options=p_options,
+        index=cur_idx,
+        format_func=lambda x: p_format.get(x, f"Portafoglio #{x}"),
+        key=key,
+        help=help_text,
+    )
+
+    if selected_pid is not None and str(selected_pid) != str(active_id):
+        set_active_portfolio(selected_pid, engine=engine)
+        st.rerun()
+
+    return selected_pid
+
+
 # ── EXPORTS DI STATE MANAGEMENT & UI LIFECYCLE ───────────────────────
 try:
     from core.ui_lifecycle import (  # noqa: F401
@@ -1210,4 +1502,5 @@ try:
     )
 except Exception:
     pass
+
 

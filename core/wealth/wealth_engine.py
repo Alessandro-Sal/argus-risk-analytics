@@ -106,62 +106,113 @@ def compute_consolidated_net_worth(
         # Totale passività effettivo: debito strutturale + scoperti operativi
         summary.total_liabilities = liab_from_types + liab_from_overdraft
 
-    # 2. Portafogli Finanziari (Titoli & Crypto dal modulo Risk Analytics)
-    active_risk_pids = risk_portfolio_ids
-    if active_risk_pids is None:
-        try:
-            from core.wealth.wealth_db import get_linked_risk_portfolios
-
-            active_risk_pids = get_linked_risk_portfolios(engine, wealth_portfolio_id=portfolio_id or 1)
-        except Exception:
-            active_risk_pids = []
-
+    # 2. Portafogli Finanziari (Titoli & Crypto da Single Source of Truth / Active Portfolio)
     risk_val = 0.0
-    if active_risk_pids and len(active_risk_pids) > 0:
-        # Verifica se WorkspaceContext contiene un portafoglio Risk live in memoria collegato a questo profilo Wealth
-        live_risk_pid = None
-        live_risk_equity = 0.0
+    active_data_found = False
+
+    # Controllo priorità 1: st.session_state["active_portfolio_data"] e sessione Risk attiva
+    try:
+        import streamlit as st
+        ss = getattr(st, "session_state", None)
+        if ss is not None:
+            act_data = ss.get("active_portfolio_data")
+            if isinstance(act_data, dict):
+                eq = act_data.get("equity")
+                if eq is not None and float(eq) > 0:
+                    risk_val = float(eq)
+                    active_data_found = True
+                elif "positions" in act_data and isinstance(act_data["positions"], pd.DataFrame) and not act_data["positions"].empty:
+                    df_p = act_data["positions"]
+                    for col in ["market_value", "value", "controvalore", "total_value"]:
+                        if col in df_p.columns:
+                            val_sum = float(pd.to_numeric(df_p[col], errors="coerce").fillna(0).sum())
+                            if val_sum > 0:
+                                risk_val = val_sum
+                                active_data_found = True
+                                break
+            elif isinstance(act_data, pd.DataFrame) and not act_data.empty:
+                for col in ["market_value", "value", "controvalore", "total_value"]:
+                    if col in act_data.columns:
+                        val_sum = float(pd.to_numeric(act_data[col], errors="coerce").fillna(0).sum())
+                        if val_sum > 0:
+                            risk_val = val_sum
+                            active_data_found = True
+                            break
+
+            if not active_data_found:
+                res = ss.get("results")
+                if isinstance(res, dict):
+                    eq = res.get("total_equity") or res.get("equity")
+                    if eq is not None and float(eq) > 0:
+                        risk_val = float(eq)
+                        active_data_found = True
+    except Exception:
+        pass
+
+    if not active_data_found:
         try:
             from core.workspace_context import WorkspaceContext
-
             ws_ctx = WorkspaceContext.get_current()
-            if ws_ctx.risk.is_live_active and ws_ctx.risk.results:
-                live_eq = ws_ctx.risk.get_total_equity()
-                if live_eq > 0:
-                    cand_pid = ws_ctx.risk.portfolio_id
-                    if cand_pid is not None and int(cand_pid) in [int(p) for p in active_risk_pids]:
-                        live_risk_pid = int(cand_pid)
-                        live_risk_equity = live_eq
+            if ws_ctx and ws_ctx.risk and ws_ctx.risk.get_total_equity() > 0:
+                risk_val = float(ws_ctx.risk.get_total_equity())
+                active_data_found = True
         except Exception:
             pass
 
-        # Interrogazione snapshot su database per i portafogli collegati (escluso l'eventuale live in memoria)
-        pids_for_db = [p for p in active_risk_pids if live_risk_pid is None or int(p) != live_risk_pid]
-        db_snap_val = 0.0
-        if pids_for_db:
+    # Controllo priorità 2: Fallback su database snapshots collegati
+    if not active_data_found:
+        active_risk_pids = risk_portfolio_ids
+        if active_risk_pids is None:
             try:
-                with engine.connect() as conn:
-                    from sqlalchemy import text as sqlt
+                from core.wealth.wealth_db import get_linked_risk_portfolios
 
-                    placeholders = ",".join([f":p{i}" for i in range(len(pids_for_db))])
-                    params = {f"p{i}": int(pid) for i, pid in enumerate(pids_for_db)}
-                    q = f"""
-                        SELECT SUM(s.total_value) as total_val
-                        FROM portfolio_snapshots s
-                        INNER JOIN (
-                            SELECT portfolio_id, MAX(snapshot_id) as max_sid
-                            FROM portfolio_snapshots
-                            WHERE portfolio_id IN ({placeholders})
-                            GROUP BY portfolio_id
-                        ) m ON s.snapshot_id = m.max_sid
-                    """
-                    r_val = conn.execute(sqlt(q), params).scalar()
-                    if r_val is not None and float(r_val) > 0:
-                        db_snap_val = float(r_val)
+                active_risk_pids = get_linked_risk_portfolios(engine, wealth_portfolio_id=portfolio_id or 1)
             except Exception:
-                db_snap_val = 0.0
+                active_risk_pids = []
 
-        risk_val = round(db_snap_val + live_risk_equity, 2)
+        if active_risk_pids and len(active_risk_pids) > 0:
+            live_risk_pid = None
+            live_risk_equity = 0.0
+            try:
+                from core.workspace_context import WorkspaceContext
+
+                ws_ctx = WorkspaceContext.get_current()
+                if ws_ctx.risk.is_live_active and ws_ctx.risk.results:
+                    live_eq = ws_ctx.risk.get_total_equity()
+                    if live_eq > 0:
+                        cand_pid = ws_ctx.risk.portfolio_id
+                        if cand_pid is not None and int(cand_pid) in [int(p) for p in active_risk_pids]:
+                            live_risk_pid = int(cand_pid)
+                            live_risk_equity = live_eq
+            except Exception:
+                pass
+
+            pids_for_db = [p for p in active_risk_pids if live_risk_pid is None or int(p) != live_risk_pid]
+            db_snap_val = 0.0
+            if pids_for_db:
+                try:
+                    with engine.connect() as conn:
+                        from sqlalchemy import text as sqlt
+
+                        placeholders = ",".join([f":p{i}" for i in range(len(pids_for_db))])
+                        params = {f"p{i}": int(pid) for i, pid in enumerate(pids_for_db)}
+                        q = f"""
+                            SELECT SUM(s.total_value) as total_val
+                            FROM portfolio_snapshots s
+                            INNER JOIN (
+                                SELECT portfolio_id, MAX(snapshot_id) as max_sid
+                                FROM portfolio_snapshots
+                                WHERE portfolio_id IN ({placeholders})
+                                GROUP BY portfolio_id
+                            ) m ON s.snapshot_id = m.max_sid
+                        """
+                        r_val = conn.execute(sqlt(q), params).scalar()
+                        if r_val is not None and float(r_val) > 0:
+                            db_snap_val = float(r_val)
+                except Exception:
+                    db_snap_val = 0.0
+
+            risk_val = round(db_snap_val + live_risk_equity, 2)
 
     brokerage_val = 0.0
     if not df_acc.empty:

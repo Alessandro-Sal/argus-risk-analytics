@@ -21,12 +21,19 @@ except ImportError:
     HAS_STREAMLIT = False
 
 
+from core.workspace_context import render_portfolio_selector, set_active_portfolio
+
+
 class ArgusSessionKeys:
     """Costanti univoche per le chiavi di st.session_state."""
     APP_INITIALIZED = "_app_initialized"
     SPLASH_DISMISSED = "splash_dismissed"
     BASE_CURRENCY = "base_currency"
     RISK_PROFILE = "risk_profile"
+    USER = "user"
+    USER_ID = "user_id"
+    ACTIVE_PORTFOLIO_ID = "active_portfolio_id"
+    ACTIVE_PORTFOLIO_DATA = "active_portfolio_data"
     PORTFOLIO_ID = "current_portfolio_id"
     SELECTED_PORTFOLIO = "selected_portfolio"
     ACTIVE_POSITIONS = "df_positions"
@@ -171,8 +178,31 @@ class ArgusSessionManager:
         return cls._state().get(ArgusSessionKeys.LAST_REBALANCE, None)
 
     @classmethod
+    def get_active_portfolio_id(cls) -> Optional[Any]:
+        """Restituisce active_portfolio_id se presente, altrimenti portfolio_id numerico."""
+        return cls._state().get(ArgusSessionKeys.ACTIVE_PORTFOLIO_ID, cls.get_portfolio_id())
+
+    @classmethod
+    def set_active_portfolio(cls, portfolio_id: Union[str, int], engine: Optional[Any] = None) -> bool:
+        """Imposta atomicamente il portafoglio attivo e sincronizza lo stato."""
+        return set_active_portfolio(portfolio_id, engine=engine)
+
+    @classmethod
+    def render_portfolio_selector(cls, key: str = "sidebar_active_portfolio_select", label: str = "Portafoglio Attivo", help_text: Optional[str] = None):
+        """Renderizza il selettore dei portafogli dell'utente autenticato."""
+        return render_portfolio_selector(key=key, label=label, help_text=help_text)
+
+    @classmethod
     def reset_session(cls) -> None:
         """Ripristina lo stato ai valori predefiniti di fabbrica."""
         state = cls._state()
         state.clear()
         cls.ensure_initialized()
+
+
+__all__ = [
+    "ArgusSessionKeys",
+    "ArgusSessionManager",
+    "set_active_portfolio",
+    "render_portfolio_selector",
+]

@@ -241,3 +241,110 @@ class ArgusDataVault:
         with open(target_path, "wb") as f_out:
             f_out.write(decrypted)
         return target_path
+
+
+# ── 5. AUTH RATE LIMITING & BRUTE-FORCE PROTECTION (OWASP Top 10) ──
+
+
+class AuthRateLimiter:
+    """
+    Protezione avanzata contro attacchi di Brute-Force e Credential Stuffing conforme a OWASP Top 10.
+    Implementa Exponential Backoff con finestre scorrevoli temporizzate e blocco reattivo.
+    """
+
+    _attempts: Dict[str, List[float]] = {}
+    _lockouts: Dict[str, float] = {}
+
+    MAX_FREE_ATTEMPTS: int = 5
+    BASE_LOCKOUT_SECONDS: float = 30.0
+    WINDOW_SECONDS: float = 300.0  # Finestra di monitoraggio 5 minuti
+
+    @classmethod
+    def _clean_old_attempts(cls, key: str, now: float) -> None:
+        """Rimuove i tentativi antecedenti la finestra temporale di osservazione."""
+        if key in cls._attempts:
+            cutoff = now - cls.WINDOW_SECONDS
+            cls._attempts[key] = [t for t in cls._attempts[key] if t > cutoff]
+            if not cls._attempts[key]:
+                cls._attempts.pop(key, None)
+
+    @classmethod
+    def check_rate_limit(cls, identity: str) -> Tuple[bool, int, str]:
+        """
+        Verifica se l'identità (username, email o client IP) è autorizzata a tentare l'accesso.
+        Restituisce: (is_allowed, remaining_lockout_seconds, message).
+        """
+        import time
+
+        key = str(identity or "anonymous").strip().lower()
+        now = time.time()
+
+        # Verifica se è attivo un blocco temporale (lockout)
+        lockout_expiry = cls._lockouts.get(key, 0.0)
+        if now < lockout_expiry:
+            remaining = int(lockout_expiry - now) + 1
+            return (
+                False,
+                remaining,
+                f"Account temporaneamente bloccato per troppi tentativi falliti. Riprova tra {remaining}s.",
+            )
+
+        # Se il lockout è scaduto, ripulisce la voce
+        if lockout_expiry > 0.0 and now >= lockout_expiry:
+            cls._lockouts.pop(key, None)
+
+        cls._clean_old_attempts(key, now)
+        return True, 0, ""
+
+    @classmethod
+    def record_failure(cls, identity: str) -> Tuple[int, int]:
+        """
+        Registra un tentativo fallito di autenticazione.
+        Se i tentativi superano MAX_FREE_ATTEMPTS, applica un lockout con exponential backoff.
+        Restituisce: (failed_attempts_count, lockout_seconds_applied).
+        """
+        import time
+
+        key = str(identity or "anonymous").strip().lower()
+        now = time.time()
+        cls._clean_old_attempts(key, now)
+
+        if key not in cls._attempts:
+            cls._attempts[key] = []
+        cls._attempts[key].append(now)
+
+        failed_count = len(cls._attempts[key])
+        lockout_sec = 0
+
+        if failed_count >= cls.MAX_FREE_ATTEMPTS:
+            # Calcolo exponential backoff: 5 -> 30s, 6 -> 60s, 7 -> 120s, 8+ -> 300s
+            exponent = min(failed_count - cls.MAX_FREE_ATTEMPTS, 3)
+            lockout_sec = int(cls.BASE_LOCKOUT_SECONDS * (2**exponent))
+            cls._lockouts[key] = now + lockout_sec
+            logger.warning(
+                "Rate limiter: Identity '%s' locked out for %ds after %d failed attempts.",
+                key,
+                lockout_sec,
+                failed_count,
+            )
+
+        return failed_count, lockout_sec
+
+    @classmethod
+    def record_success(cls, identity: str) -> None:
+        """Azzera la cronologia dei tentativi falliti dopo un login autenticato con successo."""
+        key = str(identity or "anonymous").strip().lower()
+        cls._attempts.pop(key, None)
+        cls._lockouts.pop(key, None)
+
+    @classmethod
+    def reset(cls, identity: Optional[str] = None) -> None:
+        """Azzera tutti i contatori (utile per test suite e reset amministrativo)."""
+        if identity:
+            key = str(identity).strip().lower()
+            cls._attempts.pop(key, None)
+            cls._lockouts.pop(key, None)
+        else:
+            cls._attempts.clear()
+            cls._lockouts.clear()
+

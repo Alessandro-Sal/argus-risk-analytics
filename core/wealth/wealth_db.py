@@ -1281,7 +1281,7 @@ def save_wealth_category(engine: Engine, category: Dict[str, Any]) -> int:
 def _get_active_user_isolation_context() -> Tuple[str, str, bool]:
     """
     Restituisce (username, display_name, enforce_owner_filter) in base alla sessione
-    autenticata corrente. Se un utente standard (`role == 'user'`) è autenticato sul DB
+    autenticata corrente. Se un utente standard (`role != 'admin'`) è autenticato sul DB
     condiviso, `enforce_owner_filter=True` garantisce che veda solo i propri profili.
     """
     try:
@@ -1289,12 +1289,31 @@ def _get_active_user_isolation_context() -> Tuple[str, str, bool]:
         from streamlit.runtime.scriptrunner import get_script_run_ctx
 
         ss = getattr(st, "session_state", None)
-        if ss is not None and (get_script_run_ctx() is not None or isinstance(ss, dict)):
-            uname = str(ss.get("argus_auth_user", "user") or "user").strip().lower()
-            disp = str(ss.get("argus_auth_display_name", uname.capitalize()) or uname.capitalize()).strip()
-            role = str(ss.get("argus_auth_role", "owner") or "owner").strip().lower()
+        if ss is not None and (get_script_run_ctx() is not None or hasattr(ss, "get") or isinstance(ss, dict)):
+            uname = str(ss.get("argus_auth_user", "") or "").strip().lower()
+            disp = str(ss.get("argus_auth_display_name", "") or "").strip()
+            role = str(ss.get("argus_auth_role", "") or "").strip().lower()
+
+            user_obj = ss.get("user")
+            if user_obj is not None:
+                if isinstance(user_obj, dict):
+                    uname = uname or str(user_obj.get("username") or user_obj.get("email") or "user").strip().lower()
+                    disp = disp or str(user_obj.get("display_name") or user_obj.get("username") or uname.capitalize()).strip()
+                    role = role or str(user_obj.get("role") or "user").strip().lower()
+                else:
+                    uname = uname or str(getattr(user_obj, "username", None) or getattr(user_obj, "email", None) or "user").strip().lower()
+                    disp = disp or str(getattr(user_obj, "display_name", None) or getattr(user_obj, "username", None) or uname.capitalize()).strip()
+                    role = role or str(getattr(user_obj, "role", "user") or "user").strip().lower()
+
+            if not uname:
+                uname = "user"
+            if not disp:
+                disp = uname.capitalize()
+            if not role:
+                role = "user"
+
             has_custom_db = bool(str(ss.get("argus_user_custom_db_url", "") or "").strip())
-            enforce = (role == "user") and not has_custom_db
+            enforce = (role != "admin" and not has_custom_db)
             return uname, disp, enforce
     except Exception:
         pass
@@ -1463,7 +1482,7 @@ def create_wealth_portfolio(
     """Crea un nuovo profilo patrimoniale dedicato nella tabella wealth_profiles."""
     init_wealth_db(engine)
     curr_user, _, enforce_owner = _get_active_user_isolation_context()
-    effective_owner = curr_user if (enforce_owner or not owner or owner == "user") else owner
+    effective_owner = owner if (owner and owner != "user") else (curr_user if enforce_owner else "user")
     clean_name = (name or "").strip()
     if not clean_name:
         clean_name = "Nuovo Profilo"
@@ -2594,7 +2613,12 @@ def delete_wealth_goal(engine: Engine, goal_id: int) -> bool:
 # ── SINCRONIZZAZIONE DIRETTA MYSQL / SUPABASE ⇄ SQLITE LOCALE ──
 
 
-def sync_wealth_tables_between_engines(source_engine: Engine, target_engine: Engine) -> dict:
+def sync_wealth_tables_between_engines(
+    source_engine: Engine,
+    target_engine: Engine,
+    user_id: Optional[str] = None,
+    owner: Optional[str] = None,
+) -> dict:
     """
     Sincronizza in modo sicuro ed efficiente le tabelle del modulo Wealth, Risk e Fiscale
     da un engine a un altro (es. da SQLite locale a Supabase PostgreSQL o da MySQL a SQLite).
@@ -2659,6 +2683,19 @@ def sync_wealth_tables_between_engines(source_engine: Engine, target_engine: Eng
                 continue
 
             df_to_insert = df[common_cols].copy()
+
+            # Associazione automatica user_id e owner per isolamento multi-tenant Supabase RLS
+            if user_id and "user_id" in tgt_cols:
+                if "user_id" not in df_to_insert.columns:
+                    df_to_insert["user_id"] = str(user_id)
+                else:
+                    df_to_insert["user_id"] = df_to_insert["user_id"].fillna(str(user_id))
+
+            if owner and "owner" in tgt_cols:
+                if "owner" not in df_to_insert.columns:
+                    df_to_insert["owner"] = str(owner)
+                else:
+                    df_to_insert["owner"] = df_to_insert["owner"].fillna(str(owner))
 
             for col in df_to_insert.columns:
                 col_l = col.lower()

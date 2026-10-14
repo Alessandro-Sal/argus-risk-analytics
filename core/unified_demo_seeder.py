@@ -214,6 +214,27 @@ def seed_unified_demo_scenario(target_portfolio_name: str = "DEMO_FAMILY_OFFICE"
         pass
 
     # ── 8. SEED OPZIONALE BITEMPORAL & WEALTH DB ─────────────────
+    curr_user = "user"
+    user_id = None
+    try:
+        import streamlit as st
+        ss = getattr(st, "session_state", None)
+        if ss is not None:
+            user_obj = ss.get("user")
+            if user_obj:
+                if isinstance(user_obj, dict):
+                    curr_user = user_obj.get("username") or user_obj.get("email") or "user"
+                    user_id = user_obj.get("id")
+                else:
+                    curr_user = getattr(user_obj, "username", None) or getattr(user_obj, "email", None) or "user"
+                    user_id = getattr(user_obj, "id", None)
+            if not user_id:
+                user_id = ss.get("user_id")
+            if not curr_user:
+                curr_user = ss.get("argus_auth_user", "user")
+    except Exception:
+        pass
+
     try:
         from core.bitemporal_engine import BitemporalLedgerEngine
 
@@ -234,21 +255,47 @@ def seed_unified_demo_scenario(target_portfolio_name: str = "DEMO_FAMILY_OFFICE"
             save_wealth_account,
         )
 
-        engine = get_engine(database="wealth", offline=True)
+        active_offline = bool(st.session_state.get("offline_mode", False))
+        engine = st.session_state.get("engine") or st.session_state.get("db_engine")
+        if engine is None:
+            engine = get_engine(database="wealth", offline=active_offline)
         init_wealth_db(engine)
 
         pid = create_wealth_portfolio(
             engine,
             name=target_portfolio_name,
             description="Demo Family Office Multi-Asset (5 Pilastri)",
-            owner="Demo User",
+            owner=curr_user,
             base_currency="EUR",
         )
+
+        # Se disponibile user_id, lo colleghiamo sul record del profilo / portafoglio
+        if user_id:
+            try:
+                with engine.begin() as conn:
+                    from sqlalchemy import text as sqlt
+                    try:
+                        conn.execute(
+                            sqlt("UPDATE wealth_profiles SET user_id = :uid WHERE profile_id = :pid"),
+                            {"uid": str(user_id), "pid": pid},
+                        )
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
         try:
             import streamlit as st
 
             if hasattr(st, "session_state"):
                 st.session_state["wealth_active_portfolio_id"] = pid
+                st.session_state["active_portfolio_id"] = pid
+                st.session_state["active_portfolio_data"] = {
+                    "portfolio": {"portfolio_id": pid, "name": target_portfolio_name, "owner": curr_user},
+                    "positions": positions_df,
+                    "equity": float(positions_df["current_value"].sum()) if not positions_df.empty else 214950.0,
+                    "results": results_bundle,
+                }
                 st.session_state["session_cleared"] = False
         except Exception:
             pass
