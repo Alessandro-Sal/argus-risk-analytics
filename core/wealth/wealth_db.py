@@ -1297,24 +1297,27 @@ def _get_active_user_isolation_context() -> Tuple[str, str, bool]:
             user_obj = ss.get("user")
             if user_obj is not None:
                 if isinstance(user_obj, dict):
-                    uname = uname or str(user_obj.get("username") or user_obj.get("email") or "user").strip().lower()
-                    disp = disp or str(user_obj.get("display_name") or user_obj.get("username") or uname.capitalize()).strip()
-                    role = role or str(user_obj.get("role") or "user").strip().lower()
+                    uname = uname or str(user_obj.get("username") or user_obj.get("email") or "").strip().lower()
+                    disp = disp or str(user_obj.get("display_name") or user_obj.get("username") or "").strip()
+                    role = role or str(user_obj.get("role") or "").strip().lower()
                 else:
-                    uname = uname or str(getattr(user_obj, "username", None) or getattr(user_obj, "email", None) or "user").strip().lower()
-                    disp = disp or str(getattr(user_obj, "display_name", None) or getattr(user_obj, "username", None) or uname.capitalize()).strip()
-                    role = role or str(getattr(user_obj, "role", "user") or "user").strip().lower()
+                    uname = uname or str(getattr(user_obj, "username", None) or getattr(user_obj, "email", None) or "").strip().lower()
+                    disp = disp or str(getattr(user_obj, "display_name", None) or getattr(user_obj, "username", None) or "").strip()
+                    role = role or str(getattr(user_obj, "role", None) or "").strip().lower()
 
-            if not uname:
-                uname = "user"
-            if not disp:
-                disp = uname.capitalize()
-            if not role:
-                role = "user"
+            is_auth = bool(
+                ss.get("authenticated", False)
+                or ss.get("argus_auth_verified", False)
+                or ss.get("argus_session")
+            )
+            # If no authenticated user session exists, do NOT enforce owner filtering (e.g. tests or unauthenticated CLI/offline)
+            if not is_auth or not uname:
+                return uname or "user", disp or "Personale", False
 
             has_custom_db = bool(str(ss.get("argus_user_custom_db_url", "") or "").strip())
-            enforce = (role != "admin" and not has_custom_db)
-            return uname, disp, enforce
+            is_admin_or_guest = role in ("admin", "guest_demo", "demo")
+            enforce = (not is_admin_or_guest and not has_custom_db)
+            return uname, disp or uname.capitalize(), enforce
     except Exception:
         pass
     return "user", "Personale", False

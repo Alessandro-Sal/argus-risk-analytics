@@ -338,6 +338,8 @@ class TestAuthHardeningAndUX:
         monkeypatch.setattr(AuthManager, "get_supabase_client", lambda access_token=None: MockClientDup())
         monkeypatch.setattr("core.config_manager.get_supabase_anon_key", lambda: "mock_anon_key_valid")
         monkeypatch.setattr("core.config_manager.get_supabase_url", lambda: "https://mock.supabase.co")
+        monkeypatch.setattr("core.auth_manager.get_supabase_anon_key", lambda: "mock_anon_key_valid")
+        monkeypatch.setattr("core.auth_manager.get_supabase_url", lambda: "https://mock.supabase.co")
 
         res_gotrue_dup = AuthManager.sign_up("mario.rossi@argus.cloud", "ArgusEnterprise#2026", "Mario Rossi")
         assert res_gotrue_dup["ok"] is False

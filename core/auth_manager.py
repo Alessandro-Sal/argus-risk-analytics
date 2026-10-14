@@ -617,7 +617,7 @@ class AuthManager:
         anon_key = get_supabase_anon_key()
         supa_url = get_supabase_url()
 
-        if client is not None and anon_key and supa_url and "dummy" not in anon_key:
+        if client is not None and hasattr(client, "auth"):
             try:
                 sign_res = client.auth.sign_up(
                     {
