@@ -65,6 +65,7 @@ TABLE_PK_MAP: Dict[str, str] = {
     "tax_loss_carryforward": "id",
     "tax_verification_documents": "id",
     "argus_users": "user_id",
+    "user_integrations": "id",
 }
 
 # Average bytes per row (including B-Tree index overhead) for quota estimation
@@ -88,10 +89,207 @@ ESTIMATED_BYTES_PER_ROW: Dict[str, int] = {
     "portfolios": 200,
     "wealth_profiles": 200,
     "argus_users": 240,
+    "user_integrations": 350,
 }
 
-# Process-level warm connection pool cache for Supabase PostgreSQL engines
+# Process-level warm connection pool cache for Supabase PostgreSQL engines and Client
 _SUPABASE_ENGINE_CACHE: Dict[str, Engine] = {}
+_SUPABASE_CLIENT_CACHE: Optional[Any] = None
+
+
+def get_supabase_client(access_token: Optional[str] = None) -> Optional[Any]:
+    """
+    Restituisce un'istanza singleton del client Supabase SDK ufficiale.
+    Se access_token è fornito, autentica le richieste PostgREST con il JWT specificato.
+    """
+    global _SUPABASE_CLIENT_CACHE
+    try:
+        from supabase import create_client
+    except ImportError:
+        logger.warning("Modulo 'supabase' non installato.")
+        return None
+
+    cfg = get_supabase_config()
+    supa_url = cfg.get("supabase_url", "")
+    anon_key = cfg.get("supabase_anon_key", "")
+
+    if not supa_url or not anon_key or "dummy" in anon_key:
+        return None
+
+    try:
+        if _SUPABASE_CLIENT_CACHE is None:
+            _SUPABASE_CLIENT_CACHE = create_client(supa_url, anon_key)
+
+        client = _SUPABASE_CLIENT_CACHE
+        if access_token and hasattr(client, "postgrest"):
+            client.postgrest.auth(access_token)
+        return client
+    except Exception as ex:
+        logger.warning("Impossibile creare il client Supabase SDK: %s", ex)
+        return None
+
+
+def get_user_integration(
+    provider: str,
+    user_id: Optional[str] = None,
+    access_token: Optional[str] = None,
+    engine: Optional[Engine] = None,
+) -> Optional[Dict[str, Any]]:
+    """
+    Recupera le credenziali protette di un'integrazione utente (es. 'google_sheets')
+    da Supabase tramite il client SDK ufficiale o query diretta al database.
+    """
+    # 1. Tentativo prioritario tramite Supabase Client con JWT
+    try:
+        client = get_supabase_client(access_token=access_token)
+        if client is not None:
+            query = client.table("user_integrations").select("config_data").eq("provider", provider)
+            if user_id:
+                query = query.eq("user_id", user_id)
+            res = query.limit(1).execute()
+            if res and res.data and len(res.data) > 0:
+                cfg = res.data[0].get("config_data")
+                return {
+                    "provider": provider,
+                    "config_data": cfg if isinstance(cfg, dict) else (json.loads(cfg) if cfg else {}),
+                }
+    except Exception as ex_client:
+        logger.debug("Lettura integrazione da client Supabase non riuscita: %s", ex_client)
+
+    # 2. Fallback tramite connessione SQL diretta
+    if engine is None:
+        try:
+            from core.fetcher import get_engine
+
+            engine = get_engine(offline=False)
+        except Exception:
+            pass
+
+    if engine is not None:
+        try:
+            with engine.connect() as conn:
+                inspector = sqla_inspect(engine)
+                if "user_integrations" in inspector.get_table_names():
+                    sql_str = "SELECT config_data FROM user_integrations WHERE provider = :prov"
+                    params: Dict[str, Any] = {"prov": provider}
+                    if user_id:
+                        sql_str += " AND user_id = :uid"
+                        params["uid"] = str(user_id)
+                    sql_str += " ORDER BY updated_at DESC LIMIT 1"
+                    row = conn.execute(sqlt(sql_str), params).fetchone()
+                    if row and row[0]:
+                        val = row[0]
+                        cfg = json.loads(val) if isinstance(val, str) else dict(val)
+                        return {
+                            "provider": provider,
+                            "config_data": cfg,
+                        }
+        except Exception as ex_db:
+            logger.debug("Lettura integrazione da database SQL fallita: %s", ex_db)
+
+    return None
+
+
+def save_user_integration(
+    provider: str,
+    config_data: Dict[str, Any],
+    user_id: Optional[str] = None,
+    access_token: Optional[str] = None,
+    engine: Optional[Engine] = None,
+) -> bool:
+    """
+    Salva o aggiorna in modo sicuro le credenziali di un'integrazione (es. 'google_sheets')
+    nella tabella protetta `user_integrations` su Supabase.
+    """
+    if not isinstance(config_data, dict) or not config_data:
+        return False
+
+    effective_uid = user_id
+    if not effective_uid:
+        try:
+            import streamlit as st
+
+            effective_uid = st.session_state.get("argus_auth_user_id") or "00000000-0000-0000-0000-000000000001"
+        except Exception:
+            effective_uid = "00000000-0000-0000-0000-000000000001"
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    # 1. Tentativo con Supabase Client SDK
+    try:
+        client = get_supabase_client(access_token=access_token)
+        if client is not None:
+            payload = {
+                "user_id": effective_uid,
+                "provider": provider,
+                "config_data": config_data,
+                "updated_at": now_iso,
+            }
+            client.table("user_integrations").upsert(payload, on_conflict="user_id,provider").execute()
+            return True
+    except Exception as ex_client:
+        logger.debug("Salvataggio integrazione via Supabase client non riuscito: %s", ex_client)
+
+    # 2. Fallback SQL diretto
+    if engine is None:
+        try:
+            from core.fetcher import get_engine
+
+            engine = get_engine(offline=False)
+        except Exception:
+            pass
+
+    if engine is not None:
+        try:
+            dialect_name = getattr(getattr(engine, "dialect", None), "name", "").lower()
+            with engine.begin() as conn:
+                cfg_json = json.dumps(config_data)
+                if "postgresql" in dialect_name:
+                    sql = sqlt("""
+                        INSERT INTO user_integrations (user_id, provider, config_data, created_at, updated_at)
+                        VALUES (:uid, :prov, :cfg, NOW(), NOW())
+                        ON CONFLICT (user_id, provider) DO UPDATE
+                        SET config_data = EXCLUDED.config_data, updated_at = NOW()
+                    """)
+                    conn.execute(sql, {"uid": effective_uid, "prov": provider, "cfg": cfg_json})
+                else:
+                    # SQLite fallback
+                    conn.execute(
+                        sqlt("""
+                        CREATE TABLE IF NOT EXISTS user_integrations (
+                            id TEXT PRIMARY KEY,
+                            user_id TEXT NOT NULL,
+                            provider TEXT NOT NULL,
+                            config_data TEXT NOT NULL,
+                            created_at TEXT NOT NULL,
+                            updated_at TEXT NOT NULL,
+                            UNIQUE(user_id, provider)
+                        )
+                    """)
+                    )
+                    sql = sqlt("""
+                        INSERT INTO user_integrations (id, user_id, provider, config_data, created_at, updated_at)
+                        VALUES (:id, :uid, :prov, :cfg, :now, :now)
+                        ON CONFLICT (user_id, provider) DO UPDATE
+                        SET config_data = EXCLUDED.config_data, updated_at = EXCLUDED.updated_at
+                    """)
+                    import uuid
+
+                    conn.execute(
+                        sql,
+                        {
+                            "id": str(uuid.uuid4()),
+                            "uid": effective_uid,
+                            "prov": provider,
+                            "cfg": cfg_json,
+                            "now": now_iso,
+                        },
+                    )
+                return True
+        except Exception as ex_db:
+            logger.warning("Salvataggio integrazione via SQL fallito: %s", ex_db)
+
+    return False
 
 
 # ── 1. URL Normalization & Secrets Discovery ──────────────────
@@ -282,38 +480,19 @@ def harvest_active_streamlit_sessions_for_supabase() -> Dict[str, str]:
 
 
 def _read_secret_or_env(key: str, default: str = "") -> str:
-    """Legge una configurazione prioritariamente da os.environ / .env e poi da st.secrets."""
-    val = os.getenv(key)
-    if val is not None and str(val).strip() != "":
-        return str(val).strip()
-
+    """Legge una configurazione prioritariamente da st.secrets (Streamlit Cloud) e poi da os.environ / .env."""
     try:
-        from dotenv import dotenv_values
+        from core.config_manager import get_setting
 
-        env_path = Path(__file__).resolve().parent.parent / ".env"
-        if env_path.exists():
-            d_vals = dotenv_values(env_path)
-            if key in d_vals and d_vals[key] is not None and str(d_vals[key]).strip() != "":
-                val_disk = str(d_vals[key]).strip()
-                os.environ[key] = val_disk
-                return val_disk
+        val = get_setting(key, default=None)
+        if val is not None and str(val).strip() != "":
+            return str(val).strip()
     except Exception:
         pass
 
-    try:
-        import streamlit as st
-
-        if hasattr(st, "secrets"):
-            if key in st.secrets:
-                return str(st.secrets[key]).strip()
-            if "supabase" in st.secrets and isinstance(st.secrets["supabase"], dict):
-                sub_key = key.lower().replace("supabase_", "")
-                if sub_key in st.secrets["supabase"]:
-                    return str(st.secrets["supabase"][sub_key]).strip()
-                if key in st.secrets["supabase"]:
-                    return str(st.secrets["supabase"][key]).strip()
-    except Exception:
-        pass
+    val_env = os.getenv(key)
+    if val_env is not None and str(val_env).strip() != "":
+        return str(val_env).strip()
 
     return default
 
@@ -858,6 +1037,15 @@ def generate_supabase_schema_sql(include_rls: bool = True, include_storage: bool
     is_active INTEGER NOT NULL DEFAULT 1,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );""",
+        """CREATE TABLE IF NOT EXISTS user_integrations (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+    provider TEXT NOT NULL,
+    config_data JSONB NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    UNIQUE(user_id, provider)
+);""",
         "",
         "-- 5. HIGH-PERFORMANCE B-TREE INDEXES",
         "CREATE INDEX IF NOT EXISTS idx_tx_portfolio_date ON transactions(portfolio_id, tx_date);",
@@ -875,6 +1063,7 @@ def generate_supabase_schema_sql(include_rls: bool = True, include_storage: bool
         "CREATE INDEX IF NOT EXISTS idx_verif_profile_year ON tax_verification_documents(profile_id, tax_year);",
         "CREATE INDEX IF NOT EXISTS idx_verif_doc_type ON tax_verification_documents(doc_type);",
         "CREATE INDEX IF NOT EXISTS idx_argus_users_uname ON argus_users(username);",
+        "CREATE INDEX IF NOT EXISTS idx_user_integrations_user_prov ON user_integrations(user_id, provider);",
     ]
 
     if include_storage:
@@ -914,6 +1103,11 @@ END $$;""",
                 "ALTER TABLE tax_loss_carryforward ENABLE ROW LEVEL SECURITY;",
                 "ALTER TABLE tax_verification_documents ENABLE ROW LEVEL SECURITY;",
                 "ALTER TABLE argus_users ENABLE ROW LEVEL SECURITY;",
+                "ALTER TABLE user_integrations ENABLE ROW LEVEL SECURITY;",
+                "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='user_integrations' AND policyname='Users can view own integrations') THEN CREATE POLICY \"Users can view own integrations\" ON user_integrations FOR SELECT USING (auth.uid() = user_id); END IF; END $$;",
+                "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='user_integrations' AND policyname='Users can insert own integrations') THEN CREATE POLICY \"Users can insert own integrations\" ON user_integrations FOR INSERT WITH CHECK (auth.uid() = user_id); END IF; END $$;",
+                "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='user_integrations' AND policyname='Users can update own integrations') THEN CREATE POLICY \"Users can update own integrations\" ON user_integrations FOR UPDATE USING (auth.uid() = user_id); END IF; END $$;",
+                "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='user_integrations' AND policyname='Users can delete own integrations') THEN CREATE POLICY \"Users can delete own integrations\" ON user_integrations FOR DELETE USING (auth.uid() = user_id); END IF; END $$;",
             ]
         )
 
@@ -1856,274 +2050,15 @@ def get_active_account_badge_info() -> Dict[str, str]:
 
 def render_cloud_auth_gate() -> bool:
     """
-    Se `ARGUS_REQUIRE_LOGIN=true`, mostra il terminale di Login Istituzionale a tutto schermo
-    PRIMA dello Splash Screen (con sidebar completamente nascosta), offrendo:
-    - 🔐 Accedi: Login Multi-Utente / Titolare (`argus_users` + Admin/Supabase Password) con invio da tastiera (Enter).
-    - ➕ Nuovo Account: Registrazione rapida con spazio isolato o DB Supabase dedicato.
-    - 🚀 Demo Sandbox: Accesso 1-Click Ospite / Recruiter in ambiente sandbox isolato.
-    Restituisce True se l'utente è autorizzato a proseguire verso lo Splash Screen / App.
+    Controllo di accesso istituzionale di ARGUS.
+    Delega a `AuthManager.auth_guard()`, verificando la sessione nativa Supabase Auth.
+    Se non autenticato, renderizza il Login Gate e blocca l'esecuzione con `st.stop()`.
+    Restituisce True se l'accesso è autorizzato.
     """
-    import streamlit as st
+    from core.auth_manager import AuthManager
 
-    cfg = get_supabase_config()
-    if not cfg.get("require_login", False):
-        return True
+    return AuthManager.auth_guard(show_login_if_unauth=True)
 
-    if st.session_state.get("argus_auth_verified", False):
-        return True
-
-    try:
-        from core.ui_utils import get_argus_eye_svg
-
-        eye_svg = get_argus_eye_svg(size=60, animated=True, accent="#f59e0b", unique_id="auth_gate_eye_logo")
-    except Exception:
-        eye_svg = "🏛️"
-
-    proj_ref = cfg.get("project_ref", DEFAULT_SUPABASE_PROJECT_REF)
-    is_cloud_cfg = bool(cfg.get("is_configured"))
-    cloud_pill_label = (
-        f"🟢 Cloud DB Attivo ({proj_ref[:8]}…)" if is_cloud_cfg else "💾 Vault Ibrido / Auto-Connect"
-    )
-
-    st.markdown(
-        f"""
-        <style>
-        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800;900&display=swap');
-
-        /* Nascondi completamente Sidebar, Header e Toolbar durante il Login Gate */
-        header[data-testid="stHeader"],
-        [data-testid="stHeader"],
-        [data-testid="stToolbar"],
-        div[data-testid="stToolbar"],
-        [data-testid="stExpandSidebarButton"],
-        button[data-testid="stExpandSidebarButton"],
-        [data-testid="stSidebarCollapseButton"],
-        button[data-testid="stSidebarCollapseButton"],
-        section[data-testid="stSidebar"],
-        [data-testid="stSidebar"],
-        div[data-testid="collapsedControl"],
-        [data-testid="collapsedControl"],
-        button[data-testid="stSidebarCollapsedControl"] {{
-            display: none !important;
-            visibility: hidden !important;
-            opacity: 0 !important;
-            width: 0px !important;
-            height: 0px !important;
-            pointer-events: none !important;
-            position: absolute !important;
-            top: -9999px !important;
-            left: -9999px !important;
-        }}
-
-        .block-container,
-        div[data-testid="stAppViewBlockContainer"],
-        .main .block-container {{
-            padding-top: 1.2rem !important;
-            padding-bottom: 1.2rem !important;
-            max-width: 1140px !important;
-            min-height: 92vh !important;
-            display: flex !important;
-            flex-direction: column !important;
-            justify-content: center !important;
-        }}
-
-        div[data-testid="stVerticalBlockBorderWrapper"] {{
-            background: radial-gradient(900px circle at 50% 0%, rgba(26, 36, 54, 0.92) 0%, rgba(13, 19, 32, 0.97) 65%, rgba(6, 9, 16, 0.99) 100%) !important;
-            border: 1px solid rgba(245, 158, 11, 0.28) !important;
-            border-radius: 20px !important;
-            padding: 20px 26px 22px 26px !important;
-            box-shadow: 0 24px 64px rgba(0, 0, 0, 0.78), 0 0 40px rgba(245, 158, 11, 0.06) !important;
-        }}
-
-        div[data-testid="stForm"] {{
-            border: none !important;
-            padding: 0 !important;
-            background: transparent !important;
-        }}
-
-        button[data-baseweb="tab"] {{
-            font-family: 'Outfit', sans-serif !important;
-            font-size: 13.5px !important;
-            font-weight: 700 !important;
-            padding: 8px 14px !important;
-        }}
-        </style>
-
-        <div style="text-align:center; max-width:680px; margin: 0 auto 14px auto;">
-            <div style="display:flex; justify-content:center; margin-bottom:6px; filter:drop-shadow(0 0 20px rgba(245,158,11,0.40));">
-                {eye_svg}
-            </div>
-            <div style="font-family:'Outfit',sans-serif; font-size:32px; font-weight:900; letter-spacing:10px;
-                        background:linear-gradient(180deg,#ffffff 25%,#fde68a 68%,#f59e0b 100%);
-                        -webkit-background-clip:text; -webkit-text-fill-color:transparent; line-height:1.15;">
-                ARGUS
-            </div>
-            <div style="font-family:'Outfit',sans-serif; font-size:11px; font-weight:800; color:#f59e0b;
-                        letter-spacing:3.2px; text-transform:uppercase; margin:3px 0 10px 0;">
-                INSTITUTIONAL RISK &amp; WEALTH INTELLIGENCE • CLOUD VAULT
-            </div>
-            <div style="display:flex; justify-content:center; gap:8px; flex-wrap:wrap; margin-bottom:4px;">
-                <span style="font-family:'JetBrains Mono',monospace; font-size:10px; color:#34d399;
-                             background:rgba(16,185,129,0.10); border:1px solid rgba(16,185,129,0.28);
-                             padding:3px 10px; border-radius:999px;">{cloud_pill_label}</span>
-                <span style="font-family:'JetBrains Mono',monospace; font-size:10px; color:#fbbf24;
-                             background:rgba(245,158,11,0.10); border:1px solid rgba(245,158,11,0.28);
-                             padding:3px 10px; border-radius:999px;">🛡️ PBKDF2-SHA256 Vault</span>
-                <span style="font-family:'JetBrains Mono',monospace; font-size:10px; color:#818cf8;
-                             background:rgba(99,102,241,0.12); border:1px solid rgba(99,102,241,0.28);
-                             padding:3px 10px; border-radius:999px;">👥 Multi-User Isolation</span>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    col_l, col_c, col_r = st.columns([0.85, 1.9, 0.85])
-    with col_c:
-        with st.container(border=True):
-            tab_login, tab_reg, tab_guest = st.tabs(
-                [
-                    "🔐 Accedi",
-                    "➕ Nuovo Account",
-                    "🚀 Demo Sandbox",
-                ]
-            )
-            with tab_login:
-                st.markdown(
-                    "<div style='font-size:12.5px; color:#94a3b8; margin-bottom:10px;'>"
-                    "Inserisci le tue credenziali e premi <b>Invio (Enter)</b> o clicca sul pulsante per sbloccare il tuo spazio patrimoniale privato."
-                    "</div>",
-                    unsafe_allow_html=True,
-                )
-                with st.form("argus_auth_login_form", clear_on_submit=False, border=False):
-                    user_in = st.text_input(
-                        "Username o Email",
-                        key="auth_gate_email",
-                        placeholder="es. alessandro, owner@argus.cloud, marco...",
-                        help="Per il Titolare: inserisci 'alessandro' (o 'owner@argus.cloud' o lascia vuoto) + la tua password.",
-                    )
-                    pass_in = st.text_input(
-                        "Password",
-                        type="password",
-                        key="auth_gate_pass",
-                        placeholder="Inserisci la tua password personale...",
-                    )
-                    submitted_login = st.form_submit_button(
-                        "🔓 Sblocca & Accedi ad ARGUS",
-                        type="primary",
-                        use_container_width=True,
-                    )
-                if submitted_login:
-                    res = SupabaseAuthManager.authenticate_user(user_in, pass_in)
-                    if res.get("ok"):
-                        apply_authenticated_user_session(res)
-                        st.rerun()
-                    else:
-                        st.error(f"Autenticazione fallita: {res.get('error')}")
-
-                st.markdown(
-                    """
-                    <div style="margin-top:10px; padding:9px 12px; border-radius:10px;
-                                background:rgba(15,23,42,0.65); border:1px solid rgba(148,163,184,0.16);
-                                font-size:11.5px; color:#94a3b8; line-height:1.45;">
-                        <b style="color:#f8fafc;">📌 Guida Rapida ai Profili di Accesso:</b><br>
-                        • 👑 <b>Titolare (Owner)</b>: Username <code>alessandro</code> (o <code>owner@argus.cloud</code>) + Password Master/Supabase.<br>
-                        • 👤 <b>Utente Privato</b>: Registra un account nella tab <b>➕ Nuovo Account</b> per ottenere uno spazio 100% isolato.<br>
-                        • 🧪 <b>Tester / Recruiter</b>: Usa la tab <b>🚀 Demo Sandbox</b> per esplorare l'app senza registrazione.
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-
-            with tab_reg:
-                st.markdown(
-                    "<div style='font-size:12.5px; color:#94a3b8; margin-bottom:10px;'>"
-                    "Crea un account personale isolato: vedrai esclusivamente i tuoi portafogli e conti, senza alcun accesso ai dati del Titolare o degli altri utenti."
-                    "</div>",
-                    unsafe_allow_html=True,
-                )
-                with st.form("argus_auth_register_form", clear_on_submit=False, border=False):
-                    rc1, rc2 = st.columns(2)
-                    with rc1:
-                        reg_uname = st.text_input("Username univoco", key="auth_reg_uname", placeholder="es. marco")
-                    with rc2:
-                        reg_disp = st.text_input("Nome Completo", key="auth_reg_disp", placeholder="es. Marco Rossi")
-                    reg_pass = st.text_input("Scegli una Password (min. 4 caratteri)", type="password", key="auth_reg_pass")
-                    reg_custom_db = st.text_input(
-                        "URI PostgreSQL Supabase Personale (Opzionale — lascia vuoto per isolamento automatico)",
-                        type="password",
-                        key="auth_reg_db",
-                        placeholder="Opzionale: postgresql://postgres.[ref]:[pass]@aws-0-eu-west-1.pooler.supabase.com:6543/postgres",
-                    )
-                    submitted_reg = st.form_submit_button(
-                        "✨ Crea Account & Entra Subito",
-                        type="primary",
-                        use_container_width=True,
-                    )
-                if submitted_reg:
-                    try:
-                        from core.fetcher import get_engine
-
-                        eng = create_supabase_engine(cfg["db_url"], use_cache=True) if cfg.get("is_configured") else None
-                        if eng is None:
-                            eng = get_engine(offline=True)
-                        try:
-                            c_res = SupabaseAuthManager.create_or_update_user(
-                                engine=eng,
-                                username=reg_uname,
-                                password=reg_pass,
-                                role="user",
-                                display_name=reg_disp or reg_uname,
-                                custom_db_url=reg_custom_db,
-                            )
-                        except Exception as db_ex:
-                            logger.warning("Registrazione su DB Cloud fallita (%s), fallback automatico a DB locale isolato.", db_ex)
-                            _SUPABASE_ENGINE_CACHE.pop(normalize_supabase_db_url(cfg.get("db_url", "")), None)
-                            eng_local = get_engine(offline=True)
-                            c_res = SupabaseAuthManager.create_or_update_user(
-                                engine=eng_local,
-                                username=reg_uname,
-                                password=reg_pass,
-                                role="user",
-                                display_name=reg_disp or reg_uname,
-                                custom_db_url=reg_custom_db,
-                            )
-                        if c_res.get("ok"):
-                            apply_authenticated_user_session(
-                                {
-                                    "username": c_res["username"],
-                                    "display_name": c_res["display_name"],
-                                    "role": c_res["role"],
-                                    "custom_db_url": normalize_supabase_db_url(reg_custom_db) if reg_custom_db else "",
-                                }
-                            )
-                            st.rerun()
-                        else:
-                            st.error(c_res.get("error", "Errore durante la registrazione."))
-                    except Exception as ex:
-                        st.error(f"Errore registrazione: {ex}")
-
-            with tab_guest:
-                st.markdown(
-                    "<div style='font-size:12.5px; color:#94a3b8; margin-bottom:12px;'>"
-                    "La <b>Modalità Demo Sandbox</b> avvia un ambiente dimostrativo locale isolato "
-                    "(<code>argus_demo_sandbox.db</code>) con 3 archetipi istituzionali pre-caricati, "
-                    "senza leggere né modificare il database Supabase di alcun utente."
-                    "</div>",
-                    unsafe_allow_html=True,
-                )
-                if st.button("🚀 Entra in Modalità Demo Ospite (1-Click)", type="primary", use_container_width=True, key="btn_auth_guest"):
-                    apply_authenticated_user_session(
-                        {
-                            "username": "guest_demo",
-                            "display_name": "Ospite Demo (Sandbox)",
-                            "role": "guest_demo",
-                            "custom_db_url": "",
-                        }
-                    )
-                    st.rerun()
-
-    return False
 
 
 def render_supabase_cloud_panel(engine: Optional[Engine] = None) -> None:

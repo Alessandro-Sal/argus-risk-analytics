@@ -12,6 +12,7 @@ import json
 import logging
 import os
 import sys
+from typing import Any, Dict, Optional, Tuple
 
 import pandas as pd
 
@@ -92,78 +93,161 @@ def _validate_service_account_data(info: dict, source_desc: str = "credenziali")
         )
 
 
-def get_gspread_client():
-    """Autentica il client con il Service Account JSON da Streamlit secrets, ENV o file locale."""
-    if gspread is None or Credentials is None:
-        raise ImportError(
-            "Le librerie 'gspread' e 'google-auth' sono richieste per la sincronizzazione Google Sheets. "
-            "Installale con: pip install gspread google-auth"
-        )
+def resolve_google_credentials(
+    creds_dict: Optional[dict] = None,
+    user_id: Optional[str] = None,
+    access_token: Optional[str] = None,
+    engine: Optional[Any] = None,
+) -> tuple[Optional[dict], str]:
+    """
+    Risolve le credenziali Google Service Account secondo la gerarchia a 3 livelli:
+    1. Parametro in-memory creds_dict se fornito esplicitamente.
+    2. Livello 1 (Streamlit Secrets): st.secrets["gcp_service_account"] / GOOGLE_SERVICE_ACCOUNT_JSON
+       oppure core.config_manager.get_gcp_service_account_dict()
+    3. Livello 2 (Supabase user_integrations): config_data associato a user_id e provider='google_sheets'
+    4. Livello 3 (Fallback Dev Locale): env GOOGLE_SERVICE_ACCOUNT_JSON o file locale se esistente su disco.
+    Restituisce: (dizionario_credenziali, sorgente) oppure (None, motivo)
+    """
+    # 0. In-memory esplicito
+    if isinstance(creds_dict, dict) and creds_dict:
+        try:
+            _validate_service_account_data(creds_dict, "credenziali fornite in memoria")
+            return creds_dict, "In-Memory / Parametro Diretto"
+        except Exception as e:
+            logger.warning("Credenziali in-memory non valide: %s", e)
 
-    # 1. Tentativo da Streamlit Secrets (se presente nel contesto Streamlit)
+    # 1. Livello 1: Streamlit Secrets
+    try:
+        from core.config_manager import get_gcp_service_account_dict
+
+        sec_creds = get_gcp_service_account_dict()
+        if sec_creds:
+            _validate_service_account_data(sec_creds, "Streamlit Secrets")
+            return sec_creds, "Streamlit Secrets"
+    except Exception as e_sec:
+        logger.debug("Verifica Streamlit Secrets fallback: %s", e_sec)
+
     try:
         import streamlit as st
 
         if hasattr(st, "secrets"):
             if "gcp_service_account" in st.secrets:
                 s_info = dict(st.secrets["gcp_service_account"])
-                _validate_service_account_data(s_info, "Streamlit secrets [gcp_service_account]")
-                creds = Credentials.from_service_account_info(s_info, scopes=SCOPES)
-                return gspread.authorize(creds)
+                _validate_service_account_data(s_info, "st.secrets['gcp_service_account']")
+                return s_info, "Streamlit Secrets [gcp_service_account]"
             elif "GOOGLE_SERVICE_ACCOUNT_JSON" in st.secrets:
                 s_val = st.secrets["GOOGLE_SERVICE_ACCOUNT_JSON"]
                 s_info = json.loads(s_val) if isinstance(s_val, str) else dict(s_val)
-                _validate_service_account_data(s_info, "Streamlit secrets [GOOGLE_SERVICE_ACCOUNT_JSON]")
-                creds = Credentials.from_service_account_info(s_info, scopes=SCOPES)
-                return gspread.authorize(creds)
-    except ValueError:
-        raise
-    except Exception as e_sec:
-        logger.debug("Verifica Streamlit secrets non disponibile: %s", e_sec)
+                _validate_service_account_data(s_info, "st.secrets['GOOGLE_SERVICE_ACCOUNT_JSON']")
+                return s_info, "Streamlit Secrets [GOOGLE_SERVICE_ACCOUNT_JSON]"
+    except Exception as e_st_sec:
+        logger.debug("Verifica diretta st.secrets: %s", e_st_sec)
 
-    # 2. Tentativo da variabile d'ambiente GOOGLE_SERVICE_ACCOUNT_JSON
+    # 2. Livello 2: Supabase User Integrations Table
+    try:
+        from core.supabase_cloud import get_user_integration
+
+        uid = user_id
+        tok = access_token
+        if not uid:
+            try:
+                import streamlit as st
+
+                uid = st.session_state.get("argus_auth_user_id")
+                if not tok:
+                    tok = st.session_state.get("argus_session", {}).get("access_token")
+            except Exception:
+                pass
+
+        integration = get_user_integration(provider="google_sheets", user_id=uid, access_token=tok, engine=engine)
+        if integration and isinstance(integration.get("config_data"), dict):
+            c_data = integration["config_data"]
+            _validate_service_account_data(c_data, "Supabase Cloud Vault (user_integrations)")
+            return c_data, "Supabase Cloud Vault (user_integrations)"
+    except Exception as e_supa:
+        logger.debug("Verifica Supabase user_integrations: %s", e_supa)
+
+    # 3. Livello 3: Variabile d'ambiente GOOGLE_SERVICE_ACCOUNT_JSON
     env_json = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON")
     if env_json:
         try:
             info = json.loads(env_json)
             _validate_service_account_data(info, "variabile d'ambiente GOOGLE_SERVICE_ACCOUNT_JSON")
-            creds = Credentials.from_service_account_info(info, scopes=SCOPES)
-            return gspread.authorize(creds)
-        except ValueError:
-            raise
-        except Exception as e:
-            logger.warning("Impossibile caricare GOOGLE_SERVICE_ACCOUNT_JSON: %s", e)
+            return info, "Variabile d'ambiente GOOGLE_SERVICE_ACCOUNT_JSON"
+        except Exception as e_env:
+            logger.warning("Variabile GOOGLE_SERVICE_ACCOUNT_JSON non valida: %s", e_env)
 
-    # 3. Tentativo da file su disco (GOOGLE_APPLICATION_CREDENTIALS o CREDENTIALS_PATH)
+    # 4. Livello 3 bis: File locale (solo se esiste fisicamente su disco)
     cred_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", CREDENTIALS_PATH)
-    if not os.path.exists(cred_path):
-        raise FileNotFoundError(
-            f"File credenziali Google Sheets non trovato in: {cred_path}. "
-            "Impostare la variabile d'ambiente GOOGLE_SERVICE_ACCOUNT_JSON oppure posizionare il file "
-            "'gsheets_sync_subproject/google_service_account.json'."
+    if os.path.exists(cred_path):
+        try:
+            with open(cred_path, "r", encoding="utf-8") as f:
+                file_info = json.load(f)
+            _validate_service_account_data(file_info, f"file locale '{os.path.basename(cred_path)}'")
+            return file_info, f"File Locale ({os.path.basename(cred_path)})"
+        except Exception as e_file:
+            logger.warning("File credenziali locale presente ma non valido: %s", e_file)
+
+    return None, "Nessuna credenziale configurata"
+
+
+def get_gspread_client(
+    creds_dict: Optional[dict] = None,
+    user_id: Optional[str] = None,
+    access_token: Optional[str] = None,
+    engine: Optional[Any] = None,
+):
+    """
+    Autentica il client gspread tramite risoluzione a 3 livelli (Zero-File Cloud Dependency).
+    Non solleva FileNotFoundError se il file locale non esiste.
+    """
+    if gspread is None or Credentials is None:
+        raise ImportError(
+            "Le librerie 'gspread' e 'google-auth' sono richieste per la sincronizzazione Google Sheets. "
+            "Installale con: pip install gspread google-auth"
+        )
+
+    creds_data, source_desc = resolve_google_credentials(
+        creds_dict=creds_dict,
+        user_id=user_id,
+        access_token=access_token,
+        engine=engine,
+    )
+
+    if not creds_data:
+        raise ValueError(
+            "Credenziali Google Service Account non configurate.\n"
+            "Per sincronizzare Google Sheets su Streamlit Cloud o in locale:\n"
+            "1. Configura 'gcp_service_account' nei Secrets di Streamlit (secrets.toml), OPPURE\n"
+            "2. Carica o incolla il file JSON di Service Account direttamente dalla sezione "
+            "'Sincronizzazione Google Sheets' della Wealth Control Room (salvataggio sicuro nel Cloud Vault di Supabase), OPPURE\n"
+            "3. Imposta la variabile d'ambiente GOOGLE_SERVICE_ACCOUNT_JSON."
         )
 
     try:
-        with open(cred_path, "r", encoding="utf-8") as f:
-            file_info = json.load(f)
-        _validate_service_account_data(file_info, f"file locale '{os.path.basename(cred_path)}'")
-        creds = Credentials.from_service_account_info(file_info, scopes=SCOPES)
+        creds = Credentials.from_service_account_info(creds_data, scopes=SCOPES)
         return gspread.authorize(creds)
-    except ValueError:
-        raise
-    except Exception as e_load:
-        err_msg = str(e_load)
+    except Exception as e_auth:
+        err_msg = str(e_auth)
         if "Unable to load PEM" in err_msg or "InvalidByte" in err_msg:
             raise ValueError(
-                f"La chiave privata RSA in '{os.path.basename(cred_path)}' non è valida o è danneggiata: {err_msg}. "
-                "Verifica che il file contenga la chiave privata reale scaricata da Google Cloud Console."
-            ) from e_load
+                f"La chiave privata RSA da '{source_desc}' non è valida o è danneggiata: {err_msg}. "
+                "Verifica che il JSON contenga la chiave privata reale scaricata da Google Cloud Console."
+            ) from e_auth
         raise
 
 
-def fetch_sheet_dataframe(spreadsheet_identifier: str = None, sheet_tab_name: str = DEFAULT_STOCKS_TAB) -> pd.DataFrame:
+
+def fetch_sheet_dataframe(
+    spreadsheet_identifier: str = None,
+    sheet_tab_name: str = DEFAULT_STOCKS_TAB,
+    creds_dict: Optional[dict] = None,
+    user_id: Optional[str] = None,
+    access_token: Optional[str] = None,
+    engine: Optional[Any] = None,
+) -> pd.DataFrame:
     """Scarica i dati da uno specifico tab di Google Sheets e restituisce un DataFrame."""
-    client = get_gspread_client()
+    client = get_gspread_client(creds_dict=creds_dict, user_id=user_id, access_token=access_token, engine=engine)
     
     if not spreadsheet_identifier:
         spreadsheet_identifier = DEFAULT_SPREADSHEET
@@ -380,7 +464,10 @@ def sync_single_tab(
     benchmark: str = "SPY",
     db_engine = None,
     offline_mode: bool = False,
-    run_name: str = "Daily Automatic Sync"
+    run_name: str = "Daily Automatic Sync",
+    creds_dict: Optional[dict] = None,
+    user_id: Optional[str] = None,
+    access_token: Optional[str] = None,
 ) -> dict:
     """
     Esegue l'intero ciclo ETL per un singolo tab (Stocks o Crypto):
@@ -393,7 +480,14 @@ def sync_single_tab(
     logging.info(f"--- Sincronizzazione Tab '{sheet_tab_name}' -> Portafoglio '{portfolio_name}' ---")
     
     # 1. Download & Normalize
-    df_raw = fetch_sheet_dataframe(spreadsheet_identifier, sheet_tab_name)
+    df_raw = fetch_sheet_dataframe(
+        spreadsheet_identifier,
+        sheet_tab_name,
+        creds_dict=creds_dict,
+        user_id=user_id,
+        access_token=access_token,
+        engine=db_engine,
+    )
     df_norm = normalize_gsheet_columns(df_raw, is_crypto=is_crypto)
 
     if df_norm.empty:

@@ -6,12 +6,15 @@ Provides top-level execution mode configuration, zero-recalc session persistence
 and direct hierarchical navigation with exact sub-tab binding.
 """
 
+import logging
 import os
 import socket
 import sys
 from typing import Any, Dict, List, Optional
 
 import streamlit as st
+
+logger = logging.getLogger("argus.sidebar")
 
 from core.workspace_manager import ensure_session_restored
 
@@ -382,12 +385,16 @@ def switch_to_page(target_page_file: str):
     Esegue la navigazione fluida e istantanea senza errori o flash transitori:
     - Se siamo già sulla pagina di destinazione, esegue st.rerun() per riflettere il tab aggiornato.
     - Se siamo su un'altra pagina, calcola la rotta canonica esatta ed esegue st.switch_page() direttamente.
+    - Supporta parità totale tra avvio locale (src/0_Control_Room.py) e Streamlit Cloud (app.py).
     """
     cur_page = get_current_page_name()
     target_clean = os.path.basename(target_page_file)
 
     # Se siamo già sulla stessa pagina, basta il rerun
-    if target_clean == cur_page or (("0_Control_Room" in target_clean) and ("0_Control_Room" in cur_page)):
+    is_same_ctrl = ("0_Control_Room" in target_clean or target_clean in ["app.py", "app"]) and (
+        "0_Control_Room" in cur_page or cur_page in ["app.py", "app"]
+    )
+    if target_clean == cur_page or is_same_ctrl:
         st.rerun()
         return
 
@@ -396,20 +403,32 @@ def switch_to_page(target_page_file: str):
 
     resolved = resolve_page_path(target_page_file)
 
-    try:
-        st.switch_page(resolved)
-        return
-    except Exception:
-        pass
+    candidates: List[str] = []
+    if "0_Control_Room" in target_clean or target_clean in ["app.py", "app"]:
+        candidates = [
+            "app.py",
+            "0_Control_Room.py",
+            "pages/0_Control_Room.py",
+            "src/0_Control_Room.py",
+            resolved,
+        ]
+    else:
+        candidates = [
+            f"pages/{target_clean}",
+            resolved,
+            target_page_file,
+            f"src/pages/{target_clean}",
+        ]
 
-    # Fallback deterministico secondario
-    fallback = "0_Control_Room.py" if "0_Control_Room" in target_clean else f"pages/{target_clean}"
-    if fallback != resolved:
-        try:
-            st.switch_page(fallback)
-            return
-        except Exception:
-            pass
+    seen = set()
+    for cand in candidates:
+        if cand and cand not in seen:
+            seen.add(cand)
+            try:
+                st.switch_page(cand)
+                return
+            except Exception:
+                continue
 
     st.rerun()
 
@@ -1415,12 +1434,11 @@ def render_sidebar():
     """Renderizza la Sidebar Istituzionale v9.0.0 con Modalità Esecuzione in alto e Navigation Rail ad albero."""
     ensure_session_restored()
     try:
-        from core.supabase_cloud import render_cloud_auth_gate
+        from core.auth_manager import AuthManager
 
-        if not render_cloud_auth_gate():
-            st.stop()
-    except Exception:
-        pass
+        AuthManager.auth_guard(show_login_if_unauth=True)
+    except Exception as ex_auth:
+        logger.debug("Sidebar auth guard exception: %s", ex_auth)
 
     try:
         from components.splash import auto_expand_sidebar

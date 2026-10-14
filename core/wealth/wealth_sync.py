@@ -1067,14 +1067,23 @@ def sync_all_historical_expenses_from_gsheets(
     spreadsheet_name: str = "My All financial Statements",
     years: Optional[List[int]] = None,
     portfolio_id: int = 1,
+    creds_dict: Optional[Dict[str, Any]] = None,
+    user_id: Optional[str] = None,
+    access_token: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Sincronizza in blocco tutti gli anni storici delle spese (2021, 2022, 2023, 2024, 2025, 2026).
+    Supporta risoluzione credenziali in memoria e Supabase user_integrations.
     """
     from gsheets_sync_subproject.sync_google_sheets import get_gspread_client
 
     init_wealth_db(engine)
-    client = get_gspread_client()
+    client = get_gspread_client(
+        creds_dict=creds_dict,
+        user_id=user_id,
+        access_token=access_token,
+        engine=engine,
+    )
 
     if years is None:
         years = [2021, 2022, 2023, 2024, 2025, 2026]
@@ -1195,10 +1204,19 @@ def sync_expenses_tracker_2026_from_gsheets(
     spreadsheet_name: str = "My All financial Statements",
     worksheet_name: str = "Expenses Tracker 2026",
     portfolio_id: int = 1,
+    creds_dict: Optional[Dict[str, Any]] = None,
+    user_id: Optional[str] = None,
+    access_token: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Sincronizzazione rapida del solo anno 2026."""
+    """Sincronizzazione rapida del solo anno 2026 con risoluzione credenziali in memoria."""
     res = sync_all_historical_expenses_from_gsheets(
-        engine, spreadsheet_name=spreadsheet_name, years=[2026], portfolio_id=portfolio_id
+        engine,
+        spreadsheet_name=spreadsheet_name,
+        years=[2026],
+        portfolio_id=portfolio_id,
+        creds_dict=creds_dict,
+        user_id=user_id,
+        access_token=access_token,
     )
     return res
 

@@ -588,6 +588,99 @@ if active_cr_tab == "📥 Data Pipeline & Ingestion":
 
     st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
 
+    if src_selected_label.startswith("🌐 Google Sheets"):
+        from core.supabase_cloud import get_user_integration, save_user_integration
+        from gsheets_sync_subproject.sync_google_sheets import resolve_google_credentials
+
+        active_creds, creds_source = resolve_google_credentials(engine=engine)
+        has_valid_creds = active_creds is not None
+
+        if has_valid_creds:
+            client_mail = active_creds.get("client_email", "Service Account")
+            st.markdown(
+                f"""
+                <div style="padding: 8px 14px; border-radius: 8px; margin-bottom: 12px;
+                            background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.35);
+                            display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+                    <div style="font-size: 12.5px; color: #34d399; font-weight: 600;">
+                        🟢 Credenziali Google Sheets Attive &bull; Sorgente: <code>{creds_source}</code>
+                    </div>
+                    <div style="font-size: 11px; color: #a7f3d0; font-family: monospace;">
+                        {client_mail}
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                """
+                <div style="padding: 10px 14px; border-radius: 8px; margin-bottom: 12px;
+                            background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.35);">
+                    <div style="font-size: 13px; color: #f87171; font-weight: 700; margin-bottom: 4px;">
+                        ⚠️ Credenziali Google Sheets Non Configurate
+                    </div>
+                    <div style="font-size: 11.5px; color: #cbd5e1; line-height: 1.45;">
+                        Per sincronizzare i fogli su Streamlit Cloud o in Locale senza dipendere da file fisici su disco, carica o incolla qui sotto il JSON di Service Account scaricato da Google Cloud Console. Le credenziali verranno salvate in modo protetto nella tabella <code>user_integrations</code> su Supabase (RLS isolato per utente).
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+        with st.expander("🔑 Gestione Credenziali Google Sheets (Zero-File Cloud Vault)", expanded=not has_valid_creds):
+            st.markdown(
+                "<div style='font-size: 12px; color: #94a3b8; margin-bottom: 8px;'>"
+                "Carica il file <code>google_service_account.json</code> oppure incolla il payload JSON. "
+                "Il payload verrà validato e salvato su <b>Supabase Cloud</b> associato al tuo utente."
+                "</div>",
+                unsafe_allow_html=True,
+            )
+            up_cred_file = st.file_uploader("Carica file credenziali JSON:", type=["json"], key="pipe_up_gsheet_creds")
+            pasted_json = st.text_area(
+                "Oppure incolla il payload JSON del Service Account:",
+                height=90,
+                key="pipe_paste_gsheet_creds",
+                placeholder='{"type": "service_account", "project_id": "...", "private_key": "-----YOUR-GCP-PEM-KEY-----", "client_email": "..."}',
+            )
+
+            if st.button("💾 Salva Credenziali nel Cloud Vault (Supabase)", type="secondary", key="btn_save_gsheet_creds"):
+                candidate_data = None
+                if up_cred_file is not None:
+                    try:
+                        candidate_data = json.load(up_cred_file)
+                    except Exception as ex_json:
+                        st.error(f"File JSON non valido: {ex_json}")
+                elif pasted_json.strip():
+                    try:
+                        candidate_data = json.loads(pasted_json.strip())
+                    except Exception as ex_p:
+                        st.error(f"Testo JSON non valido: {ex_p}")
+
+                if candidate_data:
+                    from gsheets_sync_subproject.sync_google_sheets import _validate_service_account_data
+
+                    try:
+                        _validate_service_account_data(candidate_data, "upload utente")
+                        uid = st.session_state.get("argus_auth_user_id")
+                        tok = st.session_state.get("argus_session", {}).get("access_token")
+                        saved = save_user_integration(
+                            provider="google_sheets",
+                            config_data=candidate_data,
+                            user_id=uid,
+                            access_token=tok,
+                            engine=engine,
+                        )
+                        if saved:
+                            st.success("✅ Credenziali Google Sheets salvate con successo nel Cloud Vault di Supabase!")
+                            st.rerun()
+                        else:
+                            st.error("Errore durante il salvataggio su Supabase. Verifica la connessione al database.")
+                    except ValueError as ve:
+                        st.error(str(ve))
+                    except Exception as ex_s:
+                        st.error(f"Errore: {ex_s}")
+
     if src_selected_label.startswith("🌐 Google Sheets — Sincronizzazione Veloce"):
         col_gq1, col_gq2 = st.columns([3, 1])
         with col_gq1:
@@ -841,24 +934,42 @@ if active_cr_tab == "📥 Data Pipeline & Ingestion":
             
             st.write("📡 **Fase 1/4**: Connessione e lettura della sorgente dati...")
             if src_selected_label.startswith("🌐 Google Sheets — Sincronizzazione Veloce"):
-                sync_res = sync_expenses_tracker_2026_from_gsheets(
-                    engine,
-                    spreadsheet_name=gsheet_name_val,
-                    worksheet_name="Expenses Tracker 2026",
-                    portfolio_id=current_pid
-                )
-                tot_synced_cnt = sync_res.get("total_transactions_synced", 0)
-                s_id = sync_res.get("snapshot_id")
+                try:
+                    uid = st.session_state.get("argus_auth_user_id")
+                    tok = st.session_state.get("argus_session", {}).get("access_token")
+                    sync_res = sync_expenses_tracker_2026_from_gsheets(
+                        engine,
+                        spreadsheet_name=gsheet_name_val,
+                        worksheet_name="Expenses Tracker 2026",
+                        portfolio_id=current_pid,
+                        user_id=uid,
+                        access_token=tok,
+                    )
+                    tot_synced_cnt = sync_res.get("total_transactions_synced", 0)
+                    s_id = sync_res.get("snapshot_id")
+                except Exception as ex_sync:
+                    status_box.update(label=f"❌ Errore Sincronizzazione: {ex_sync}", state="error")
+                    st.error(f"Impossibile sincronizzare Google Sheets: {ex_sync}")
+                    st.stop()
 
             elif src_selected_label.startswith("🌐 Google Sheets — Archivio Storico"):
-                sync_res = sync_all_historical_expenses_from_gsheets(
-                    engine,
-                    spreadsheet_name=gsheet_name_val,
-                    years=multi_years_val,
-                    portfolio_id=current_pid
-                )
-                tot_synced_cnt = sync_res.get("total_transactions_synced", 0)
-                s_id = sync_res.get("snapshot_id")
+                try:
+                    uid = st.session_state.get("argus_auth_user_id")
+                    tok = st.session_state.get("argus_session", {}).get("access_token")
+                    sync_res = sync_all_historical_expenses_from_gsheets(
+                        engine,
+                        spreadsheet_name=gsheet_name_val,
+                        years=multi_years_val,
+                        portfolio_id=current_pid,
+                        user_id=uid,
+                        access_token=tok,
+                    )
+                    tot_synced_cnt = sync_res.get("total_transactions_synced", 0)
+                    s_id = sync_res.get("snapshot_id")
+                except Exception as ex_sync:
+                    status_box.update(label=f"❌ Errore Sincronizzazione: {ex_sync}", state="error")
+                    st.error(f"Impossibile sincronizzare Google Sheets: {ex_sync}")
+                    st.stop()
 
             elif src_selected_label.startswith("💳 Estratto Conto Bancario"):
                 st.write("📊 **Fase 2/4**: Categorizzazione semantica transazioni ed eliminazione duplicati...")

@@ -35,6 +35,7 @@ def test_splash_screen_bypass_via_query_params():
 def test_splash_screen_cold_boot_renders_and_returns_true():
     """Verifica che al primo avvio assoluto render_splash_screen ritorni True per bloccare con st.stop()."""
     st.session_state.clear()
+    st.session_state["argus_auth_verified"] = True
     with patch("streamlit.markdown") as mock_markdown, patch("streamlit.columns") as mock_columns, patch("streamlit.button", return_value=False), patch("streamlit.components.v1.html"):
         c1, c2 = MagicMock(), MagicMock()
         mock_columns.return_value = (c1, c2)
@@ -46,6 +47,7 @@ def test_splash_screen_cold_boot_renders_and_returns_true():
 def test_splash_screen_force_show_returns_true():
     """Verifica che force_show=True riapra lo splash anche se gia inizializzato."""
     st.session_state.clear()
+    st.session_state["argus_auth_verified"] = True
     st.session_state["_app_initialized"] = True
     with patch("streamlit.markdown") as mock_markdown, patch("streamlit.columns") as mock_columns, patch("streamlit.button", return_value=False), patch("streamlit.components.v1.html"):
         c1, c2 = MagicMock(), MagicMock()
@@ -57,6 +59,7 @@ def test_splash_screen_force_show_returns_true():
 def test_splash_screen_button_click_enters_risk():
     """Verifica che il click sul pulsante Risk Analytics imposti i flag e chiami rerun()."""
     st.session_state.clear()
+    st.session_state["argus_auth_verified"] = True
     def fake_button(label, **kwargs):
         if "btn_splash_risk" in kwargs.get("key", ""):
             return True
@@ -75,6 +78,7 @@ def test_splash_screen_button_click_enters_risk():
 def test_splash_screen_button_click_enters_wealth():
     """Verifica che il click sul pulsante Wealth Management imposti i flag e chiami switch_page()."""
     st.session_state.clear()
+    st.session_state["argus_auth_verified"] = True
     def fake_button(label, **kwargs):
         if "btn_splash_wealth" in kwargs.get("key", ""):
             return True

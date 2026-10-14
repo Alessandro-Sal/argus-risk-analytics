@@ -913,6 +913,11 @@ def render_splash_screen(
     Restituisce True se il Login Gate o lo Splash e' attivo (bloccando l'esecuzione sottostante con st.stop()).
     Restituisce False se lo splash e' completato/bypassato (permettendo il caricamento immediato della dashboard).
     """
+    # ── Hardened Auth Guard (Supabase Native Auth & Session Lock) ──
+    from core.auth_manager import AuthManager
+
+    AuthManager.auth_guard(show_login_if_unauth=True)
+
     # Se splash_dismissed e' esplicitamente False (es. click su 'Schermata di Avvio' nella sidebar)
     if st.session_state.get("splash_dismissed") is False:
         force_show = True
@@ -928,15 +933,6 @@ def render_splash_screen(
         st.session_state["splash_dismissed"] = True
         st.session_state["splash_completed"] = True
         return False
-
-    try:
-        from core.supabase_cloud import render_cloud_auth_gate
-
-        if not render_cloud_auth_gate():
-            auto_collapse_sidebar()
-            return True
-    except Exception:
-        pass
 
     # Assicura che all'avvio la sidebar rimanga chiusa e le freccette nascoste
     auto_collapse_sidebar()

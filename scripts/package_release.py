@@ -122,6 +122,8 @@ def create_secure_release_zip(version: str = ""):
         "scripts/package_release.py",
         "gsheets_sync_subproject/google_service_account.json.example",
         "gsheets_sync_subproject/tests/test_gsheets_sync.py",
+        "tests/test_auth_and_config_manager.py",
+        ".streamlit/secrets.toml.example",
     }
     for full_p, rel_p in files_to_zip:
         if rel_p in SAFE_EXAMPLE_MOCK_FILES:
@@ -138,7 +140,7 @@ def create_secure_release_zip(version: str = ""):
     if flagged_files:
         print("\n[ERRORE CRITICO SICUREZZA] Rilevate potenziali credenziali nei seguenti file:")
         for fp, kw in flagged_files:
-            print(f"  [X] {fp} (Keyword: {kw})")
+            print(f"  [X] {ascii(fp)} (Keyword: {kw})")
         sys.exit(1)
         
     print("[SICUREZZA CERTIFICATA] Nessuna chiave o credenziale sensibile rilevata nei file ammessi.")
