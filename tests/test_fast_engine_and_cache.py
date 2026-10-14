@@ -1,12 +1,14 @@
 import time
+
 import pytest
 from sqlalchemy import create_engine
-from core.fetcher import get_engine, _BOOTSTRAPPED_ENGINES, clear_engine_caches
+
+from core.fetcher import _BOOTSTRAPPED_ENGINES, clear_engine_caches, get_engine
 from core.wealth.wealth_db import (
-    get_wealth_portfolios,
-    create_wealth_portfolio,
-    clear_wealth_portfolios_cache,
     _WEALTH_PROFILES_CACHE,
+    clear_wealth_portfolios_cache,
+    create_wealth_portfolio,
+    get_wealth_portfolios,
 )
 
 

@@ -1151,6 +1151,7 @@ def render_google_credentials_ui():
     """
     try:
         import streamlit as st
+
         from core.supabase_cloud import get_user_integration, save_user_integration
 
         st.markdown("#### 🔑 Credenziali Google Sheets (In-Memory & Supabase Vault)")

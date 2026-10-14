@@ -8,19 +8,20 @@ ARGUS — Verification Suite for Enterprise Architecture Overhaul:
 5. Supabase Reset SQL Script Validity
 """
 
-import os
 import json
+import os
+
 import pandas as pd
 import pytest
+import streamlit as st
 from sqlalchemy import create_engine
 
-import streamlit as st
 from core.auth_manager import AuthManager, DotDict
-from core.workspace_context import WorkspaceContext, set_active_portfolio
-from core.session_manager import ArgusSessionManager, ArgusSessionKeys
-from core.wealth.wealth_engine import compute_consolidated_net_worth
+from core.session_manager import ArgusSessionKeys, ArgusSessionManager
 from core.wealth.wealth_db import _get_active_user_isolation_context, init_wealth_db
+from core.wealth.wealth_engine import compute_consolidated_net_worth
 from core.wealth.wealth_sync import get_gspread_client
+from core.workspace_context import WorkspaceContext, set_active_portfolio
 
 
 def test_dot_dict_access_and_aliasing():

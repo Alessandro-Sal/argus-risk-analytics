@@ -11,7 +11,7 @@ import html
 import logging
 import os
 import re
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import pandas as pd
 from cryptography.fernet import Fernet
