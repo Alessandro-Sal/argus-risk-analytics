@@ -19,8 +19,6 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
-from scipy import stats
-from scipy.optimize import minimize
 
 from core.garch_engine import fit_garch11
 
@@ -158,6 +156,8 @@ class DCCGarchEngine:
         bounds = [(1e-4, 0.25), (0.70, 0.99)]
 
         try:
+            from scipy.optimize import minimize
+
             res = minimize(
                 self._dcc_log_likelihood,
                 init_params,
@@ -192,6 +192,8 @@ class DCCGarchEngine:
         Estimates non-linear lower and upper tail dependence via Clayton & Gumbel bivariate copulas.
         Clayton lambda_L = 2^{-1/theta}, Gumbel lambda_U = 2 - 2^{1/theta}.
         """
+        from scipy import stats
+
         kendall_tau, _ = stats.kendalltau(u1, u2)
         tau = float(np.clip(kendall_tau, 0.01, 0.95))
 
@@ -249,6 +251,8 @@ class DCCGarchEngine:
         H_t5 = H_t1 * 5.0
 
         # Uniform marginals via empirical probability integral transform
+        from scipy import stats
+
         t_len = self.std_residuals.shape[0]
         U = (stats.rankdata(self.std_residuals, axis=0)) / (t_len + 1.0)
 

@@ -11,9 +11,6 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
-from scipy import stats
-from scipy.optimize import minimize
-from sklearn.covariance import LedoitWolf
 
 # ==============================================================================
 # 1. TAIL COPULA MODELS (CLAYTON & GUMBEL ASYMMETRIC DEPENDENCE)
@@ -51,6 +48,8 @@ def compute_tail_copula_matrix(returns_df: pd.DataFrame, quantile_threshold: flo
     tickers = list(clean_df.columns)
     n = len(tickers)
     t_len = len(clean_df)
+
+    from scipy import stats
 
     # 1. Trasformazione alle marginali uniformi (Rank Transformation empirical CDF)
     uniforms = clean_df.rank(axis=0) / (t_len + 1.0)
@@ -344,6 +343,8 @@ def solve_spinu_risk_budgeting(
     scale = np.sqrt(float(inv_vols.T @ cov_matrix @ inv_vols))
     x0 = inv_vols / max(scale, 1e-6)
 
+    from scipy.optimize import minimize
+
     def _obj_and_grad(x: np.ndarray) -> Tuple[float, np.ndarray]:
         x_safe = np.maximum(x, 1e-12)
         sig_x = cov_matrix @ x_safe
@@ -448,6 +449,8 @@ def compute_risk_budgeting_portfolio(
 
     # Covarianza Ledoit-Wolf
     try:
+        from sklearn.covariance import LedoitWolf
+
         lw = LedoitWolf().fit(clean_df)
         cov_matrix = lw.covariance_ * 252.0
     except Exception:
@@ -571,6 +574,8 @@ def compute_liquidity_adjusted_var(
             port_vol = 0.0125  # ~20% annualizzata default
     else:
         port_vol = 0.0125
+
+    from scipy import stats
 
     z_alpha = float(stats.norm.ppf(confidence))
     standard_var_eur = total_val * (z_alpha * port_vol)

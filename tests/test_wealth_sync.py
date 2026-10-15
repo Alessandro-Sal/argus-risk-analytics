@@ -59,7 +59,8 @@ def test_sync_expenses_tracker_2026_mocked():
 
     engine = create_engine("sqlite:///:memory:")
 
-    with patch("gsheets_sync_subproject.sync_google_sheets.get_gspread_client", return_value=mock_client):
+    with patch("core.wealth.wealth_sync.get_gspread_client", return_value=mock_client), \
+         patch("gsheets_sync_subproject.sync_google_sheets.get_gspread_client", return_value=mock_client):
         res = sync_expenses_tracker_2026_from_gsheets(engine, "My All financial Statements", "Expenses Tracker 2026")
         assert res["status"] == "success"
         assert res["accounts_synced"] == 6

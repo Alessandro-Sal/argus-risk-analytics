@@ -23,7 +23,6 @@ from typing import Any, Optional
 
 import numpy as np
 import pandas as pd
-import yfinance as yf
 from sqlalchemy import create_engine, event, text
 
 logger = logging.getLogger("argus.fetcher")
@@ -440,6 +439,8 @@ def fetch_and_store(df_clean: pd.DataFrame, engine, portfolio_id: int = None, be
                     t_start = start_dt
 
             # Chiamata protetta tramite scudo di caching multi-livello (RAM + SQLite con 24h TTL)
+            import yfinance as yf
+
             hist = get_cached_ticker_history(t, start_date=t_start, end_date=end_date)
             info = get_cached_ticker_info(t)
             yf_ticker = yf.Ticker(t)
@@ -1066,6 +1067,8 @@ def fetch_cached_benchmark_returns(ticker: str, start_str: str, end_str: str) ->
     }
     yf_ticker = alias_map.get(ticker, ticker)
     try:
+        import yfinance as yf
+
         df = yf.download(yf_ticker, start=start_str, end=end_str, progress=False)
         if df is not None and not df.empty:
             if isinstance(df.columns, pd.MultiIndex):

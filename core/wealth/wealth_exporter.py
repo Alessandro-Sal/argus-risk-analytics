@@ -10,7 +10,6 @@ from typing import Any, Dict, Optional
 
 import numpy as np
 import pandas as pd
-import xlsxwriter
 from sqlalchemy import Engine
 
 from core.security_engine import mask_iban, sanitize_for_export
@@ -66,6 +65,8 @@ def export_wealth_master_excel_workbook(
     Include sanitizzazione contro Formula Injection (CWE-1236) e mascheramento PII facoltativo.
     """
     output = io.BytesIO()
+    import xlsxwriter
+
     workbook = xlsxwriter.Workbook(output, {"in_memory": True, "nan_inf_to_errors": True})
 
     # ── FORMATI GRAFICI ISTITUZIONALI (Midnight Obsidian & Navy Blue) ──

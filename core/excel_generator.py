@@ -10,7 +10,6 @@ from typing import Optional
 
 import numpy as np
 import pandas as pd
-import xlsxwriter
 
 
 def _safe_num(val, default=0.0) -> float:
@@ -61,6 +60,8 @@ def generate_excel_in_memory(df: pd.DataFrame) -> io.BytesIO:
         )
 
     output = io.BytesIO()
+    import xlsxwriter
+
     workbook = xlsxwriter.Workbook(output, {"in_memory": True, "nan_inf_to_errors": True})
 
     # ── FORMATI GRAFICI OBSIDIAN SOVEREIGN ──────────────────────

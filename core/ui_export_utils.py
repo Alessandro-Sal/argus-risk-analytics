@@ -27,22 +27,41 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
-# Verifica disponibilità motori Excel
-try:
-    import openpyxl
-    from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
-    from openpyxl.utils import get_column_letter
+# Verifica disponibilità motori Excel differita (Lazy Loading per performance di avvio)
+_HAS_OPENPYXL: Optional[bool] = None
+_HAS_XLSXWRITER: Optional[bool] = None
 
-    HAS_OPENPYXL = True
-except ImportError:
-    HAS_OPENPYXL = False
 
-try:
-    import xlsxwriter
+def _check_openpyxl() -> bool:
+    global _HAS_OPENPYXL
+    if _HAS_OPENPYXL is None:
+        try:
+            import openpyxl  # noqa: F401
 
-    HAS_XLSXWRITER = True
-except ImportError:
-    HAS_XLSXWRITER = False
+            _HAS_OPENPYXL = True
+        except ImportError:
+            _HAS_OPENPYXL = False
+    return _HAS_OPENPYXL
+
+
+def _check_xlsxwriter() -> bool:
+    global _HAS_XLSXWRITER
+    if _HAS_XLSXWRITER is None:
+        try:
+            import xlsxwriter  # noqa: F401
+
+            _HAS_XLSXWRITER = True
+        except ImportError:
+            _HAS_XLSXWRITER = False
+    return _HAS_XLSXWRITER
+
+
+def __getattr__(name: str) -> Any:
+    if name == "HAS_OPENPYXL":
+        return _check_openpyxl()
+    if name == "HAS_XLSXWRITER":
+        return _check_xlsxwriter()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 # ==============================================================================
@@ -187,9 +206,11 @@ def to_excel_bytes(
     - Auto-adattamento della larghezza delle colonne con margine protettivo.
     """
     clean_df = prepare_dataframe_for_export(df)
+    has_openpyxl = _check_openpyxl()
+    has_xlsxwriter = _check_xlsxwriter()
     if clean_df.empty:
         output = io.BytesIO()
-        with pd.ExcelWriter(output, engine="openpyxl" if HAS_OPENPYXL else "xlsxwriter") as writer:
+        with pd.ExcelWriter(output, engine="openpyxl" if has_openpyxl else "xlsxwriter") as writer:
             pd.DataFrame({"Messaggio": ["Nessun dato disponibile"]}).to_excel(
                 writer, index=False, sheet_name=sheet_name[:31]
             )
@@ -198,7 +219,11 @@ def to_excel_bytes(
     output = io.BytesIO()
 
     # Motore 1: openpyxl (massima flessibilità stilistica istituzionale)
-    if HAS_OPENPYXL:
+    if has_openpyxl:
+        import openpyxl
+        from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+        from openpyxl.utils import get_column_letter
+
         wb = openpyxl.Workbook()
         ws = wb.active
         ws.title = sheet_name[:31] if sheet_name else "Dati"
@@ -349,7 +374,7 @@ def to_excel_bytes(
         return output.getvalue()
 
     # Fallback con xlsxwriter
-    elif HAS_XLSXWRITER:
+    elif has_xlsxwriter:
         with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
             clean_df.to_excel(writer, index=False, sheet_name=sheet_name[:31])
             workbook = writer.book

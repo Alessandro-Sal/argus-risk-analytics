@@ -13,16 +13,6 @@ if _root_dir not in sys.path:
 
 import streamlit as st
 
-try:
-    import importlib
-
-    import core.supabase_cloud as _supa_early
-
-    importlib.reload(_supa_early)
-    _supa_early.harvest_active_streamlit_sessions_for_supabase()
-except Exception:
-    pass
-
 # Gestione parametri URL e calcolo stato sidebar (collassata all'avvio su login/splash, aperta nei moduli)
 _qp = getattr(st, "query_params", None)
 _is_splash = not st.session_state.get("_app_initialized", False) and not st.session_state.get("splash_dismissed", False)
@@ -75,12 +65,6 @@ if not AuthManager.is_authenticated():
     st.stop()
 
 # ── Splash Screen & Bootloader Istituzionale (All'avvio) ──────
-import components.splash as _splash_mod
-
-try:
-    importlib.reload(_splash_mod)
-except Exception:
-    pass
 from components.splash import auto_expand_sidebar
 from components.splash import render_splash_screen as render_argus_splash
 from core.ux_institutional_hub import APP_VERSION
@@ -184,13 +168,9 @@ inject_custom_css()
 
 # ── Sidebar (Caricata solo dopo l'accesso al terminale) ───────
 try:
-    import importlib
+    from core.supabase_cloud import harvest_active_streamlit_sessions_for_supabase
 
-    import core.supabase_cloud as _supa_mod
-
-    if not hasattr(_supa_mod, "harvest_active_streamlit_sessions_for_supabase"):
-        importlib.reload(_supa_mod)
-    _supa_mod.harvest_active_streamlit_sessions_for_supabase()
+    harvest_active_streamlit_sessions_for_supabase()
 except Exception:
     pass
 

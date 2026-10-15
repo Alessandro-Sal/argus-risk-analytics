@@ -19,10 +19,6 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
-import scipy.optimize as sco
-import scipy.stats as stats
-from sklearn.cluster import KMeans
-from sklearn.covariance import LedoitWolf
 from sqlalchemy import text
 
 logger = logging.getLogger("risk_engine")
@@ -1415,6 +1411,8 @@ def run_advanced_monte_carlo_simulation(
 
     if num_assets > 1:
         try:
+            from sklearn.covariance import LedoitWolf
+
             lw = LedoitWolf().fit(df_ret)
             cov_daily = lw.covariance_ * (volatility_multiplier**2)
         except Exception:
@@ -1557,6 +1555,8 @@ def _compute_efficient_frontier(
 
     mean_returns = df_ret.mean().values * TRADING_DAYS_YEAR
     try:
+        from sklearn.covariance import LedoitWolf
+
         lw = LedoitWolf().fit(df_ret)
         cov_matrix = lw.covariance_ * TRADING_DAYS_YEAR
         cov_type = "Ledoit-Wolf Shrinkage"
@@ -1565,6 +1565,8 @@ def _compute_efficient_frontier(
         cov_type = "Sample Covariance"
 
     # Exact SLSQP Optimization with SciPy
+    import scipy.optimize as sco
+
     num_assets = len(common)
     # Garanzia di perfetta simmetria e semidefinitezza positiva (PSD) con regolarizzazione ridge
     cov_matrix = (cov_matrix + cov_matrix.T) / 2.0
@@ -1757,6 +1759,8 @@ def _calc_market_risk(
     vol_annual = vol_daily * np.sqrt(TRADING_DAYS_YEAR)
 
     # Skewness e Kurtosis
+    import scipy.stats as stats
+
     skewness = float(stats.skew(r)) if len(r) > 2 else 0.0
     kurtosis = float(stats.kurtosis(r)) if len(r) > 2 else 0.0
 
@@ -2313,6 +2317,8 @@ def _calc_ai_insights(df_positions: pd.DataFrame, df_returns: pd.DataFrame, sr_p
                 X_scaled = (X - X.mean(axis=0)) / std_X
 
                 n_clusters = min(3, len(features))
+                from sklearn.cluster import KMeans
+
                 kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
                 features["cluster"] = kmeans.fit_predict(X_scaled)
 
@@ -2825,6 +2831,8 @@ def compute_black_litterman_optimization(
     cons = {"type": "eq", "fun": lambda w: np.sum(w) - 1.0}
 
     try:
+        import scipy.optimize as sco
+
         opt_res = sco.minimize(
             bl_objective,
             w0,
@@ -3709,6 +3717,8 @@ def compute_marginal_and_component_var(
     ret_sub = df_returns[active_tickers].fillna(0.0)
     if len(active_tickers) > 1 and len(ret_sub) >= 5:
         try:
+            from sklearn.covariance import LedoitWolf
+
             cov_matrix = LedoitWolf().fit(ret_sub).covariance_
         except Exception:
             cov_matrix = ret_sub.cov().values
@@ -3726,6 +3736,8 @@ def compute_marginal_and_component_var(
 
     port_var = float(w_arr.T @ cov_matrix @ w_arr)
     port_sigma = float(np.sqrt(max(1e-12, port_var)))
+
+    import scipy.stats as stats
 
     z_alpha = float(stats.norm.ppf(confidence_level))
     scale_factor = float(np.sqrt(max(1, time_horizon)))

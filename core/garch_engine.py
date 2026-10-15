@@ -9,7 +9,6 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 import pandas as pd
-from scipy.optimize import minimize
 
 logger = logging.getLogger(__name__)
 
@@ -121,6 +120,8 @@ def fit_garch11(returns: pd.Series) -> Dict[str, Any]:
     constraints = [
         {"type": "ineq", "fun": lambda p: 0.9999 - (p[1] + p[2])}  # alpha + beta < 1
     ]
+
+    from scipy.optimize import minimize
 
     opt_res = minimize(
         _garch11_log_likelihood,
