@@ -922,8 +922,8 @@ def render_splash_screen(
     if st.session_state.get("splash_dismissed") is False:
         force_show = True
 
-    # Bypass istantaneo se gia inizializzato e non forzato
-    if st.session_state.get("_app_initialized", False) and not force_show:
+    # Bypass istantaneo se gia inizializzato o dismissato e non forzato
+    if (st.session_state.get("splash_dismissed", False) or st.session_state.get("_app_initialized", False)) and not force_show:
         return False
 
     # Controllo query parameters per bypass esplicito / skip
@@ -934,30 +934,18 @@ def render_splash_screen(
         st.session_state["splash_completed"] = True
         return False
 
-    # Assicura che all'avvio la sidebar rimanga chiusa e le freccette nascoste
-    auto_collapse_sidebar()
-
-    # Iniezione stili CSS isolati (inclusa la rimozione totale dell'header e delle freccette)
-    st.markdown(SPLASH_STYLES, unsafe_allow_html=True)
-
-    # Frame HTML istituzionale completo
-    html_frame = render_splash_html(
-        app_title="A R G U S",
-        subtitle="QUANTITATIVE RISK ANALYTICS & WEALTH INTELLIGENCE ECOSYSTEM",
-        version_tag=f"v{app_version} Institutional",
-        current_status="Kernel operativo. Seleziona l'Ambiente di Lavoro sottostante:",
-        progress_pct=100,
-        accent_color="#f59e0b",
-        is_fading_out=False,
-        show_skip=False,
-    )
-    st.markdown(html_frame, unsafe_allow_html=True)
+    # Contenitore atomico per rimozione immediata dal DOM senza ghost elements
+    splash_container = st.empty()
 
     def _on_click_enter_risk():
         st.session_state["_app_initialized"] = True
         st.session_state["splash_dismissed"] = True
         st.session_state["splash_completed"] = True
         st.session_state["argus_portal_mode"] = "📊 Risk Analytics"
+        try:
+            splash_container.empty()
+        except Exception:
+            pass
         try:
             if hasattr(st, "query_params") and "splash" in st.query_params:
                 del st.query_params["splash"]
@@ -970,6 +958,10 @@ def render_splash_screen(
         st.session_state["splash_completed"] = True
         st.session_state["argus_portal_mode"] = "🏛️ Wealth Management"
         try:
+            splash_container.empty()
+        except Exception:
+            pass
+        try:
             if hasattr(st, "query_params") and "splash" in st.query_params:
                 del st.query_params["splash"]
         except Exception:
@@ -980,89 +972,112 @@ def render_splash_screen(
         except Exception:
             pass
 
-    # Schede Bento Grid e Pulsanti di Accesso Istituzionale Fusi Insieme
-    col_risk, col_wealth = st.columns(2)
-    with col_risk:
-        risk_card_html = _clean_html("""
-        <div class="portal-card-risk">
-            <div>
-                <div class="portal-card-header">
-                    <span class="portal-card-title">📊 Risk Analytics &amp; Portfolios</span>
-                    <span class="portal-badge-risk">12 MODULI RISK &amp; QUANT</span>
-                </div>
-                <div style="font-size: 12px; color: #94a3b8; line-height: 1.4; margin-bottom: 7px;">
-                    Desk quantitativo istituzionale per asset pricing, stress testing sistemico e ottimizzazione di frontiera.
-                </div>
-                <div class="portal-feature-list">
-                    <div class="portal-feature-item"><span class="portal-tag-pill tag-risk">VaR</span> <span><b>Metriche di Coda:</b> VaR Storico/Parametrico (95/99%), CVaR &amp; EWMA</span></div>
-                    <div class="portal-feature-item"><span class="portal-tag-pill tag-risk">SHOCK</span> <span><b>Stress Testing:</b> Scenari Crisi 2008, Shock Tassi, Crolli Tech &amp; Tariffe</span></div>
-                    <div class="portal-feature-item"><span class="portal-tag-pill tag-risk">QP</span> <span><b>Asset Allocation:</b> Markowitz, Black-Litterman, HRP &amp; Copule Matematiche</span></div>
-                    <div class="portal-feature-item"><span class="portal-tag-pill tag-risk">QUANT</span> <span><b>Screener &amp; BQuant:</b> Multi-Factor Screener + Sandbox Python Integrata</span></div>
-                </div>
-            </div>
-        </div>
-        """)
-        st.markdown(risk_card_html, unsafe_allow_html=True)
-        if st.button("🚀 ENTRA NEL DESK RISK ANALYTICS →", key="btn_splash_risk", use_container_width=True, on_click=_on_click_enter_risk):
-            _on_click_enter_risk()
-            st.rerun()
+    with splash_container.container():
+        # Assicura che all'avvio la sidebar rimanga chiusa e le freccette nascoste
+        auto_collapse_sidebar()
 
-    with col_wealth:
-        wealth_card_html = _clean_html("""
-        <div class="portal-card-wealth">
-            <div>
-                <div class="portal-card-header">
-                    <span class="portal-card-title">🏛️ Wealth Management &amp; Advisory</span>
-                    <span class="portal-badge-wealth">10 MODULI WEALTH &amp; ADVISORY</span>
-                </div>
-                <div style="font-size: 12px; color: #94a3b8; line-height: 1.4; margin-bottom: 7px;">
-                    Piattaforma di consolidamento olistico del patrimonio netto, budget familiare, caveau beni rifugio e fiscalità.
-                </div>
-                <div class="portal-feature-list">
-                    <div class="portal-feature-item"><span class="portal-tag-pill tag-wealth">LEDGER</span> <span><b>Net Worth Olistico:</b> Conti Correnti, Broker, Immobili &amp; Caveau Orologi</span></div>
-                    <div class="portal-feature-item"><span class="portal-tag-pill tag-wealth">BUDGET</span> <span><b>Cash Flow:</b> Framework 50/30/20, Burn Rate &amp; Proiezioni FIRE</span></div>
-                    <div class="portal-feature-item"><span class="portal-tag-pill tag-wealth">FISCO</span> <span><b>Fisco &amp; Previdenza:</b> Monitoraggio Quadro RW (IVAFE/IVIE) &amp; Fondi Pensione</span></div>
-                    <div class="portal-feature-item"><span class="portal-tag-pill tag-wealth">AI</span> <span><b>Advisory Copilot:</b> Audit patrimoniale avanzato con motore quantitativo locale</span></div>
-                </div>
-            </div>
-        </div>
-        """)
-        st.markdown(wealth_card_html, unsafe_allow_html=True)
-        if st.button("💎 ENTRA NELLA SUITE WEALTH ADVISORY →", key="btn_splash_wealth", use_container_width=True, on_click=_on_click_enter_wealth):
-            _on_click_enter_wealth()
-            if not st.session_state.get("wealth_active_portfolio_id"):
-                auth_pid = st.session_state.get("argus_auth_personal_profile_id")
-                st.session_state["wealth_active_portfolio_id"] = auth_pid or 1
-            from core.sidebar import switch_to_page
-            switch_to_page("pages/12_🎛️_Wealth_Control_Room.py")
+        # Iniezione stili CSS isolati (inclusa la rimozione totale dell'header e delle freccette)
+        st.markdown(SPLASH_STYLES, unsafe_allow_html=True)
 
-    try:
-        from core.supabase_cloud import (
-            SupabaseAuthManager,
-            get_active_account_badge_info,
-            logout_argus_user,
+        # Frame HTML istituzionale completo
+        html_frame = render_splash_html(
+            app_title="A R G U S",
+            subtitle="QUANTITATIVE RISK ANALYTICS & WEALTH INTELLIGENCE ECOSYSTEM",
+            version_tag=f"v{app_version} Institutional",
+            current_status="Kernel operativo. Seleziona l'Ambiente di Lavoro sottostante:",
+            progress_pct=100,
+            accent_color="#f59e0b",
+            is_fading_out=False,
+            show_skip=False,
         )
+        st.markdown(html_frame, unsafe_allow_html=True)
 
-        acct_splash = get_active_account_badge_info()
-        _, col_logout_sp, _ = st.columns([1.4, 1.2, 1.4])
-        with col_logout_sp:
-            if st.button(
-                f"🚪 Cambia Account / Logout ({acct_splash['display_name']})",
-                key="btn_splash_switch_account",
-                use_container_width=True,
-                help="Disconnette la sessione corrente e riapre il terminale di Login ARGUS.",
-            ):
-                from core.auth_manager import AuthManager
-
-                SupabaseAuthManager.set_security_settings(require_login=True)
-                logout_argus_user()
-                AuthManager.logout()
-                st.session_state["splash_dismissed"] = True
-                st.session_state["auth_view"] = "LOGIN"
-                st.session_state["require_login_forced"] = True
+        # Schede Bento Grid e Pulsanti di Accesso Istituzionale Fusi Insieme
+        col_risk, col_wealth = st.columns(2)
+        with col_risk:
+            risk_card_html = _clean_html("""
+            <div class="portal-card-risk">
+                <div>
+                    <div class="portal-card-header">
+                        <span class="portal-card-title">📊 Risk Analytics &amp; Portfolios</span>
+                        <span class="portal-badge-risk">12 MODULI RISK &amp; QUANT</span>
+                    </div>
+                    <div style="font-size: 12px; color: #94a3b8; line-height: 1.4; margin-bottom: 7px;">
+                        Desk quantitativo istituzionale per asset pricing, stress testing sistemico e ottimizzazione di frontiera.
+                    </div>
+                    <div class="portal-feature-list">
+                        <div class="portal-feature-item"><span class="portal-tag-pill tag-risk">VaR</span> <span><b>Metriche di Coda:</b> VaR Storico/Parametrico (95/99%), CVaR &amp; EWMA</span></div>
+                        <div class="portal-feature-item"><span class="portal-tag-pill tag-risk">SHOCK</span> <span><b>Stress Testing:</b> Scenari Crisi 2008, Shock Tassi, Crolli Tech &amp; Tariffe</span></div>
+                        <div class="portal-feature-item"><span class="portal-tag-pill tag-risk">QP</span> <span><b>Asset Allocation:</b> Markowitz, Black-Litterman, HRP &amp; Copule Matematiche</span></div>
+                        <div class="portal-feature-item"><span class="portal-tag-pill tag-risk">QUANT</span> <span><b>Screener &amp; BQuant:</b> Multi-Factor Screener + Sandbox Python Integrata</span></div>
+                    </div>
+                </div>
+            </div>
+            """)
+            st.markdown(risk_card_html, unsafe_allow_html=True)
+            if st.button("🚀 ENTRA NEL DESK RISK ANALYTICS →", key="btn_splash_risk", use_container_width=True, on_click=_on_click_enter_risk):
+                _on_click_enter_risk()
+                splash_container.empty()
                 st.rerun()
-    except Exception:
-        pass
+
+        with col_wealth:
+            wealth_card_html = _clean_html("""
+            <div class="portal-card-wealth">
+                <div>
+                    <div class="portal-card-header">
+                        <span class="portal-card-title">🏛️ Wealth Management &amp; Advisory</span>
+                        <span class="portal-badge-wealth">10 MODULI WEALTH &amp; ADVISORY</span>
+                    </div>
+                    <div style="font-size: 12px; color: #94a3b8; line-height: 1.4; margin-bottom: 7px;">
+                        Piattaforma di consolidamento olistico del patrimonio netto, budget familiare, caveau beni rifugio e fiscalità.
+                    </div>
+                    <div class="portal-feature-list">
+                        <div class="portal-feature-item"><span class="portal-tag-pill tag-wealth">LEDGER</span> <span><b>Net Worth Olistico:</b> Conti Correnti, Broker, Immobili &amp; Caveau Orologi</span></div>
+                        <div class="portal-feature-item"><span class="portal-tag-pill tag-wealth">BUDGET</span> <span><b>Cash Flow:</b> Framework 50/30/20, Burn Rate &amp; Proiezioni FIRE</span></div>
+                        <div class="portal-feature-item"><span class="portal-tag-pill tag-wealth">FISCO</span> <span><b>Fisco &amp; Previdenza:</b> Monitoraggio Quadro RW (IVAFE/IVIE) &amp; Fondi Pensione</span></div>
+                        <div class="portal-feature-item"><span class="portal-tag-pill tag-wealth">AI</span> <span><b>Advisory Copilot:</b> Audit patrimoniale avanzato con motore quantitativo locale</span></div>
+                    </div>
+                </div>
+            </div>
+            """)
+            st.markdown(wealth_card_html, unsafe_allow_html=True)
+            if st.button("💎 ENTRA NELLA SUITE WEALTH ADVISORY →", key="btn_splash_wealth", use_container_width=True, on_click=_on_click_enter_wealth):
+                _on_click_enter_wealth()
+                splash_container.empty()
+                if not st.session_state.get("wealth_active_portfolio_id"):
+                    auth_pid = st.session_state.get("argus_auth_personal_profile_id")
+                    st.session_state["wealth_active_portfolio_id"] = auth_pid or 1
+                from core.sidebar import switch_to_page
+                switch_to_page("pages/12_🎛️_Wealth_Control_Room.py")
+
+        try:
+            from core.supabase_cloud import (
+                SupabaseAuthManager,
+                get_active_account_badge_info,
+                logout_argus_user,
+            )
+
+            acct_splash = get_active_account_badge_info()
+            _, col_logout_sp, _ = st.columns([1.4, 1.2, 1.4])
+            with col_logout_sp:
+                if st.button(
+                    f"🚪 Cambia Account / Logout ({acct_splash['display_name']})",
+                    key="btn_splash_switch_account",
+                    use_container_width=True,
+                    help="Disconnette la sessione corrente e riapre il terminale di Login ARGUS.",
+                ):
+                    from core.auth_manager import AuthManager
+
+                    splash_container.empty()
+                    SupabaseAuthManager.set_security_settings(require_login=True)
+                    logout_argus_user()
+                    AuthManager.logout()
+                    st.session_state["splash_dismissed"] = True
+                    st.session_state["auth_view"] = "LOGIN"
+                    st.session_state["require_login_forced"] = True
+                    st.rerun()
+        except Exception:
+            pass
 
     return True
 

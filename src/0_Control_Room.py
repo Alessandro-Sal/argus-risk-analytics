@@ -108,7 +108,6 @@ import core.adapters.broker_hub as broker_hub
 import core.duckdb_engine as duckdb_engine
 import core.multi_portfolio
 import core.ui_utils
-from components.splash import render_splash_screen as render_argus_splash
 from core.cache_shield import clear_cache
 from core.db_exporter import save_snapshot_to_db
 from core.diagnostics import (

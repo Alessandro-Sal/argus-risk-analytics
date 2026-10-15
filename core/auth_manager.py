@@ -805,6 +805,7 @@ class AuthManager:
         st.session_state["argus_auth_display_name"] = disp_name
         st.session_state["argus_user_custom_db_url"] = auth_res.get("custom_db_url", "")
         st.session_state["splash_dismissed"] = False
+        st.session_state["splash_completed"] = False
         st.session_state["_app_initialized"] = False
         st.session_state["require_login_forced"] = False
 
@@ -827,9 +828,12 @@ class AuthManager:
     def logout(cls) -> None:
         """Esegue il logout da Supabase Auth e azzera completamente la sessione Streamlit."""
         try:
+            import threading
+
             client = cls.get_supabase_client()
             if client is not None:
-                client.auth.sign_out()
+                # Esecuzione in background daemon thread per azzerare la latenza di rete e il freeze della UI
+                threading.Thread(target=client.auth.sign_out, daemon=True).start()
         except Exception:
             pass
 
@@ -850,7 +854,9 @@ class AuthManager:
         st.session_state["authenticated"] = False
         st.session_state["argus_auth_verified"] = False
         st.session_state["splash_dismissed"] = True
+        st.session_state["splash_completed"] = False
         st.session_state["_app_initialized"] = False
+        st.session_state["argus_portal_mode"] = None
         st.session_state["auth_view"] = "LOGIN"
         st.session_state["require_login_forced"] = True
         import os

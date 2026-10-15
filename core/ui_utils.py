@@ -7652,7 +7652,7 @@ def render_splash_screen(force_show: bool = False) -> bool:
     if force_show:
         st.session_state.splash_dismissed = False
 
-    if st.session_state.splash_dismissed:
+    if (st.session_state.get("splash_dismissed", False) or st.session_state.get("_app_initialized", False)) and not force_show:
         return False
 
     theme = st.session_state.get("ui_theme", "Midnight Obsidian")

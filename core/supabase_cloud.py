@@ -2240,7 +2240,9 @@ def logout_argus_user() -> None:
         st.session_state["auth_view"] = "LOGIN"
 
     st.session_state["splash_dismissed"] = True
+    st.session_state["splash_completed"] = False
     st.session_state["_app_initialized"] = False
+    st.session_state["argus_portal_mode"] = None
     st.session_state["require_login_forced"] = True
     import os
 

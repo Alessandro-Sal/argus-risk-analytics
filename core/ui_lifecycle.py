@@ -36,11 +36,27 @@ logger = logging.getLogger("argus.ui_lifecycle")
 SYSTEM_PERSISTENT_KEYS: Set[str] = {
     # Core UI Infrastructure
     "splash_dismissed",
+    "splash_completed",
     "sidebar_expanded",
     "theme",
     "argus_portal_mode",
     "_app_initialized",
     "session_cleared",
+    # Auth & Security State
+    "require_login_forced",
+    "auth_view",
+    "authenticated",
+    "argus_auth_verified",
+    "argus_auth_role",
+    "argus_auth_user",
+    "argus_auth_user_id",
+    "argus_auth_email",
+    "argus_auth_display_name",
+    "argus_session",
+    "user",
+    "user_id",
+    "failed_attempts",
+    "lockout_until",
     # Global Currency & Localization
     "base_currency",
     "confidence_level",

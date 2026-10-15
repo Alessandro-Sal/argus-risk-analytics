@@ -2287,6 +2287,8 @@ def render_sidebar():
         if st.button("👁️ Schermata di Avvio (Splash)", key="btn_sidebar_show_splash", use_container_width=True):
             st.session_state["splash_dismissed"] = False
             st.session_state["_app_initialized"] = False
+            st.session_state["splash_completed"] = False
+            st.session_state["argus_portal_mode"] = None
             try:
                 st.switch_page("0_Control_Room.py")
             except Exception:
@@ -2305,6 +2307,9 @@ def render_sidebar():
             logout_argus_user()
             AuthManager.logout()
             st.session_state["splash_dismissed"] = True
+            st.session_state["splash_completed"] = False
+            st.session_state["_app_initialized"] = False
+            st.session_state["argus_portal_mode"] = None
             st.session_state["auth_view"] = "LOGIN"
             st.session_state["require_login_forced"] = True
             try:
