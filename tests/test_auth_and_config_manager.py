@@ -98,6 +98,8 @@ class TestAuthManager:
         }
         AuthManager.apply_session(session_data)
         assert AuthManager.is_authenticated() is True
+        assert st.session_state.get("splash_dismissed") is False
+        assert st.session_state.get("_app_initialized") is False
 
         current = AuthManager.get_current_user()
         assert current["user_id"] == "test-uuid-1234"
@@ -108,6 +110,35 @@ class TestAuthManager:
         AuthManager.logout()
         assert AuthManager.is_authenticated() is False
         assert "argus_session" not in st.session_state
+        assert st.session_state.get("splash_dismissed") is True
+        assert st.session_state.get("require_login_forced") is True
+
+    def test_login_transitions_to_splash_screen(self):
+        from unittest.mock import MagicMock, patch
+
+        from components.splash import render_splash_screen
+
+        st.session_state.clear()
+        session_data = {
+            "ok": True,
+            "user_id": "user-login-789",
+            "email": "user@argus.cloud",
+            "username": "user789",
+            "display_name": "User 789",
+            "role": "user",
+            "access_token": "token-abc",
+            "expires_at": int(time.time()) + 3600,
+        }
+        AuthManager.apply_session(session_data)
+        assert AuthManager.is_authenticated() is True
+        assert st.session_state.get("splash_dismissed") is False
+        assert st.session_state.get("_app_initialized") is False
+
+        with patch("streamlit.markdown") as mock_md, patch("streamlit.columns") as mock_cols, patch("streamlit.button", return_value=False), patch("streamlit.components.v1.html"):
+            c1, c2 = MagicMock(), MagicMock()
+            mock_cols.return_value = (c1, c2)
+            assert render_splash_screen() is True
+            assert mock_md.called
 
     def test_guest_demo_login(self):
         st.session_state.clear()

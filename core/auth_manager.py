@@ -804,8 +804,8 @@ class AuthManager:
         st.session_state["argus_auth_email"] = email
         st.session_state["argus_auth_display_name"] = disp_name
         st.session_state["argus_user_custom_db_url"] = auth_res.get("custom_db_url", "")
-        st.session_state["splash_dismissed"] = True
-        st.session_state["_app_initialized"] = True
+        st.session_state["splash_dismissed"] = False
+        st.session_state["_app_initialized"] = False
         st.session_state["require_login_forced"] = False
 
         if role == "owner":
