@@ -140,6 +140,25 @@ class TestAuthManager:
             assert render_splash_screen() is True
             assert mock_md.called
 
+    def test_login_local_owner_transitions_to_splash(self):
+        from unittest.mock import MagicMock, patch
+        from components.splash import render_splash_screen
+
+        st.session_state.clear()
+        AuthManager.login_local_owner(remember_session=True)
+        assert AuthManager.is_authenticated() is True
+        assert st.session_state.get("splash_dismissed") is False
+        assert st.session_state.get("_app_initialized") is False
+        assert st.session_state.get("argus_auth_role") == "owner"
+
+        # Verify splash renders properly with locale='en'
+        st.session_state["locale"] = "en"
+        with patch("streamlit.markdown") as mock_md, patch("streamlit.columns") as mock_cols, patch("streamlit.button", return_value=False), patch("streamlit.components.v1.html"):
+            c1, c2 = MagicMock(), MagicMock()
+            mock_cols.return_value = (c1, c2)
+            assert render_splash_screen() is True
+            assert mock_md.called
+
     def test_guest_demo_login(self):
         st.session_state.clear()
         AuthManager.login_guest_demo()

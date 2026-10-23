@@ -976,15 +976,38 @@ def render_splash_screen(
         # Assicura che all'avvio la sidebar rimanga chiusa e le freccette nascoste
         auto_collapse_sidebar()
 
+        cur_lang = (st.session_state.get("locale") or st.session_state.get("argus_locale") or "it").lower()
+        is_it = (cur_lang == "it")
+
+        # Barra superiore lingua nello splash
+        top_sp_c1, top_sp_c2 = st.columns([4.2, 1.0])
+        with top_sp_c2:
+            sp_it, sp_en = st.columns(2)
+            with sp_it:
+                if st.button("IT", key="btn_splash_toggle_it", type="primary" if is_it else "secondary", use_container_width=True):
+                    st.session_state["locale"] = "it"
+                    st.session_state["argus_locale"] = "it"
+                    from core.i18n.translator import I18nEngine
+                    I18nEngine.get_instance().set_locale("it")
+                    st.rerun()
+            with sp_en:
+                if st.button("EN", key="btn_splash_toggle_en", type="primary" if not is_it else "secondary", use_container_width=True):
+                    st.session_state["locale"] = "en"
+                    st.session_state["argus_locale"] = "en"
+                    from core.i18n.translator import I18nEngine
+                    I18nEngine.get_instance().set_locale("en")
+                    st.rerun()
+
         # Iniezione stili CSS isolati (inclusa la rimozione totale dell'header e delle freccette)
         st.markdown(SPLASH_STYLES, unsafe_allow_html=True)
 
         # Frame HTML istituzionale completo
+        status_msg = "Kernel operativo. Seleziona l'Ambiente di Lavoro sottostante:" if is_it else "Operational kernel ready. Select your workspace below:"
         html_frame = render_splash_html(
             app_title="A R G U S",
             subtitle="QUANTITATIVE RISK ANALYTICS & WEALTH INTELLIGENCE ECOSYSTEM",
             version_tag=f"v{app_version} Institutional",
-            current_status="Kernel operativo. Seleziona l'Ambiente di Lavoro sottostante:",
+            current_status=status_msg,
             progress_pct=100,
             accent_color="#f59e0b",
             is_fading_out=False,
@@ -995,53 +1018,77 @@ def render_splash_screen(
         # Schede Bento Grid e Pulsanti di Accesso Istituzionale Fusi Insieme
         col_risk, col_wealth = st.columns(2)
         with col_risk:
-            risk_card_html = _clean_html("""
+            r_badge = "12 MODULI RISK &amp; QUANT" if is_it else "12 RISK &amp; QUANT MODULES"
+            r_desc = (
+                "Desk quantitativo istituzionale per asset pricing, stress testing sistemico e ottimizzazione di frontiera."
+                if is_it else
+                "Institutional quantitative desk for asset pricing, systemic stress testing, and frontier optimization."
+            )
+            r_f1 = "<b>Metriche di Coda:</b> VaR Storico/Parametrico (95/99%), CVaR &amp; EWMA" if is_it else "<b>Tail Metrics:</b> Historical/Parametric VaR (95/99%), CVaR &amp; EWMA"
+            r_f2 = "<b>Stress Testing:</b> Scenari Crisi 2008, Shock Tassi, Crolli Tech &amp; Tariffe" if is_it else "<b>Stress Testing:</b> 2008 Crisis Scenarios, Rate Shocks, Tech Crashes &amp; Tariffs"
+            r_f3 = "<b>Asset Allocation:</b> Markowitz, Black-Litterman, HRP &amp; Copule Matematiche" if is_it else "<b>Asset Allocation:</b> Markowitz, Black-Litterman, HRP &amp; Mathematical Copulas"
+            r_f4 = "<b>Screener &amp; BQuant:</b> Multi-Factor Screener + Sandbox Python Integrata" if is_it else "<b>Screener &amp; BQuant:</b> Multi-Factor Screener + Integrated Python Sandbox"
+
+            risk_card_html = _clean_html(f"""
             <div class="portal-card-risk">
                 <div>
                     <div class="portal-card-header">
                         <span class="portal-card-title">📊 Risk Analytics &amp; Portfolios</span>
-                        <span class="portal-badge-risk">12 MODULI RISK &amp; QUANT</span>
+                        <span class="portal-badge-risk">{r_badge}</span>
                     </div>
                     <div style="font-size: 12px; color: #94a3b8; line-height: 1.4; margin-bottom: 7px;">
-                        Desk quantitativo istituzionale per asset pricing, stress testing sistemico e ottimizzazione di frontiera.
+                        {r_desc}
                     </div>
                     <div class="portal-feature-list">
-                        <div class="portal-feature-item"><span class="portal-tag-pill tag-risk">VaR</span> <span><b>Metriche di Coda:</b> VaR Storico/Parametrico (95/99%), CVaR &amp; EWMA</span></div>
-                        <div class="portal-feature-item"><span class="portal-tag-pill tag-risk">SHOCK</span> <span><b>Stress Testing:</b> Scenari Crisi 2008, Shock Tassi, Crolli Tech &amp; Tariffe</span></div>
-                        <div class="portal-feature-item"><span class="portal-tag-pill tag-risk">QP</span> <span><b>Asset Allocation:</b> Markowitz, Black-Litterman, HRP &amp; Copule Matematiche</span></div>
-                        <div class="portal-feature-item"><span class="portal-tag-pill tag-risk">QUANT</span> <span><b>Screener &amp; BQuant:</b> Multi-Factor Screener + Sandbox Python Integrata</span></div>
+                        <div class="portal-feature-item"><span class="portal-tag-pill tag-risk">VaR</span> <span>{r_f1}</span></div>
+                        <div class="portal-feature-item"><span class="portal-tag-pill tag-risk">SHOCK</span> <span>{r_f2}</span></div>
+                        <div class="portal-feature-item"><span class="portal-tag-pill tag-risk">QP</span> <span>{r_f3}</span></div>
+                        <div class="portal-feature-item"><span class="portal-tag-pill tag-risk">QUANT</span> <span>{r_f4}</span></div>
                     </div>
                 </div>
             </div>
             """)
             st.markdown(risk_card_html, unsafe_allow_html=True)
-            if st.button("🚀 ENTRA NEL DESK RISK ANALYTICS →", key="btn_splash_risk", use_container_width=True, on_click=_on_click_enter_risk):
+            btn_risk_txt = "🚀 ENTRA NEL DESK RISK ANALYTICS →" if is_it else "🚀 ENTER RISK ANALYTICS DESK →"
+            if st.button(btn_risk_txt, key="btn_splash_risk", use_container_width=True, on_click=_on_click_enter_risk):
                 _on_click_enter_risk()
                 splash_container.empty()
                 st.rerun()
 
         with col_wealth:
-            wealth_card_html = _clean_html("""
+            w_badge = "10 MODULI WEALTH &amp; ADVISORY" if is_it else "10 WEALTH &amp; ADVISORY MODULES"
+            w_desc = (
+                "Piattaforma di consolidamento olistico del patrimonio netto, budget familiare, caveau beni rifugio e fiscalità."
+                if is_it else
+                "Holistic balance sheet consolidation platform, family budgeting, safe-haven caveau, and taxation."
+            )
+            w_f1 = "<b>Net Worth Olistico:</b> Conti Correnti, Broker, Immobili &amp; Caveau Orologi" if is_it else "<b>Holistic Net Worth:</b> Bank Accounts, Brokers, Real Estate &amp; Watch Caveau"
+            w_f2 = "<b>Cash Flow:</b> Framework 50/30/20, Burn Rate &amp; Proiezioni FIRE" if is_it else "<b>Cash Flow:</b> 50/30/20 Framework, Burn Rate &amp; FIRE Projections"
+            w_f3 = "<b>Fisco &amp; Previdenza:</b> Monitoraggio Quadro RW (IVAFE/IVIE) &amp; Fondi Pensione" if is_it else "<b>Tax &amp; Pension:</b> Italian Quadro RW (IVAFE/IVIE) &amp; Pension Funds"
+            w_f4 = "<b>Advisory Copilot:</b> Audit patrimoniale avanzato con motore quantitativo locale" if is_it else "<b>Advisory Copilot:</b> Advanced wealth audit with local quantitative engine"
+
+            wealth_card_html = _clean_html(f"""
             <div class="portal-card-wealth">
                 <div>
                     <div class="portal-card-header">
                         <span class="portal-card-title">🏛️ Wealth Management &amp; Advisory</span>
-                        <span class="portal-badge-wealth">10 MODULI WEALTH &amp; ADVISORY</span>
+                        <span class="portal-badge-wealth">{w_badge}</span>
                     </div>
                     <div style="font-size: 12px; color: #94a3b8; line-height: 1.4; margin-bottom: 7px;">
-                        Piattaforma di consolidamento olistico del patrimonio netto, budget familiare, caveau beni rifugio e fiscalità.
+                        {w_desc}
                     </div>
                     <div class="portal-feature-list">
-                        <div class="portal-feature-item"><span class="portal-tag-pill tag-wealth">LEDGER</span> <span><b>Net Worth Olistico:</b> Conti Correnti, Broker, Immobili &amp; Caveau Orologi</span></div>
-                        <div class="portal-feature-item"><span class="portal-tag-pill tag-wealth">BUDGET</span> <span><b>Cash Flow:</b> Framework 50/30/20, Burn Rate &amp; Proiezioni FIRE</span></div>
-                        <div class="portal-feature-item"><span class="portal-tag-pill tag-wealth">FISCO</span> <span><b>Fisco &amp; Previdenza:</b> Monitoraggio Quadro RW (IVAFE/IVIE) &amp; Fondi Pensione</span></div>
-                        <div class="portal-feature-item"><span class="portal-tag-pill tag-wealth">AI</span> <span><b>Advisory Copilot:</b> Audit patrimoniale avanzato con motore quantitativo locale</span></div>
+                        <div class="portal-feature-item"><span class="portal-tag-pill tag-wealth">LEDGER</span> <span>{w_f1}</span></div>
+                        <div class="portal-feature-item"><span class="portal-tag-pill tag-wealth">BUDGET</span> <span>{w_f2}</span></div>
+                        <div class="portal-feature-item"><span class="portal-tag-pill tag-wealth">FISCO</span> <span>{w_f3}</span></div>
+                        <div class="portal-feature-item"><span class="portal-tag-pill tag-wealth">AI</span> <span>{w_f4}</span></div>
                     </div>
                 </div>
             </div>
             """)
             st.markdown(wealth_card_html, unsafe_allow_html=True)
-            if st.button("💎 ENTRA NELLA SUITE WEALTH ADVISORY →", key="btn_splash_wealth", use_container_width=True, on_click=_on_click_enter_wealth):
+            btn_wealth_txt = "💎 ENTRA NELLA SUITE WEALTH ADVISORY →" if is_it else "💎 ENTER WEALTH ADVISORY SUITE →"
+            if st.button(btn_wealth_txt, key="btn_splash_wealth", use_container_width=True, on_click=_on_click_enter_wealth):
                 _on_click_enter_wealth()
                 splash_container.empty()
                 if not st.session_state.get("wealth_active_portfolio_id"):
@@ -1060,11 +1107,13 @@ def render_splash_screen(
             acct_splash = get_active_account_badge_info()
             _, col_logout_sp, _ = st.columns([1.4, 1.2, 1.4])
             with col_logout_sp:
+                btn_out_txt = f"🚪 Cambia Account / Logout ({acct_splash['display_name']})" if is_it else f"🚪 Switch Account / Logout ({acct_splash['display_name']})"
+                btn_out_hlp = "Disconnette la sessione corrente e riapre il terminale di Login ARGUS." if is_it else "Disconnects current session and reopens the ARGUS Sign In terminal."
                 if st.button(
-                    f"🚪 Cambia Account / Logout ({acct_splash['display_name']})",
+                    btn_out_txt,
                     key="btn_splash_switch_account",
                     use_container_width=True,
-                    help="Disconnette la sessione corrente e riapre il terminale di Login ARGUS.",
+                    help=btn_out_hlp,
                 ):
                     from core.auth_manager import AuthManager
 

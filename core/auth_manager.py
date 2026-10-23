@@ -162,23 +162,26 @@ def render_password_strength_bar(password: str) -> None:
     if not password:
         return
     is_valid, msg, score = validate_password_strength(password)
+    cur_lang = (st.session_state.get("locale") or st.session_state.get("argus_locale") or "it").lower()
+    is_it = (cur_lang == "it")
     if score < 40:
         color = "#ef4444"
-        label = "DEBOLE"
+        label = "DEBOLE" if is_it else "WEAK"
     elif score < 75:
         color = "#f59e0b"
-        label = "MEDIA"
+        label = "MEDIA" if is_it else "MEDIUM"
     else:
         color = "#10b981"
-        label = "SICURA"
+        label = "SICURA" if is_it else "STRONG"
 
+    strength_hdr = "ROBUSTEZZA" if is_it else "STRENGTH"
     st.markdown(
         _clean_html(
             f"""
             <div style="margin-top:-6px; margin-bottom:12px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
                     <span style="font-size:0.72rem; color:#94a3b8; font-family:'JetBrains Mono',monospace;">
-                        ROBUSTEZZA: <strong style="color:{color};">{label}</strong>
+                        {strength_hdr}: <strong style="color:{color};">{label}</strong>
                     </span>
                     <span style="font-size:0.70rem; color:#94a3b8; font-family:'JetBrains Mono',monospace;">{score}%</span>
                 </div>
@@ -961,8 +964,9 @@ class AuthManager:
         st.session_state["argus_auth_verified"] = True
         st.session_state["authenticated"] = True
         st.session_state["offline_mode"] = False
-        st.session_state["splash_dismissed"] = True
-        st.session_state["_app_initialized"] = True
+        st.session_state["splash_dismissed"] = False
+        st.session_state["splash_completed"] = False
+        st.session_state["_app_initialized"] = False
         st.session_state["argus_auth_personal_profile_id"] = 1
         st.session_state["require_login_forced"] = False
         st.session_state["supabase_cloud_authenticated"] = False
@@ -1109,6 +1113,9 @@ def render_institutional_login_gate() -> bool:
             if "email" in qp:
                 st.session_state["recovery_email"] = qp.get("email")
 
+    cur_lang = (st.session_state.get("locale") or st.session_state.get("argus_locale") or "it").lower()
+    is_it = (cur_lang == "it")
+
     try:
         from core.ui_utils import get_argus_eye_svg
 
@@ -1120,6 +1127,38 @@ def render_institutional_login_gate() -> bool:
 
     # ── COLONNA SINISTRA: BRAND & VALUE PROPOSITION ────────────────
     with col_brand:
+        brand_subtitle = "Analisi del Rischio &amp; Intelligence Patrimoniale" if is_it else "Risk Analytics &amp; Wealth Intelligence"
+        status_pill_text = "● Sistema Operativo · v10.0.0 Istituzionale" if is_it else "● Operating System · v10.0.0 Institutional"
+        brand_desc = (
+            "Terminale quantitativo unificato per la gestione integrata del rischio di mercato, "
+            "analisi fattoriale, fiscalità avanzata e allocazione patrimoniale multi-asset."
+            if is_it else
+            "Unified quantitative terminal for integrated market risk management, "
+            "factor analysis, advanced taxation, and multi-asset wealth allocation."
+        )
+        f1_title = "⚡ Architettura di Calcolo Rischi Multi-Asset" if is_it else "⚡ Multi-Asset Risk Computation Engine"
+        f1_desc = (
+            "VaR/CVaR parametrico e storico, simulazione Monte Carlo vettorizzata, Stress Testing CCAR e modelli fattoriali MSCI/Barra."
+            if is_it else
+            "Parametric and historical VaR/CVaR, vectorized Monte Carlo simulation, CCAR Stress Testing, and MSCI/Barra factor models."
+        )
+        f2_title = "🏛️ Gestione Patrimoniale &amp; Fiscale Integrata" if is_it else "🏛️ Integrated Wealth &amp; Tax Management"
+        f2_desc = (
+            "Consolidamento in tempo reale di conti bancari, immobili, previdenza integrativa, ottimizzazione minusvalenze e Quadro RW."
+            if is_it else
+            "Real-time consolidation of bank accounts, real estate, pension funds, capital loss tax harvesting, and Italian Quadro RW."
+        )
+        f3_title = "🛡️ Sicurezza Enterprise &amp; Sincronizzazione Cloud" if is_it else "🛡️ Enterprise Security &amp; Cloud Synchronization"
+        f3_desc = (
+            "Isolamento multi-tenant con Supabase Row-Level Security (auth.uid = user_id), credenziali protette in memoria e crittografia AES-256."
+            if is_it else
+            "Multi-tenant isolation via Supabase Row-Level Security (auth.uid = user_id), in-memory credential protection, and AES-256 encryption."
+        )
+        t_engine = "Motore Principale: <b>Attivo</b>" if is_it else "Core Engine: <b>Active</b>"
+        t_cloud = "Cassaforte Cloud: <b>Pronta</b>" if is_it else "Cloud Vault: <b>Ready</b>"
+        t_rls = "Isolamento RLS: <b>Attivo</b>" if is_it else "RLS Isolation: <b>Active</b>"
+        t_latency = "Latenza: <b>~12ms</b>" if is_it else "Latency: <b>~12ms</b>"
+
         st.markdown(
             _clean_html(
                 f"""
@@ -1129,38 +1168,37 @@ def render_institutional_login_gate() -> bool:
                         <div>
                             <div class="argus-brand-title">ARGUS</div>
                             <div style="font-family:'JetBrains Mono',monospace; font-size:0.75rem; color:#f59e0b; font-weight:700; letter-spacing:0.18em; text-transform:uppercase;">
-                                Analisi del Rischio &amp; Intelligence Patrimoniale
+                                {brand_subtitle}
                             </div>
                         </div>
                     </div>
 
-                    <div class="argus-status-pill">● Sistema Operativo · v10.0.0 Istituzionale</div>
+                    <div class="argus-status-pill">{status_pill_text}</div>
 
                     <p style="color:#94a3b8; font-size:0.95rem; line-height:1.55; margin-bottom:1.6rem;">
-                        Terminale quantitativo unificato per la gestione integrata del rischio di mercato,
-                        analisi fattoriale, fiscalità avanzata e allocazione patrimoniale multi-asset.
+                        {brand_desc}
                     </p>
 
                     <div class="argus-feature-item">
-                        <div class="argus-feature-title">⚡ Architettura di Calcolo Rischi Multi-Asset</div>
-                        <div class="argus-feature-desc">VaR/CVaR parametrico e storico, simulazione Monte Carlo vettorizzata, Stress Testing CCAR e modelli fattoriali MSCI/Barra.</div>
+                        <div class="argus-feature-title">{f1_title}</div>
+                        <div class="argus-feature-desc">{f1_desc}</div>
                     </div>
 
                     <div class="argus-feature-item">
-                        <div class="argus-feature-title">🏛️ Gestione Patrimoniale &amp; Fiscale Integrata</div>
-                        <div class="argus-feature-desc">Consolidamento in tempo reale di conti bancari, immobili, previdenza integrativa, ottimizzazione minusvalenze e Quadro RW.</div>
+                        <div class="argus-feature-title">{f2_title}</div>
+                        <div class="argus-feature-desc">{f2_desc}</div>
                     </div>
 
                     <div class="argus-feature-item">
-                        <div class="argus-feature-title">🛡️ Sicurezza Enterprise &amp; Sincronizzazione Cloud</div>
-                        <div class="argus-feature-desc">Isolamento multi-tenant con Supabase Row-Level Security (auth.uid = user_id), credenziali protette in memoria e crittografia AES-256.</div>
+                        <div class="argus-feature-title">{f3_title}</div>
+                        <div class="argus-feature-desc">{f3_desc}</div>
                     </div>
 
                     <div class="argus-telemetry-badge">
-                        <span>Motore Principale: <b>Attivo</b></span>
-                        <span>Cassaforte Cloud: <b>Pronta</b></span>
-                        <span>Isolamento RLS: <b>Attivo</b></span>
-                        <span>Latenza: <b>~12ms</b></span>
+                        <span>{t_engine}</span>
+                        <span>{t_cloud}</span>
+                        <span>{t_rls}</span>
+                        <span>{t_latency}</span>
                     </div>
                 </div>
                 """
@@ -1177,26 +1215,32 @@ def render_institutional_login_gate() -> bool:
         lockout_until = float(st.session_state.get("lockout_until", 0.0))
         if now < lockout_until:
             remaining = int(lockout_until - now) + 1
-            st.error(
+            err_lock = (
                 f"⛔ **Terminale Temporaneamente Bloccato**: troppi tentativi falliti rilevati.\n\n"
                 f"Riprova tra **{remaining} secondi**."
+                if is_it else
+                f"⛔ **Terminal Temporarily Locked**: too many failed attempts detected.\n\n"
+                f"Retry in **{remaining} seconds**."
             )
+            st.error(err_lock)
             return False
 
         # Barra superiore lingua e contesto
         top_c1, top_c2 = st.columns([1.6, 1.0])
         with top_c1:
-            st.caption("🛡️ **Cassaforte di Autenticazione Supabase (GoTrue)**")
+            caption_text = "🛡️ **Cassaforte di Autenticazione Supabase (GoTrue)**" if is_it else "🛡️ **Supabase Authentication Vault (GoTrue)**"
+            st.caption(caption_text)
         with top_c2:
-            cur_lang = st.session_state.get("argus_locale", "it").lower()
             l_it, l_en = st.columns(2)
             with l_it:
-                if st.button("IT", key="btn_lang_toggle_it", type="primary" if cur_lang == "it" else "secondary", use_container_width=True):
+                if st.button("IT", key="btn_lang_toggle_it", type="primary" if is_it else "secondary", use_container_width=True):
+                    st.session_state["locale"] = "it"
                     st.session_state["argus_locale"] = "it"
                     I18nEngine.get_instance().set_locale("it")
                     st.rerun()
             with l_en:
-                if st.button("EN", key="btn_lang_toggle_en", type="primary" if cur_lang == "en" else "secondary", use_container_width=True):
+                if st.button("EN", key="btn_lang_toggle_en", type="primary" if not is_it else "secondary", use_container_width=True):
+                    st.session_state["locale"] = "en"
                     st.session_state["argus_locale"] = "en"
                     I18nEngine.get_instance().set_locale("en")
                     st.rerun()
@@ -1212,15 +1256,21 @@ def render_institutional_login_gate() -> bool:
             is_local = is_local_environment()
 
             if is_local:
+                loc_title = "Accesso Diretto Postazione Locale" if is_it else "Direct Local Workstation Access"
+                loc_desc = (
+                    "Sei sulla tua macchina locale (MySQL / SQLite). Puoi entrare direttamente con il tuo account titolare senza dover inserire email e password."
+                    if is_it else
+                    "You are on your local machine (MySQL / SQLite). You can sign in directly with your owner account without entering email and password."
+                )
                 st.markdown(
-                    """
+                    f"""
                     <div style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(5, 150, 105, 0.04) 100%);
                                 border: 1px solid rgba(16, 185, 129, 0.35); border-radius: 12px; padding: 14px 16px; margin-bottom: 14px;">
                         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
                             <div style="display:flex; align-items:center; gap:8px;">
                                 <span style="font-size:1.2rem;">💻</span>
                                 <span style="font-size:0.88rem; font-weight:700; color:#34d399; letter-spacing:0.04em; text-transform:uppercase;">
-                                    Accesso Diretto Postazione Locale
+                                    {loc_title}
                                 </span>
                             </div>
                             <span style="font-size:0.68rem; color:#10b981; font-family:'JetBrains Mono',monospace; background:rgba(16,185,129,0.18); padding:3px 8px; border-radius:12px; font-weight:700;">
@@ -1228,39 +1278,60 @@ def render_institutional_login_gate() -> bool:
                             </span>
                         </div>
                         <div style="font-size:0.80rem; color:#cbd5e1; line-height:1.45; margin-bottom:10px;">
-                            Sei sulla tua macchina locale (MySQL / SQLite). Puoi entrare direttamente con il tuo account titolare senza dover inserire email e password.
+                            {loc_desc}
                         </div>
                     </div>
                     """,
                     unsafe_allow_html=True,
                 )
 
+                chk_remember_label = (
+                    "Ricorda ed entra sempre in automatico all'avvio su questo PC"
+                    if is_it else
+                    "Remember and always sign in automatically on startup on this PC"
+                )
+                chk_remember_help = (
+                    "Se attivo, all'avvio locale salterà del tutto questa schermata accedendo direttamente allo splash screen."
+                    if is_it else
+                    "If enabled, future local startups will skip this screen and open the splash screen directly."
+                )
                 remember_local = st.checkbox(
-                    "Ricorda ed entra sempre in automatico all'avvio su questo PC",
+                    chk_remember_label,
                     value=get_local_auto_login_preference(),
                     key="chk_auto_login_local",
-                    help="Se attivo, all'avvio locale salterà del tutto questa schermata accedendo direttamente al terminale.",
+                    help=chk_remember_help,
                 )
 
+                btn_bypass_label = "⚡ Entra Subito al Terminale (Alessandro)" if is_it else "⚡ Enter Terminal Now (Alessandro)"
+                btn_bypass_help = (
+                    "Accesso immediato senza credenziali per l'ambiente locale"
+                    if is_it else
+                    "Instant access without credentials for local environment"
+                )
                 if st.button(
-                    "⚡ Entra Subito al Terminale (Alessandro)",
+                    btn_bypass_label,
                     type="primary",
                     use_container_width=True,
                     key="btn_quick_local_bypass",
-                    help="Accesso immediato senza credenziali per l'ambiente locale",
+                    help=btn_bypass_help,
                 ):
                     set_local_auto_login_preference(remember_local)
                     AuthManager.login_local_owner(remember_session=True)
-                    st.success("✅ Accesso locale autorizzato. Apertura del terminale...")
+                    st.session_state["splash_dismissed"] = False
+                    st.session_state["splash_completed"] = False
+                    st.session_state["_app_initialized"] = False
+                    msg_succ = "✅ Accesso locale autorizzato. Apertura dello splash screen..." if is_it else "✅ Local access authorized. Opening splash screen..."
+                    st.success(msg_succ)
                     time.sleep(0.2)
                     st.rerun()
 
+                div_or_text = "oppure accedi con credenziali Cloud / Supabase" if is_it else "or sign in with Cloud / Supabase credentials"
                 st.markdown(
-                    """
+                    f"""
                     <div style="display:flex; align-items:center; margin: 18px 0 16px 0; text-align:center;">
                         <div style="flex-grow:1; border-bottom: 1px solid rgba(255,255,255,0.1);"></div>
                         <span style="padding: 0 10px; font-size:0.72rem; color:#64748b; text-transform:uppercase; letter-spacing:0.08em; font-weight:600;">
-                            oppure accedi con credenziali Cloud / Supabase
+                            {div_or_text}
                         </span>
                         <div style="flex-grow:1; border-bottom: 1px solid rgba(255,255,255,0.1);"></div>
                     </div>
@@ -1269,40 +1340,58 @@ def render_institutional_login_gate() -> bool:
                 )
 
             with st.form("argus_login_form", clear_on_submit=False):
-                st.markdown("### Accesso al Terminale")
-                st.caption("Inserisci le tue credenziali per accedere al workspace riservato.")
-
-                login_email = st.text_input(
-                    "Email o Username Istituzionale",
-                    key="login_identity_in",
-                    placeholder="nome.cognome@dominio.it o username",
-                    help="Per il Titolare: inserisci 'alessandro' o 'owner@argus.cloud'.",
+                form_title = "### Accesso al Terminale" if is_it else "### Terminal Sign In"
+                form_caption = (
+                    "Inserisci le tue credenziali per accedere al workspace riservato."
+                    if is_it else
+                    "Enter your credentials to access the confidential workspace."
                 )
+                st.markdown(form_title)
+                st.caption(form_caption)
+
+                email_lbl = "Email o Username Istituzionale" if is_it else "Institutional Email or Username"
+                email_ph = "nome.cognome@dominio.it o username" if is_it else "name.surname@domain.com or username"
+                email_hlp = (
+                    "Per il Titolare: inserisci 'alessandro' o 'owner@argus.cloud'."
+                    if is_it else
+                    "For Owner: enter 'alessandro' or 'owner@argus.cloud'."
+                )
+                login_email = st.text_input(
+                    email_lbl,
+                    key="login_identity_in",
+                    placeholder=email_ph,
+                    help=email_hlp,
+                )
+                pwd_lbl = "Password Personale" if is_it else "Personal Password"
                 login_pwd = st.text_input(
-                    "Password Personale",
+                    pwd_lbl,
                     type="password",
                     key="login_password_in",
                     placeholder="••••••••••••",
                 )
 
+                remember_lbl = "Mantieni la sessione attiva su questo dispositivo" if is_it else "Keep session active on this device"
                 remember_me = st.checkbox(
-                    "Mantieni la sessione attiva su questo dispositivo",
+                    remember_lbl,
                     value=True,
                     key="login_remember_me_check",
                 )
 
-                btn_login = st.form_submit_button("Accedi al Terminale", use_container_width=True)
+                btn_sub_lbl = "Accedi al Terminale" if is_it else "Sign In to Terminal"
+                btn_login = st.form_submit_button(btn_sub_lbl, use_container_width=True)
 
                 if btn_login:
                     if not login_email or not login_pwd:
-                        st.warning("Compila sia il campo email/username che la password.")
+                        msg_missing = "Compila sia il campo email/username che la password." if is_it else "Please fill in both the email/username and password fields."
+                        st.warning(msg_missing)
                     else:
                         allowed, rem_sec, limit_msg = AuthRateLimiter.check_rate_limit(login_email)
                         if not allowed:
                             st.session_state["lockout_until"] = time.time() + rem_sec
                             st.error(f"⛔ {limit_msg}")
                         else:
-                            with st.spinner("Autenticazione crittografica e verifica token in corso..."):
+                            spin_txt = "Autenticazione crittografica e verifica token in corso..." if is_it else "Cryptographic authentication and token verification in progress..."
+                            with st.spinner(spin_txt):
                                 auth_result = AuthManager.login(
                                     login_email, login_pwd, remember_session=remember_me
                                 )
@@ -1311,7 +1400,9 @@ def render_institutional_login_gate() -> bool:
                                 st.session_state["failed_attempts"] = 0
                                 st.session_state["lockout_until"] = 0.0
                                 AuthRateLimiter.record_success(login_email)
-                                st.success(f"✅ Accesso autorizzato. Benvenuto, **{auth_result.get('display_name', login_email)}**!")
+                                disp_u = auth_result.get('display_name', login_email)
+                                succ_login = f"✅ Accesso autorizzato. Benvenuto, **{disp_u}**!" if is_it else f"✅ Access authorized. Welcome, **{disp_u}**!"
+                                st.success(succ_login)
                                 time.sleep(0.3)
                                 st.rerun()
                             else:
@@ -1319,23 +1410,28 @@ def render_institutional_login_gate() -> bool:
                                 st.session_state["failed_attempts"] = fails
                                 if lock_sec > 0:
                                     st.session_state["lockout_until"] = time.time() + lock_sec
-                                    st.error(f"❌ Troppi tentativi errati. Blocco temporaneo per {lock_sec} secondi.")
+                                    err_lck = f"❌ Troppi tentativi errati. Blocco temporaneo per {lock_sec} secondi." if is_it else f"❌ Too many failed attempts. Temporarily locked for {lock_sec} seconds."
+                                    st.error(err_lck)
                                 else:
-                                    st.error(f"❌ Accesso fallito: {auth_result.get('error', 'Credenziali errate.')}")
+                                    def_err = 'Credenziali errate.' if is_it else 'Invalid credentials.'
+                                    err_str = f"❌ Accesso fallito: {auth_result.get('error', def_err)}" if is_it else f"❌ Sign in failed: {auth_result.get('error', def_err)}"
+                                    st.error(err_str)
 
             # Navigazione secondaria a zero-flicker
             c_nav1, c_nav2 = st.columns(2)
             with c_nav1:
+                btn_forgot_lbl = "Password dimenticata?" if is_it else "Forgot password?"
                 st.button(
-                    "Password dimenticata?",
+                    btn_forgot_lbl,
                     on_click=set_auth_view,
                     args=("FORGOT_PASSWORD",),
                     use_container_width=True,
                     key="btn_nav_forgot",
                 )
             with c_nav2:
+                btn_reg_lbl = "Crea nuovo account" if is_it else "Create new account"
                 st.button(
-                    "Crea nuovo account",
+                    btn_reg_lbl,
                     on_click=set_auth_view,
                     args=("REGISTER",),
                     use_container_width=True,
@@ -1344,56 +1440,70 @@ def render_institutional_login_gate() -> bool:
 
             # Quick-Launch Sandbox Bar (Valutazione Rapida Didattica)
             st.markdown("<hr style='margin:1.1rem 0 0.8rem 0; border-color:rgba(255,255,255,0.08);'/>", unsafe_allow_html=True)
-            st.caption("🚀 ACCESSO RAPIDO VALUTAZIONE (SANDBOX DIDATTICA)")
+            cap_sandbox = "🚀 ACCESSO RAPIDO VALUTAZIONE (SANDBOX DIDATTICA)" if is_it else "🚀 QUICK EVALUATION ACCESS (EDUCATIONAL SANDBOX)"
+            st.caption(cap_sandbox)
 
             demo_col1, demo_col2 = st.columns([1.6, 1.0])
             with demo_col1:
                 selected_archetype = st.selectbox(
-                    "Profilo Sandbox Didattico",
+                    "Profilo Sandbox Didattico" if is_it else "Educational Sandbox Profile",
                     options=["hnwi_family", "fire_decumulation", "young_accumulator"],
                     format_func=lambda x: {
-                        "hnwi_family": "👑 HNWI Family Office (€4.8M)",
-                        "fire_decumulation": "🏖️ FIRE Decumulo (Cedolare)",
-                        "young_accumulator": "🚀 Giovane Accumulatore (PAC)",
+                        "hnwi_family": ("👑 HNWI Family Office (€4.8M)" if is_it else "👑 HNWI Family Office (€4.8M)"),
+                        "fire_decumulation": ("🏖️ FIRE Decumulo (Cedolare)" if is_it else "🏖️ FIRE Decumulation (Dividend)"),
+                        "young_accumulator": ("🚀 Giovane Accumulatore (PAC)" if is_it else "🚀 Young Accumulator (DCA)"),
                     }[x],
                     label_visibility="collapsed",
                     key="sb_login_archetype_select",
                 )
             with demo_col2:
-                if st.button("Avvia Demo", use_container_width=True, key="btn_login_launch_demo", type="secondary"):
-                    with st.spinner("Inizializzazione sandbox multi-asset in corso..."):
+                btn_demo_lbl = "Avvia Demo" if is_it else "Launch Demo"
+                if st.button(btn_demo_lbl, use_container_width=True, key="btn_login_launch_demo", type="secondary"):
+                    spin_sb = "Inizializzazione sandbox multi-asset in corso..." if is_it else "Initializing multi-asset sandbox..."
+                    with st.spinner(spin_sb):
                         AuthManager.login_sandbox_archetype(selected_archetype)
-                    st.success("✅ Sandbox attivata con successo!")
+                    succ_sb = "✅ Sandbox attivata con successo!" if is_it else "✅ Sandbox activated successfully!"
+                    st.success(succ_sb)
                     time.sleep(0.3)
                     st.rerun()
 
         # ── 2. VISTA RECUPERO PASSWORD (Richiesta OTP) ────────────────
         elif current_view == "FORGOT_PASSWORD":
             with st.form("argus_forgot_form", clear_on_submit=False):
-                st.markdown("### Recupero Credenziali")
-                st.caption("Inserisci l'indirizzo email associato al tuo profilo per ricevere il token di recupero.")
+                st.markdown("### Recupero Credenziali" if is_it else "### Password Recovery")
+                st.caption(
+                    "Inserisci l'indirizzo email associato al tuo profilo per ricevere il token di recupero."
+                    if is_it else
+                    "Enter the email address associated with your profile to receive a recovery token."
+                )
 
                 f_email = st.text_input(
-                    "Email Registrata",
-                    placeholder="nome.cognome@dominio.it",
+                    "Email Registrata" if is_it else "Registered Email",
+                    placeholder="nome.cognome@dominio.it" if is_it else "name.surname@domain.com",
                     key="forgot_email_input",
                 )
-                submit_forgot = st.form_submit_button("Invia Codice di Recupero", use_container_width=True)
+                submit_forgot = st.form_submit_button(
+                    "Invia Codice di Recupero" if is_it else "Send Recovery Code",
+                    use_container_width=True,
+                )
 
                 if submit_forgot:
                     if not f_email or "@" not in f_email or "." not in f_email:
-                        st.warning("Inserisci un indirizzo email sintatticamente valido.")
+                        st.warning("Inserisci un indirizzo email sintatticamente valido." if is_it else "Please enter a syntactically valid email address.")
                     else:
-                        with st.spinner("Invio istruzioni di recupero in corso..."):
+                        spin_f = "Invio istruzioni di recupero in corso..." if is_it else "Sending recovery instructions..."
+                        with st.spinner(spin_f):
                             res_req = AuthManager.request_password_reset(f_email)
                         st.session_state["recovery_email"] = f_email
-                        st.success(res_req.get("message", "Se l'indirizzo è registrato, riceverai a breve il codice."))
+                        def_msg = "Se l'indirizzo è registrato, riceverai a breve il codice." if is_it else "If the address is registered, you will receive the code shortly."
+                        st.success(res_req.get("message", def_msg))
                         time.sleep(1.0)
                         set_auth_view("RESET_CONFIRM")
                         st.rerun()
 
+            btn_back_forgot = "← Torna al Login" if is_it else "← Back to Sign In"
             st.button(
-                "← Torna al Login",
+                btn_back_forgot,
                 on_click=set_auth_view,
                 args=("LOGIN",),
                 use_container_width=True,
@@ -1403,25 +1513,29 @@ def render_institutional_login_gate() -> bool:
         # ── 3. VISTA CONFERMA RESET E CAMBIO PASSWORD ──────────────────
         elif current_view == "RESET_CONFIRM":
             with st.form("argus_reset_confirm_form", clear_on_submit=False):
-                st.markdown("### Imposta Nuova Password")
-                st.caption("Inserisci il codice di sicurezza (OTP o token) ricevuto via email e definisci la nuova password.")
+                st.markdown("### Imposta Nuova Password" if is_it else "### Set New Password")
+                st.caption(
+                    "Inserisci il codice di sicurezza (OTP o token) ricevuto via email e definisci la nuova password."
+                    if is_it else
+                    "Enter the security code (OTP or token) received via email and set your new password."
+                )
 
                 prefilled_email = st.session_state.get("recovery_email", "")
                 conf_email = st.text_input(
-                    "Email di Recupero",
+                    "Email di Recupero" if is_it else "Recovery Email",
                     value=prefilled_email,
                     key="reset_conf_email_input",
-                    placeholder="nome.cognome@dominio.it",
+                    placeholder="nome.cognome@dominio.it" if is_it else "name.surname@domain.com",
                 )
                 prefilled_token = st.session_state.get("recovery_token_param", "")
                 conf_token = st.text_input(
-                    "Codice OTP / Token di Recupero",
+                    "Codice OTP / Token di Recupero" if is_it else "OTP Code / Recovery Token",
                     value=prefilled_token,
                     key="reset_conf_token_input",
-                    placeholder="Codice numerico o token di sicurezza",
+                    placeholder="Codice numerico o token di sicurezza" if is_it else "Numeric code or security token",
                 )
                 new_pwd = st.text_input(
-                    "Nuova Password (min. 10 caratteri)",
+                    "Nuova Password (min. 10 caratteri)" if is_it else "New Password (min. 10 chars)",
                     type="password",
                     key="reset_new_pwd_input",
                     placeholder="••••••••••••",
@@ -1429,35 +1543,40 @@ def render_institutional_login_gate() -> bool:
                 render_password_strength_bar(new_pwd)
 
                 confirm_pwd = st.text_input(
-                    "Conferma Nuova Password",
+                    "Conferma Nuova Password" if is_it else "Confirm New Password",
                     type="password",
                     key="reset_confirm_pwd_input",
                     placeholder="••••••••••••",
                 )
 
-                submit_confirm = st.form_submit_button("Aggiorna Password & Accedi", use_container_width=True)
+                btn_sub_reset = "Aggiorna Password & Accedi" if is_it else "Update Password & Sign In"
+                submit_confirm = st.form_submit_button(btn_sub_reset, use_container_width=True)
 
                 if submit_confirm:
                     is_valid, val_msg, _ = validate_password_strength(new_pwd)
                     if not conf_email or not conf_token:
-                        st.warning("Email e codice OTP sono campi obbligatori.")
+                        st.warning("Email e codice OTP sono campi obbligatori." if is_it else "Email and OTP code are required fields.")
                     elif new_pwd != confirm_pwd:
-                        st.error("Le password inserite non coincidono.")
+                        st.error("Le password inserite non coincidono." if is_it else "The passwords entered do not match.")
                     elif not is_valid:
                         st.error(val_msg)
                     else:
-                        with st.spinner("Aggiornamento credenziali crittografiche in corso..."):
+                        spin_reset = "Aggiornamento credenziali crittografiche in corso..." if is_it else "Updating cryptographic credentials..."
+                        with st.spinner(spin_reset):
                             res_upd = AuthManager.confirm_password_reset(conf_email, conf_token, new_pwd)
                         if res_upd.get("ok"):
-                            st.success("🎉 Password aggiornata con successo! Effettua il login con le nuove credenziali.")
+                            succ_pwd = "🎉 Password aggiornata con successo! Effettua il login con le nuove credenziali." if is_it else "🎉 Password successfully updated! Please sign in with your new credentials."
+                            st.success(succ_pwd)
                             time.sleep(1.2)
                             set_auth_view("LOGIN")
                             st.rerun()
                         else:
-                            st.error(f"❌ Errore aggiornamento password: {res_upd.get('error')}")
+                            err_pwd = f"❌ Errore aggiornamento password: {res_upd.get('error')}" if is_it else f"❌ Password update error: {res_upd.get('error')}"
+                            st.error(err_pwd)
 
+            btn_cancel_lbl = "← Annulla e torna al Login" if is_it else "← Cancel and Back to Sign In"
             st.button(
-                "← Annulla e torna al Login",
+                btn_cancel_lbl,
                 on_click=set_auth_view,
                 args=("LOGIN",),
                 use_container_width=True,
@@ -1467,21 +1586,25 @@ def render_institutional_login_gate() -> bool:
         # ── 4. VISTA REGISTRAZIONE OPERATORE ──────────────────────────
         elif current_view == "REGISTER":
             with st.form("argus_register_form", clear_on_submit=False):
-                st.markdown("### Registrazione Operatore")
-                st.caption("Configura le tue credenziali istituzionali per creare un nuovo workspace isolato.")
+                st.markdown("### Registrazione Operatore" if is_it else "### Operator Registration")
+                st.caption(
+                    "Configura le tue credenziali istituzionali per creare un nuovo workspace isolato."
+                    if is_it else
+                    "Configure your institutional credentials to create a new isolated workspace."
+                )
 
                 reg_name = st.text_input(
-                    "Nome Completo / Ragione Sociale *",
-                    placeholder="es. Marco Rossi o Capital Family Office",
+                    "Nome Completo / Ragione Sociale *" if is_it else "Full Name / Organization *",
+                    placeholder="es. Marco Rossi o Capital Family Office" if is_it else "e.g. John Doe or Capital Family Office",
                     key="reg_name_input",
                 )
                 reg_email = st.text_input(
-                    "Email Istituzionale *",
-                    placeholder="nome.cognome@dominio.it",
+                    "Email Istituzionale *" if is_it else "Institutional Email *",
+                    placeholder="nome.cognome@dominio.it" if is_it else "name.surname@domain.com",
                     key="reg_email_input",
                 )
                 reg_pwd = st.text_input(
-                    "Password di Accesso (min. 10 caratteri) *",
+                    "Password di Accesso (min. 10 caratteri) *" if is_it else "Access Password (min. 10 characters) *",
                     type="password",
                     key="reg_pwd_input",
                     placeholder="••••••••••••",
@@ -1489,34 +1612,39 @@ def render_institutional_login_gate() -> bool:
                 render_password_strength_bar(reg_pwd)
 
                 reg_pwd_confirm = st.text_input(
-                    "Conferma Password *",
+                    "Conferma Password *" if is_it else "Confirm Password *",
                     type="password",
                     key="reg_pwd_confirm_input",
                     placeholder="••••••••••••",
                 )
 
-                submit_reg = st.form_submit_button("Crea Workspace Istituzionale", use_container_width=True)
+                btn_sub_reg = "Crea Workspace Istituzionale" if is_it else "Create Institutional Workspace"
+                submit_reg = st.form_submit_button(btn_sub_reg, use_container_width=True)
 
                 if submit_reg:
                     is_valid, val_msg, _ = validate_password_strength(reg_pwd)
                     if not reg_name or not reg_email:
-                        st.warning("Tutti i campi contrassegnati con * sono obbligatori.")
+                        st.warning("Tutti i campi contrassegnati con * sono obbligatori." if is_it else "All fields marked with * are required.")
                     elif reg_pwd != reg_pwd_confirm:
-                        st.error("Le password inserite non coincidono.")
+                        st.error("Le password inserite non coincidono." if is_it else "The passwords entered do not match.")
                     elif not is_valid:
                         st.error(val_msg)
                     else:
-                        with st.spinner("Creazione profilo crittografato e provvigione RLS in corso..."):
+                        spin_reg = "Creazione profilo crittografato e provvigione RLS in corso..." if is_it else "Creating encrypted profile and provisioning RLS..."
+                        with st.spinner(spin_reg):
                             reg_res = AuthManager.sign_up(reg_email, reg_pwd, display_name=reg_name)
                         if reg_res.get("ok"):
-                            st.success(f"🎉 Workspace per **{reg_name}** creato con successo!")
+                            succ_reg = f"🎉 Workspace per **{reg_name}** creato con successo!" if is_it else f"🎉 Workspace for **{reg_name}** created successfully!"
+                            st.success(succ_reg)
                             time.sleep(1.0)
                             st.rerun()
                         else:
-                            st.error(f"❌ Errore durante la registrazione: {reg_res.get('error')}")
+                            err_reg = f"❌ Errore durante la registrazione: {reg_res.get('error')}" if is_it else f"❌ Registration error: {reg_res.get('error')}"
+                            st.error(err_reg)
 
+            btn_back_reg = "← Hai già un account? Accedi" if is_it else "← Already have an account? Sign In"
             st.button(
-                "← Hai già un account? Accedi",
+                btn_back_reg,
                 on_click=set_auth_view,
                 args=("LOGIN",),
                 use_container_width=True,
