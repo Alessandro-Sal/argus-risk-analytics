@@ -651,13 +651,36 @@ class UniversalLedgerEngine:
         }
 
     def get_arrow_table(self, table_name: str = "fact_ledger_entry") -> Optional[Any]:
-        """Restituisce la tabella come pyarrow.Table per interscambio zero-copy."""
+        """Restituisce la tabella come pyarrow.Table per interscambio zero-copy (cross-platform)."""
         if not HAS_PYARROW or self.con is None:
             return None
-        res = self.con.execute(f"SELECT * FROM {table_name};").arrow()
-        if hasattr(res, "read_all"):
-            return res.read_all()
-        return res
+        try:
+            rel = self.con.query(f"SELECT * FROM {table_name};")
+            if hasattr(rel, "to_arrow_table"):
+                return rel.to_arrow_table()
+            if hasattr(rel, "arrow"):
+                res = rel.arrow()
+                if hasattr(res, "read_all"):
+                    return res.read_all()
+                return res
+        except Exception:
+            pass
+
+        try:
+            if hasattr(self.con, "fetch_arrow_table"):
+                self.con.execute(f"SELECT * FROM {table_name};")
+                return self.con.fetch_arrow_table()
+        except Exception:
+            pass
+
+        try:
+            import pyarrow as pa
+
+            df = self.con.execute(f"SELECT * FROM {table_name};").df()
+            return pa.Table.from_pandas(df)
+        except Exception as ex:
+            logger.error("Errore recupero Arrow Table: %s", ex)
+            return None
 
     def execute_raw_olap_query(self, sql_query: str) -> pd.DataFrame:
         """Esegue una query analitica arbitraria sul motore DuckDB."""
