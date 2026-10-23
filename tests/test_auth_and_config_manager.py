@@ -142,6 +142,7 @@ class TestAuthManager:
 
     def test_login_local_owner_transitions_to_splash(self):
         from unittest.mock import MagicMock, patch
+
         from components.splash import render_splash_screen
 
         st.session_state.clear()
