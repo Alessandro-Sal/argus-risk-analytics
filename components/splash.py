@@ -409,18 +409,16 @@ div[data-testid="stHorizontalBlock"]:has(.portal-card-risk) {
     gap: 16px !important;
 }
 
-/* Bento Grid: Schede Monolitiche di Design Superiore */
+/* Bento Grid: Schede Monolitiche di Design Superiore con altezza identica garantita */
 .portal-card-risk {
     background: radial-gradient(circle at 0% 0%, rgba(245, 158, 11, 0.10) 0%, rgba(13, 19, 33, 0.96) 75%);
     border: 1px solid rgba(245, 158, 11, 0.35);
     border-top: 2px solid #f59e0b;
-    border-bottom: none;
-    border-top-left-radius: 18px;
-    border-top-right-radius: 18px;
-    border-bottom-left-radius: 0px;
-    border-bottom-right-radius: 0px;
-    padding: 22px 24px 14px 24px;
-    min-height: 205px;
+    border-radius: 20px;
+    padding: 22px 24px 20px 24px;
+    height: 252px;
+    min-height: 252px;
+    box-sizing: border-box;
     box-shadow: 0 14px 36px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.1);
     transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
     display: flex;
@@ -436,13 +434,11 @@ div[data-testid="stHorizontalBlock"]:has(.portal-card-risk) {
     background: radial-gradient(circle at 100% 0%, rgba(16, 185, 129, 0.10) 0%, rgba(13, 19, 33, 0.96) 75%);
     border: 1px solid rgba(16, 185, 129, 0.35);
     border-top: 2px solid #10b981;
-    border-bottom: none;
-    border-top-left-radius: 18px;
-    border-top-right-radius: 18px;
-    border-bottom-left-radius: 0px;
-    border-bottom-right-radius: 0px;
-    padding: 22px 24px 14px 24px;
-    min-height: 205px;
+    border-radius: 20px;
+    padding: 22px 24px 20px 24px;
+    height: 252px;
+    min-height: 252px;
+    box-sizing: border-box;
     box-shadow: 0 14px 36px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.1);
     transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
     display: flex;
@@ -506,10 +502,10 @@ div[data-testid="stHorizontalBlock"]:has(.portal-card-risk) {
 }
 
 .portal-feature-item {
-    font-size: 12.5px;
+    font-size: 12px;
     color: #cbd5e1;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 10px;
     font-family: 'Outfit', -apple-system, sans-serif;
     line-height: 1.45;
@@ -523,16 +519,17 @@ div[data-testid="stHorizontalBlock"]:has(.portal-card-risk) {
     align-items: center;
     justify-content: center;
     font-family: 'JetBrains Mono', monospace;
-    font-size: 9.5px;
+    font-size: 9px;
     font-weight: 800;
     padding: 2px 0px;
     border-radius: 5px;
     letter-spacing: 0.5px;
-    width: 54px;
-    min-width: 54px;
-    max-width: 54px;
+    width: 62px;
+    min-width: 62px;
+    max-width: 62px;
     text-align: center;
     flex-shrink: 0;
+    margin-top: 1.5px;
 }
 .tag-risk {
     background: rgba(245, 158, 11, 0.15);
@@ -545,28 +542,26 @@ div[data-testid="stHorizontalBlock"]:has(.portal-card-risk) {
     border: 1px solid rgba(16, 185, 129, 0.35);
 }
 
-/* Azzeramento del gap tra card e pulsante CTA per renderli un unico blocco coeso */
-div[data-testid="column"]:has(.portal-card-risk) div[data-testid="stButton"],
-div[data-testid="column"]:has(.portal-card-wealth) div[data-testid="stButton"] {
-    margin-top: -6px !important;
+/* Spaziatura controllata e pulsanti CTA Obsidian Glass perfettamente livellati */
+div.st-key-btn_splash_risk,
+div.st-key-btn_splash_wealth {
+    margin-top: 10px !important;
 }
 
 /* Pulsante CTA Risk: Obsidian Glass Istituzionale con bordo ambra illuminato */
 div[data-testid="stButton"] button[key="btn_splash_risk"],
 div.st-key-btn_splash_risk button {
-    background: linear-gradient(180deg, rgba(245, 158, 11, 0.20) 0%, rgba(180, 83, 9, 0.35) 100%) !important;
-    border: 1px solid rgba(245, 158, 11, 0.6) !important;
+    background: linear-gradient(180deg, rgba(245, 158, 11, 0.18) 0%, rgba(180, 83, 9, 0.32) 100%) !important;
+    border: 1px solid rgba(245, 158, 11, 0.65) !important;
     border-top: 1px solid rgba(255, 255, 255, 0.22) !important;
-    border-top-left-radius: 0px !important;
-    border-top-right-radius: 0px !important;
-    border-bottom-left-radius: 18px !important;
-    border-bottom-right-radius: 18px !important;
+    border-radius: 14px !important;
     color: #ffffff !important;
     font-family: 'Outfit', sans-serif !important;
     font-weight: 800 !important;
     font-size: 13.5px !important;
     letter-spacing: 1px !important;
     padding: 13px 24px !important;
+    height: 48px !important;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), 0 0 16px rgba(245, 158, 11, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
     transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
     text-transform: uppercase !important;
@@ -574,7 +569,7 @@ div.st-key-btn_splash_risk button {
 }
 div[data-testid="stButton"] button[key="btn_splash_risk"]:hover,
 div.st-key-btn_splash_risk button:hover {
-    background: linear-gradient(180deg, rgba(245, 158, 11, 0.40) 0%, rgba(217, 119, 6, 0.60) 100%) !important;
+    background: linear-gradient(180deg, rgba(245, 158, 11, 0.38) 0%, rgba(217, 119, 6, 0.58) 100%) !important;
     border-color: #f59e0b !important;
     color: #ffffff !important;
     box-shadow: 0 12px 32px rgba(245, 158, 11, 0.45), 0 0 28px rgba(245, 158, 11, 0.3) !important;
@@ -588,19 +583,17 @@ div.st-key-btn_splash_risk button:active {
 /* Pulsante CTA Wealth: Obsidian Glass Istituzionale con bordo smeraldo illuminato */
 div[data-testid="stButton"] button[key="btn_splash_wealth"],
 div.st-key-btn_splash_wealth button {
-    background: linear-gradient(180deg, rgba(16, 185, 129, 0.20) 0%, rgba(5, 150, 105, 0.35) 100%) !important;
-    border: 1px solid rgba(16, 185, 129, 0.6) !important;
+    background: linear-gradient(180deg, rgba(16, 185, 129, 0.18) 0%, rgba(5, 150, 105, 0.32) 100%) !important;
+    border: 1px solid rgba(16, 185, 129, 0.65) !important;
     border-top: 1px solid rgba(255, 255, 255, 0.22) !important;
-    border-top-left-radius: 0px !important;
-    border-top-right-radius: 0px !important;
-    border-bottom-left-radius: 18px !important;
-    border-bottom-right-radius: 18px !important;
+    border-radius: 14px !important;
     color: #ffffff !important;
     font-family: 'Outfit', sans-serif !important;
     font-weight: 800 !important;
     font-size: 13.5px !important;
     letter-spacing: 1px !important;
     padding: 13px 24px !important;
+    height: 48px !important;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), 0 0 16px rgba(16, 185, 129, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
     transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
     text-transform: uppercase !important;
@@ -608,7 +601,7 @@ div.st-key-btn_splash_wealth button {
 }
 div[data-testid="stButton"] button[key="btn_splash_wealth"]:hover,
 div.st-key-btn_splash_wealth button:hover {
-    background: linear-gradient(180deg, rgba(16, 185, 129, 0.40) 0%, rgba(4, 120, 87, 0.60) 100%) !important;
+    background: linear-gradient(180deg, rgba(16, 185, 129, 0.38) 0%, rgba(4, 120, 87, 0.58) 100%) !important;
     border-color: #10b981 !important;
     color: #ffffff !important;
     box-shadow: 0 12px 32px rgba(16, 185, 129, 0.45), 0 0 28px rgba(16, 185, 129, 0.3) !important;
@@ -1129,7 +1122,9 @@ def render_splash_screen(
         auto_collapse_sidebar()
 
         # Barra superiore istituzionale perfettamente allineata al container
-        top_sp_c1, top_sp_c2 = st.columns([3.8, 1.2])
+        top_cols = st.columns([4.4, 0.6])
+        top_sp_c1 = top_cols[0]
+        top_sp_c2 = top_cols[1] if len(top_cols) > 1 else top_cols[0]
         with top_sp_c1:
             desk_txt = "GATEWAY AMBIENTI" if is_it else "WORKSPACE GATEWAY"
             top_bar_status = _clean_html(f"""
@@ -1144,7 +1139,9 @@ def render_splash_screen(
             """)
             st.markdown(top_bar_status, unsafe_allow_html=True)
         with top_sp_c2:
-            sp_it, sp_en = st.columns(2)
+            lang_cols = st.columns(2, gap="small")
+            sp_it = lang_cols[0]
+            sp_en = lang_cols[1] if len(lang_cols) > 1 else lang_cols[0]
             with sp_it:
                 if st.button("IT", key="btn_splash_toggle_it", type="primary" if is_it else "secondary", use_container_width=True):
                     st.session_state["locale"] = "it"
@@ -1161,7 +1158,7 @@ def render_splash_screen(
                     st.rerun()
 
         # Frame HTML istituzionale completo
-        status_msg = "Kernel operativo. Seleziona l'Ambiente di Lavoro sottostante:" if is_it else "Operational kernel ready. Select your workspace below:"
+        status_msg = "Seleziona l'Ambiente di Lavoro sottostante:" if is_it else "Select your operational workspace below:"
         html_frame = render_splash_html(
             app_title="A R G U S",
             subtitle="QUANTITATIVE RISK ANALYTICS & WEALTH INTELLIGENCE ECOSYSTEM",
@@ -1269,7 +1266,7 @@ def render_splash_screen(
             cols_logout = st.columns([1.3, 1.4, 1.3])
             col_logout_sp = cols_logout[1] if len(cols_logout) >= 2 else cols_logout[0]
             with col_logout_sp:
-                btn_out_txt = f"🚪 Cambia Account / Logout ({disp_user_name})" if is_it else f"🚪 Switch Account / Logout ({disp_user_name})"
+                btn_out_txt = f"⇄ Cambia Account / Logout ({disp_user_name})" if is_it else f"⇄ Switch Account / Sign Out ({disp_user_name})"
                 btn_out_hlp = "Disconnette la sessione corrente e riapre il terminale di Login ARGUS." if is_it else "Disconnects current session and reopens the ARGUS Sign In terminal."
                 if st.button(
                     btn_out_txt,
