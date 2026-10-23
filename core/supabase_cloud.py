@@ -2505,15 +2505,23 @@ def get_active_account_badge_info() -> Dict[str, str]:
     except Exception:
         role, uname, disp, custom_db = "owner", "alessandro", "Alessandro (Titolare)", ""
 
+    # Formattazione compatta ottimizzata per Sidebar (~180-220px) per evitare troncamenti o wrapping
+    sidebar_disp = disp.replace(" (Titolare)", "").replace(" (Owner)", "").strip()
+    if not sidebar_disp:
+        sidebar_disp = disp
+
     if role == "owner":
         cloud_active = is_supabase_cloud_authenticated()
         badge_lbl = "👑 OWNER (CLOUD)" if cloud_active else "👑 OWNER (LOCALE)"
+        badge_short = "👑 OWNER"
         desc = "Accesso Completo Cloud & Locale" if cloud_active else "Workstation Locale • Cloud Protetto"
         return {
             "role": "owner",
             "username": "alessandro" if uname in ("user", "owner", "") else uname,
             "display_name": disp,
+            "sidebar_display_name": sidebar_disp,
             "badge_label": badge_lbl,
+            "badge_short_label": badge_short,
             "badge_color": "#f59e0b",
             "badge_bg": "rgba(245, 158, 11, 0.16)",
             "badge_border": "rgba(245, 158, 11, 0.38)",
@@ -2524,7 +2532,9 @@ def get_active_account_badge_info() -> Dict[str, str]:
             "role": "guest_demo",
             "username": "guest_demo",
             "display_name": "Ospite Demo (Sandbox)",
+            "sidebar_display_name": "Ospite Demo",
             "badge_label": "🧪 SANDBOX",
+            "badge_short_label": "🧪 SANDBOX",
             "badge_color": "#a78bfa",
             "badge_bg": "rgba(167, 139, 250, 0.16)",
             "badge_border": "rgba(167, 139, 250, 0.38)",
@@ -2534,7 +2544,9 @@ def get_active_account_badge_info() -> Dict[str, str]:
         "role": "user",
         "username": uname,
         "display_name": disp,
+        "sidebar_display_name": sidebar_disp,
         "badge_label": "🛡️ BYOD DB" if custom_db else "🛡️ ISOLATO",
+        "badge_short_label": "🛡️ BYOD" if custom_db else "🛡️ USER",
         "badge_color": "#38bdf8",
         "badge_bg": "rgba(56, 189, 248, 0.16)",
         "badge_border": "rgba(56, 189, 248, 0.38)",

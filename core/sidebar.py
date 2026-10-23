@@ -1917,6 +1917,8 @@ def render_sidebar():
         from core.ui_utils import get_display_portfolio_name
 
         acct_badge = get_active_account_badge_info()
+        sb_user_name = acct_badge.get("sidebar_display_name") or acct_badge["display_name"]
+        sb_badge_lbl = acct_badge.get("badge_short_label") or acct_badge["badge_label"]
         port_label, has_port = get_display_portfolio_name()
         port_text_style = (
             "color:#ffffff; font-weight:700;" if has_port else "color:#e3b341; font-style:italic; font-weight:600;"
@@ -1957,9 +1959,9 @@ def render_sidebar():
                 <div style="font-size:11.5px; color:#ffffff; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom: 4px;">
                     🏛️ Wealth &amp; Personal Finance
                 </div>
-                <div style="display:flex; justify-content:space-between; align-items:center; font-size:10.5px; color:#e2e8f0; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 5px; margin-bottom: 4px;">
-                    <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:130px;">👤 <b>{acct_badge["display_name"]}</b></span>
-                    <span style="font-size:9.5px; font-weight:800; color:{acct_badge["badge_color"]}; background:{acct_badge["badge_bg"]}; border:1px solid {acct_badge["badge_border"]}; padding:1px 6px; border-radius:999px;">{acct_badge["badge_label"]}</span>
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; font-size:10.5px; color:#e2e8f0; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 5px; margin-bottom: 4px;">
+                    <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; flex:1;" title="{acct_badge['display_name']}">👤 <b>{sb_user_name}</b></span>
+                    <span style="white-space:nowrap; flex-shrink:0; font-size:9px; font-weight:800; color:{acct_badge['badge_color']}; background:{acct_badge['badge_bg']}; border:1px solid {acct_badge['badge_border']}; padding:1px 7px; border-radius:999px;" title="{acct_badge.get('isolation_desc', '')}">{sb_badge_lbl}</span>
                 </div>
                 <div style="display:flex; justify-content:space-between; align-items:center; font-size:10.5px; color:#8b949e; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 5px;">
                     <span>🗄️ <b style="color:#c9d1d9;">{w_db_label}</b></span>
@@ -2156,9 +2158,9 @@ def render_sidebar():
                 <div style="font-size:11.5px; {port_text_style} white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom: 4px;">
                     💼 {active_port_label}
                 </div>
-                <div style="display:flex; justify-content:space-between; align-items:center; font-size:10.5px; color:#e2e8f0; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 5px; margin-bottom: 4px;">
-                    <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:130px;">👤 <b>{acct_badge["display_name"]}</b></span>
-                    <span style="font-size:9.5px; font-weight:800; color:{acct_badge["badge_color"]}; background:{acct_badge["badge_bg"]}; border:1px solid {acct_badge["badge_border"]}; padding:1px 6px; border-radius:999px;">{acct_badge["badge_label"]}</span>
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; font-size:10.5px; color:#e2e8f0; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 5px; margin-bottom: 4px;">
+                    <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; flex:1;" title="{acct_badge['display_name']}">👤 <b>{sb_user_name}</b></span>
+                    <span style="white-space:nowrap; flex-shrink:0; font-size:9px; font-weight:800; color:{acct_badge['badge_color']}; background:{acct_badge['badge_bg']}; border:1px solid {acct_badge['badge_border']}; padding:1px 7px; border-radius:999px;" title="{acct_badge.get('isolation_desc', '')}">{sb_badge_lbl}</span>
                 </div>
                 <div style="display:flex; justify-content:space-between; align-items:center; font-size:10.5px; color:#8b949e; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 5px;">
                     <span>🗄️ <b style="color:#c9d1d9;">{active_db_label}</b></span>
