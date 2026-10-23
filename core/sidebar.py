@@ -476,12 +476,13 @@ def init_settings_session_state(is_wealth_mode: bool = False) -> None:
         st.session_state.db_user = os.getenv("STREAMLIT_DB_USER", "root")
     if "db_pass" not in st.session_state:
         st.session_state.db_pass = os.getenv("STREAMLIT_DB_PASS", "root")
+    default_db = "wealth" if is_wealth_mode else "investment_risk_bi"
     if "db_name" not in st.session_state:
-        st.session_state.db_name = os.getenv("STREAMLIT_DB_NAME", "wealth")
+        st.session_state.db_name = os.getenv("STREAMLIT_DB_NAME", default_db)
     if "wealth_db_name" not in st.session_state:
-        st.session_state.wealth_db_name = st.session_state.db_name
+        st.session_state.wealth_db_name = "wealth"
     if "risk_db_name" not in st.session_state:
-        st.session_state.risk_db_name = st.session_state.db_name
+        st.session_state.risk_db_name = "investment_risk_bi" 
 
     # ── Parametri Specifici Risk Analytics ────────────────────────
     if "risk_estimation_method" not in st.session_state:
@@ -1779,16 +1780,13 @@ def render_sidebar():
         # ── 1. MODALITÀ DI ESECUZIONE & ENGINE PARAMETERS (IN ALTO) ─────
         init_settings_session_state(is_wealth_mode=is_wealth_mode)
 
-        # Sincronizzazione globale unificata: Risk e Wealth condividono sempre lo stesso database attivo
-        active_unified_db = (
-            st.session_state.get("db_name")
-            or st.session_state.get("wealth_db_name")
-            or st.session_state.get("risk_db_name")
-            or "wealth"
-        )
-        st.session_state.db_name = active_unified_db
-        st.session_state.wealth_db_name = active_unified_db
-        st.session_state.risk_db_name = active_unified_db
+        # Sincronizzazione contestuale: Risk usa il DB di Risk Analytics, Wealth usa il DB di Wealth
+        if is_wealth_mode:
+            target_desk_db = st.session_state.get("wealth_db_name") or "wealth"
+        else:
+            target_desk_db = st.session_state.get("risk_db_name") or "investment_risk_bi"
+        # Se db_name non è impostato o era rimasto sul default dell'altro modulo, allinea
+        st.session_state.db_name = target_desk_db
 
         # Sincronizzazione reattiva immediata prima del rendering del badge
         if "sb_offline_toggle" in st.session_state:
@@ -1925,6 +1923,16 @@ def render_sidebar():
         )
         active_port_label = port_label if len(port_label) <= 26 else f"{port_label[:24]}..."
         active_eng = st.session_state.get("engine")
+        if active_eng is None:
+            try:
+                from core.fetcher import get_engine
+                is_off = bool(st.session_state.get("offline_mode", False))
+                active_eng = get_engine(db=st.session_state.get("db_name"), offline=is_off)
+                if active_eng is not None:
+                    st.session_state["engine"] = active_eng
+                    st.session_state["db_engine"] = active_eng
+            except Exception:
+                pass
         active_dialect = getattr(getattr(active_eng, "dialect", None), "name", "").lower()
         is_pg_engine = (active_eng is not None and active_dialect == "postgresql")
         is_mysql_engine = (active_eng is not None and "mysql" in active_dialect)

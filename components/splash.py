@@ -1081,6 +1081,7 @@ def render_splash_screen(
         st.session_state["splash_dismissed"] = True
         st.session_state["splash_completed"] = True
         st.session_state["argus_portal_mode"] = "📊 Risk Analytics"
+        st.session_state["db_name"] = st.session_state.get("risk_db_name") or "investment_risk_bi"
         try:
             splash_container.empty()
         except Exception:
@@ -1096,6 +1097,7 @@ def render_splash_screen(
         st.session_state["splash_dismissed"] = True
         st.session_state["splash_completed"] = True
         st.session_state["argus_portal_mode"] = "🏛️ Wealth Management"
+        st.session_state["db_name"] = st.session_state.get("wealth_db_name") or "wealth"
         try:
             splash_container.empty()
         except Exception:
