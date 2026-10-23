@@ -125,7 +125,7 @@ def get_engine(
     password: str = "root",
     host: str = "localhost",
     port: int = 3306,
-    db: str = "investment_risk_bi",
+    db: str = "wealth",
     database: str = None,
     offline: bool = False,
     sqlite_path: str = "data/argus_local.db",
@@ -246,10 +246,10 @@ def get_engine(
                 port = int(port_env) if port_env else 3306
             if database is not None:
                 db = database
-            elif db and db != "investment_risk_bi":
+            elif db and db != "wealth":
                 db = db
             else:
-                db = os.getenv("MYSQL_DATABASE") or os.getenv("STREAMLIT_DB_NAME") or db
+                db = os.getenv("MYSQL_DATABASE") or os.getenv("STREAMLIT_DB_NAME") or db or "wealth"
 
             try:
                 if host in ("localhost", "127.0.0.1"):

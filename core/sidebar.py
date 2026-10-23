@@ -476,13 +476,13 @@ def init_settings_session_state(is_wealth_mode: bool = False) -> None:
         st.session_state.db_user = os.getenv("STREAMLIT_DB_USER", "root")
     if "db_pass" not in st.session_state:
         st.session_state.db_pass = os.getenv("STREAMLIT_DB_PASS", "root")
-    default_db = "wealth" if is_wealth_mode else "investment_risk_bi"
+    default_db = os.getenv("STREAMLIT_DB_NAME", "wealth")
     if "db_name" not in st.session_state:
-        st.session_state.db_name = os.getenv("STREAMLIT_DB_NAME", default_db)
+        st.session_state.db_name = default_db
     if "wealth_db_name" not in st.session_state:
-        st.session_state.wealth_db_name = "wealth"
+        st.session_state.wealth_db_name = st.session_state.db_name
     if "risk_db_name" not in st.session_state:
-        st.session_state.risk_db_name = "investment_risk_bi" 
+        st.session_state.risk_db_name = st.session_state.db_name
 
     # ── Parametri Specifici Risk Analytics ────────────────────────
     if "risk_estimation_method" not in st.session_state:
@@ -1780,13 +1780,16 @@ def render_sidebar():
         # ── 1. MODALITÀ DI ESECUZIONE & ENGINE PARAMETERS (IN ALTO) ─────
         init_settings_session_state(is_wealth_mode=is_wealth_mode)
 
-        # Sincronizzazione contestuale: Risk usa il DB di Risk Analytics, Wealth usa il DB di Wealth
-        if is_wealth_mode:
-            target_desk_db = st.session_state.get("wealth_db_name") or "wealth"
-        else:
-            target_desk_db = st.session_state.get("risk_db_name") or "investment_risk_bi"
-        # Se db_name non è impostato o era rimasto sul default dell'altro modulo, allinea
-        st.session_state.db_name = target_desk_db
+        # Sincronizzazione globale: l'utente sceglie a quale DB puntare (default 'wealth', modificabile dalle impostazioni)
+        active_unified_db = (
+            st.session_state.get("db_name")
+            or st.session_state.get("wealth_db_name")
+            or st.session_state.get("risk_db_name")
+            or "wealth"
+        )
+        st.session_state.db_name = active_unified_db
+        st.session_state.wealth_db_name = active_unified_db
+        st.session_state.risk_db_name = active_unified_db
 
         # Sincronizzazione reattiva immediata prima del rendering del badge
         if "sb_offline_toggle" in st.session_state:
@@ -1927,7 +1930,18 @@ def render_sidebar():
             try:
                 from core.fetcher import get_engine
                 is_off = bool(st.session_state.get("offline_mode", False))
-                active_eng = get_engine(db=st.session_state.get("db_name"), offline=is_off)
+                u = st.session_state.get("db_user", "root")
+                pw = st.session_state.get("db_pass", "root")
+                h = st.session_state.get("db_host", "localhost")
+                p = int(st.session_state.get("db_port", 3306))
+                active_eng = get_engine(
+                    user=u,
+                    password=pw,
+                    host=h,
+                    port=p,
+                    db=st.session_state.get("db_name", "wealth"),
+                    offline=is_off,
+                )
                 if active_eng is not None:
                     st.session_state["engine"] = active_eng
                     st.session_state["db_engine"] = active_eng
@@ -2146,13 +2160,13 @@ def render_sidebar():
                 status_badge_color = "#10b981"
                 status_text = "MYSQL"
                 status_icon = "🐬"
-                active_db_label = f"localhost ({st.session_state.get('db_name', 'investment_risk_bi')})"
+                active_db_label = f"localhost ({st.session_state.get('db_name', 'wealth')})"
             else:
                 status_badge_bg = "rgba(46, 160, 67, 0.20)"
                 status_badge_color = "#3fb950"
                 status_text = "LIVE DB"
                 status_icon = "🟢"
-                active_db_label = f"{st.session_state.get('db_name', 'investment_risk_bi')}"
+                active_db_label = f"{st.session_state.get('db_name', 'wealth')}"
 
             st.markdown(
                 f"""

@@ -172,7 +172,7 @@ except Exception:
     db_port = 3306
 db_user = st.session_state.get("db_user", "root")
 db_pass = st.session_state.get("db_pass", "root")
-db_name = st.session_state.get("db_name", "investment_risk_bi")
+db_name = st.session_state.get("db_name", "wealth")
 portfolio_name = st.session_state.get("portfolio_name", "")
 run_name = st.session_state.get("run_name", "")
 
@@ -258,7 +258,7 @@ if not offline_mode:
 
 # ── SEZIONE: Storico Analisi (Recall da Database) ────────────
 
-with st.expander(f"📚 Storico Snapshot & Recall Analisi ({st.session_state.get('db_name', 'investment_risk_bi')})", expanded=not st.session_state.get("pipeline_done")):
+with st.expander(f"📚 Storico Snapshot & Recall Analisi ({st.session_state.get('db_name', 'wealth')})", expanded=not st.session_state.get("pipeline_done")):
     if offline_mode:
         st.info("ℹ️ **Modalità Offline Attiva.** Lo storico delle analisi salvate nel Database non è disponibile in questa modalità In-Memory. Disattiva la modalità offline nella barra laterale a sinistra per connetterti a MySQL e visualizzare lo storico.")
     elif db_error:
@@ -266,9 +266,9 @@ with st.expander(f"📚 Storico Snapshot & Recall Analisi ({st.session_state.get
     elif engine_sidebar:
         history = get_analysis_history(engine_sidebar)
         if not history:
-            st.info(f"Nessuna analisi salvata nel Database '{st.session_state.get('db_name', 'investment_risk_bi')}'. Carica un CSV, un Preset o sincronizza Google Sheets per salvare la prima analisi!")
+            st.info(f"Nessuna analisi salvata nel Database '{st.session_state.get('db_name', 'wealth')}'. Carica un CSV, un Preset o sincronizza Google Sheets per salvare la prima analisi!")
         else:
-            st.caption(f"Sfoglia gli snapshot salvati nel database **`{st.session_state.get('db_name', 'investment_risk_bi')}`** per ricaricarli istantaneamente nella Dashboard senza ri-elaborare i prezzi storici.")
+            st.caption(f"Sfoglia gli snapshot salvati nel database **`{st.session_state.get('db_name', 'wealth')}`** per ricaricarli istantaneamente nella Dashboard senza ri-elaborare i prezzi storici.")
             
             # ── BARRA DI RICERCA & FILTRI DINAMICI ──
             col_search, col_port_filter, col_sort = st.columns([2.2, 1.4, 1.4])

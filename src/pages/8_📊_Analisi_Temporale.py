@@ -840,7 +840,7 @@ elif active_time_tab == "⚖️ Confronto Side-by-Side & Snapshot DB":
     db_port = int(st.session_state.get("db_port", 3306))
     db_user = st.session_state.get("db_user", "root")
     db_pass = st.session_state.get("db_pass", "root")
-    db_name = st.session_state.get("db_name", "investment_risk_bi")
+    db_name = st.session_state.get("db_name", "wealth")
     offline_mode = st.session_state.get("offline_mode", False)
 
     engine = None

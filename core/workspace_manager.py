@@ -138,7 +138,7 @@ def save_session_snapshot_to_cache():
             "db_port": st.session_state.get("db_port", 3306),
             "db_user": st.session_state.get("db_user", "root"),
             "db_pass": st.session_state.get("db_pass", "root"),
-            "db_name": st.session_state.get("db_name", "investment_risk_bi"),
+            "db_name": st.session_state.get("db_name", "wealth"),
             "saved_at": datetime.now().isoformat(),
         }
 
