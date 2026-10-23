@@ -1,4 +1,4 @@
-# Investment Risk & Wealth Intelligence Platform — Project Handoff (v9.19.0 Enterprise Release)
+# Investment Risk & Wealth Intelligence Platform — Project Handoff (v10.0.0+ Enterprise Release)
 
 > File di contesto esaustivo per la manutenzione futura, lo sviluppo di moduli aggiuntivi o l'integrazione di ARGUS con infrastrutture di analisi terze.
 
@@ -6,7 +6,7 @@
 
 ## 1. Contesto Generale e Obiettivi del Progetto
 
-**Piattaforma**: ARGUS — Quantitative Risk, AI Analytics, Portfolio BI, Wealth Ecosystem & Enterprise Resilience v9.19.0.
+**Piattaforma**: ARGUS — Quantitative Risk, AI Analytics, Portfolio BI, Wealth Ecosystem & Enterprise Resilience v10.0.0+ Enterprise Release.
 
 **Stack Tecnologico del Sistema**:
 - **Python 3.11+ / 3.14**: Motore ETL, Data Quality Gate (Pydantic v2), Risk Engine quantitativo, Live Terminal Desk (Pre-Trade Checks & OMS Blotter), Backup Engine, Security Vault, AI Analyst (Dual-Engine LLM/NLG con Guardrails MiFID II / Art. 21 TUF), Modelli Econometrici e di Bilancio, Generazione PDF/Excel/HTML/Parquet, Plotly Institutional Framework e Design System.
@@ -22,7 +22,7 @@
 Ingegnerizzata come piattaforma avanzata di Finanza Quantitativa, Wealth Intelligence e Risk Management, **ARGUS** — il cui nome si ispira al mito dell'osservatore dai cento occhi che vede tutto e non dorme mai — è un ecosistema completo per la diagnosi contabile, la profilazione del rischio, la pianificazione patrimoniale multi-generazionale e la protezione strategica di patrimoni d'investimento multi-asset (*Equity, ETF, Fixed Income, Crypto, Immobili, Illiquidi e Cash*).
 
 **Differenziatore Chiave**:
-A differenza dei benchmark basati su simulazioni sintetiche, **ARGUS** è stato validato empiricamente su un **dataset reale di oltre 400 operazioni finanziarie storiche** (2021–2026 dal progetto WealthApp) e testato con **864 test automatizzati (100% passed)** su 134 file di test. Il sistema garantisce una precisione deterministica centesimale nella gestione di scenari operativi complessi (contabilità FIFO, dividendi frazionati, cambi valuta EUR/USD/GBP/CHF, movimenti di cassa, deduplicazione deterministica SHA-256 e risoluzione ISIN-Ticker).
+A differenza dei benchmark basati su simulazioni sintetiche, **ARGUS** è stato validato empiricamente su un **dataset reale di oltre 400 operazioni finanziarie storiche** (2021–2026 dal progetto WealthApp) e testato con **959 test automatizzati (100% passed)** su 134 file di test. Il sistema garantisce una precisione deterministica centesimale nella gestione di scenari operativi complessi (contabilità FIFO, dividendi frazionati, cambi valuta EUR/USD/GBP/CHF, movimenti di cassa, deduplicazione deterministica SHA-256 e risoluzione ISIN-Ticker).
 
 ---
 
@@ -85,7 +85,19 @@ Presentation Layer (21 Moduli Streamlit / PyWebView):
 
 ## 3. Mappatura e Stato dei Moduli Core (`core/`)
 
-Tutti i moduli Python sorgente sono stati sviluppati, ottimizzati e verificati con la suite di test automatizzati (**864/864 PyTest PASSED - 100%**):
+Tutti i moduli Python sorgente sono stati sviluppati, ottimizzati e verificati con la suite di test automatizzati (**959/959 PyTest PASSED - 100%**):
+
+### `core/auth_manager.py` & `core/config_manager.py` — ✅ Enterprise Multi-Tenant Auth, Workstation 1-Click & Runtime Detection
+- **Runtime Environment Detection (`is_local_environment()`, `is_streamlit_cloud()`)**: Rilevamento deterministico di workstation locale vs deploy cloud (Streamlit Cloud, container non-local) con switch automatico delle politiche di sicurezza.
+- **1-Click Local Owner Bypass (`login_local_owner()`)**: Accesso immediato con profilo `owner` (Alessandro) senza password per operatività rapida su macchine locali; gestione della preferenza di auto-login persistente (`data/.argus_local_session.json`).
+- **Pre-Splash Cloud Auth Gate**: Cifratura credenziali PBKDF2-HMAC-SHA256 (120k iterazioni) o Supabase GoTrue JWT su ambienti web/cloud con blocco assoluto di accessi non autenticati.
+- **Session State Lifecycle**: Gestione tipizzata dello stato di sessione, timeout di inattività, refresh automatico dei token JWT e protezione contro attacchi brute force via rate limiter esponenziale.
+
+### `core/cloud_db.py` & `core/supabase_cloud.py` — ✅ Hybrid Persistence Engine & Gated Cloud Escalation
+- **Universal Dialect Proxy (`ArgusConnectionProxy`)**: Traduzione trasparente tra dialetti PostgreSQL (Supabase AWS EU-West-1) e SQLite (`data/argus_local.db`), garantendo portabilità totale tra cloud e desktop.
+- **Gated Cloud Escalation (`is_supabase_cloud_authenticated()`)**: Quando si è connessi in locale, il passaggio al database Supabase da `Tab 3: Database & Rete` richiede tassativamente credenziali GoTrue per generare un token JWT valido, impedendo accessi non autorizzati a risorse remote.
+- **Multi-Tenant Zero-Leakage Isolation**: Segregazione rigorosa su oltre 30 tabelle SQL tramite `user_id` crittografico UUID e isolamento portafogli per `owner_username`.
+- **Ottimizzazioni Prestazionali**: Eliminazione di chiamate sincrone a scraper esterni nella barra laterale, mantenimento mirato della cache dei prezzi storici ed esportazione DuckDB PyArrow cross-platform (`to_arrow_table()`, `fetch_arrow_table()`).
 
 ### `core/ai_analyst.py` — ✅ AI Narrative Intelligence & Quant Copilot
 - **Dual-Engine Executive Memorandum**: Generazione di diagnosi narrative strutturate in 4 sezioni via REST API con Google Gemini / OpenAI, e fallback istantaneo su motore Natural Language Generation (NLG) quantitativo deterministico offline al 100%.

@@ -95,3 +95,33 @@ curl -X POST http://localhost:8000/api/v1/optimize/hrp \
   "sorted_assets": ["BND", "AAPL", "MSFT"]
 }
 ```
+
+
+---
+
+## Launching the Interactive Institutional Cockpit
+
+To experience the full visual intelligence platform with 22 institutional modules, start the Streamlit application:
+
+```bash
+streamlit run src/0_Control_Room.py
+```
+
+### 1. Local Workstation Mode (Zero Password)
+- When launched on your local machine, ARGUS detects the desktop environment (`is_local_environment() == True`).
+- **1-Click Direct Access**: Click **⚡ Entra Subito al Terminale (Alessandro)** to enter immediately without email or password.
+- **Auto-Login Persistence**: Enable *"Ricorda ed entra sempre in automatico all'avvio su questo PC"* to bypass the gate automatically on all future local launches.
+- **Offline Storage**: Your balances, trades, and wealth records persist to embedded SQLite databases (`data/argus_local.db` and `data/argus_wealth.db`).
+
+### 2. Gated Connection to Supabase Cloud from Local
+- To sync or view portfolios on **Supabase Cloud (PostgreSQL)** while running locally, open the left sidebar -> `⚙️ Global Settings -> Tab 3: Database & Network`.
+- Select **Supabase Cloud (PostgreSQL)**.
+- **Security Check**: ARGUS detects that you are currently in a local unauthenticated session (`is_supabase_cloud_authenticated() == False`) and displays a warning:
+  > *⚠️ Per connetterti a Supabase Cloud è richiesta l'autenticazione. Sblocca la connessione nel riquadro sottostante.*
+- Expand the `☁️ Cloud Supabase & Deploy Online` panel, enter your Supabase GoTrue account email and password, and click **Accedi**.
+- Once validated, your session receives a cryptographic JWT token and your remote PostgreSQL data source is seamlessly unlocked.
+
+### 3. Online Cloud Mode (Streamlit Community Cloud)
+- When deployed on a public URL or container, the local passwordless bypass is strictly disabled.
+- **Institutional Pre-Splash Gate**: Users must sign in to their encrypted vault (`PBKDF2-HMAC-SHA256` 120,000 iterations), register a new isolated account, or explore via **🧪 Modalità Demo (1-Click)**.
+- **Multi-Tenant Data Isolation**: All queries enforce strict tenant filtering by `user_id`, preventing any data leakage across accounts.

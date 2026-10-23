@@ -7,7 +7,7 @@
 [![Latest Release](https://img.shields.io/github/v/release/Alessandro-Sal/argus-risk-analytics?color=blue&label=version)](https://github.com/Alessandro-Sal/argus-risk-analytics/releases/latest)
 [![Python Version](https://img.shields.io/badge/python-3.11%20%7C%203.12-green.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-purple.svg)](LICENSE.md)
-[![Test Suite](https://img.shields.io/badge/PyTest-929%2F929%20PASSED%20(100%25)-brightgreen)](tests/)
+[![Test Suite](https://img.shields.io/badge/PyTest-959%2F959%20PASSED%20(100%25)-brightgreen)](tests/)
 [![Documentation: MkDocs](https://img.shields.io/badge/docs-Material%20for%20MkDocs-blue.svg)](https://alessandro-sal.github.io/argus-risk-analytics/)
 [![REST API: FastAPI](https://img.shields.io/badge/REST%20API-FastAPI%20%7C%20OpenAPI-009688.svg)](http://localhost:8000/docs)
 [![Code Style: Ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
@@ -23,6 +23,67 @@ ARGUS v10.0.0 segna il passaggio epocale a una piattaforma **Cloud-Native Multi-
 - **Isolamento Multi-Tenant Zero-Leakage & BYOD Database Override (`core/wealth/wealth_db.py`, `core/db_exporter.py`, `src/0_Control_Room.py`)**: Segregazione rigorosa dei dati su oltre 30 tabelle SQL patrimoniali e di rischio (`_resolve_isolated_portfolio_filter`), prenotazione esclusiva del `profile_id = 1` (`Personale`) per l'account `owner`, targatura nominativa dei portafogli Risk (`owner_username`) e supporto **BYOD (Bring Your Own Database)** per consentire agli utenti avanzati di connettere una propria istanza PostgreSQL personale (Supabase/Neon) in sessione.
 - **Suite Fiscale Italiana & Pianificazione Patrimoniale Avanzata (`core/tax_engine.py`, `core/wealth/tax_wealth_engine.py`, `src/pages/6_🧾_Ottimizzazione_Fiscale.py`, `src/pages/18_🏛️_Pianificazione_Fiscale.py`)**: Doppio motore di calcolo plusvalenze (**Costo Medio Ponderato ex Art. 67-68 TUIR** vs simulatore LIFO), regole Crypto-attività 2026 (aliquota 33% diretta vs 26% tramite ETN/ETC), generatore **Quadro RW / IVAFE (0,2% vs 0,4%) / IVIE (1,06%)**, matrice di compensazione **Redditi di Capitale vs Redditi Diversi** con scadenziario quadriennale dello *Zainetto Fiscale* ($T+4$) e simulatore interattivo di Stress Test Normativo.
 - **Audit di Sicurezza & Packaging Certificato (`scripts/package_release.py`, `SECURITY.md`)**: Scanner preventivo automatizzato che garantisce l'assenza totale di database personali, backup compressi, cache o credenziali nel repository Git e nell'archivio di rilascio `dist/ARGUS_v10.0.0.zip`.
+
+---
+
+## 🏛️ Architettura Operativa Ibrida: Locale Offline vs Cloud Online
+
+ARGUS implementa un'architettura **Dual-Mode Zero-Friction & Zero-Leakage** che adatta automaticamente il modello di autenticazione, la persistenza relazionale e l'interazione di rete in base all'ambiente di esecuzione rilevato a runtime (`is_local_environment()` vs `is_streamlit_cloud()`):
+
+```mermaid
+flowchart TD
+    Start["Avvio ARGUS (streamlit run src/0_Control_Room.py)"] --> Detect{"Rilevamento Runtime<br/>is_local_environment()?"}
+    
+    %% Ramo Locale
+    Detect -->|SÌ: Workstation / Desktop Locale| LocalBranch["Modalità Locale / Workstation Desktop"]
+    LocalBranch --> LocalGate["Login Gate con Card Istituzionale Dedicata"]
+    LocalGate --> DirectOwner["⚡ Entra Subito al Terminale (Alessandro - Titolare)<br/>1-Click: Nessuna Password Richiesta"]
+    LocalGate --> AutoCheck{"Ricorda ed entra sempre<br/>in automatico all'avvio?"}
+    AutoCheck -->|Abilitato| AutoFile["Persistenza preferenza in data/.argus_local_session.json"]
+    DirectOwner --> LocalEngine["Storage: SQLite Locale / MySQL 8.0<br/>data/argus_local.db & data/argus_wealth.db"]
+    LocalEngine --> Terminal["Accesso Diretto al Terminale Istituzionale"]
+    
+    %% Transizione Protetta a Supabase Cloud da Locale
+    Terminal --> WantCloud{"Vuoi connetterti a Supabase Cloud?"}
+    WantCloud -->|SÌ: Sidebar ⚙️ Impostazioni -> Tab 3 Database & Rete| AuthCheck{"Verifica Token Remoto<br/>is_supabase_cloud_authenticated()?"}
+    AuthCheck -->|NON Autenticato| SupaWarning["⚠️ Warning di Sicurezza: Connessione Bloccata<br/>Richiesta Autenticazione Cloud Esplicita"]
+    SupaWarning --> SupaPanel["Pannello Espandibile: Inserisci Credenziali Supabase"]
+    SupaPanel -->|JWT Valido & UUID Reale| SupaSuccess["st.session_state.supabase_cloud_authenticated = True"]
+    SupaSuccess --> SupaConn["Switch Abilitato: Supabase PostgreSQL 16 SSL Pooler"]
+    
+    %% Ramo Cloud / Online
+    Detect -->|NO: Streamlit Cloud / Web Server| CloudBranch["Modalità Cloud / Multi-Tenant Online"]
+    CloudBranch --> CloudGate["Auth Gate Istituzionale Pre-Splash Full-Screen"]
+    CloudGate --> C1["1. 🔑 Accedi al tuo Vault: PBKDF2-SHA256 / GoTrue JWT"]
+    CloudGate --> C2["2. 📝 Crea Nuovo Account: Provisioning Vault Isolato"]
+    CloudGate --> C3["3. 🧪 Esplora in Modalità Demo: 1-Click Sandbox RAM"]
+    C1 & C2 --> CloudDB["Storage: Supabase PostgreSQL 16 AWS EU-West-1<br/>Zero-Leakage Multi-Tenant Isolation via user_id"]
+    C3 --> RAMDB["Storage: Sandbox Temporanea In-Memory (Zero Scritture)"]
+    CloudDB & RAMDB --> TerminalCloud["Accesso al Terminale Istituzionale Cloud"]
+```
+
+### 📊 Matrice Comparativa: Locale Workstation vs Online / Cloud Multi-Tenant
+
+| Dimensione Architetturale | 💻 Ambiente Locale (Workstation / Desktop) | ☁️ Ambiente Online (Streamlit Cloud / Web Server) |
+| :--- | :--- | :--- |
+| **Riconoscimento Ambiente** | Automatico via `is_local_environment()` (`True` quando non in cloud) | Automatico via `is_streamlit_cloud()` (`STREAMLIT_RUNTIME_ENV=cloud` o secrets) |
+| **Autenticazione all'Avvio** | **1-Click Diretto Titolare** (`login_local_owner`): zero password richiesta. Possibilità di spuntare *"Ricorda ed entra sempre in automatico all'avvio su questo PC"* per bypassare permanentemente il gate al boot locale. | **Auth Gate Full-Screen Rigoroso**: hashing `PBKDF2-HMAC-SHA256` (120.000 iterazioni) o Supabase GoTrue JWT. Bypass locale tassativamente disabilitato per proteggere gli account. |
+| **Persistenza Predefinita** | **SQLite Embedded Locale** (`data/argus_local.db`, `data/argus_wealth.db`) o **MySQL 8.0 locale**. Piena operatività 100% offline, zero dipendenze da reti esterne. | **Supabase PostgreSQL 16 (AWS EU-West-1 Ireland)** su SSL pooler (`pool_pre_ping=True`, failover trasparente) con supporto BYOD (*Bring Your Own Database*). |
+| **Isolamento & Riservatezza** | I dati risiedono fisicamente sul disco fisso dell'utente. Nessuna trasmissione di bilanci, posizioni o transazioni all'esterno. | **Zero-Leakage Multi-Tenant**: segregazione per `user_id` crittografico UUID su oltre 30 tabelle SQL, isolamento portafogli Risk per `owner_username`, `profile_id = 1` riservato. |
+| **Connessione a Supabase** | **Transizione Protetta con Re-Autenticazione**: dalla barra laterale (`⚙️ Impostazioni Globali -> Tab 3: Database & Rete`), il passaggio a `Supabase Cloud (PostgreSQL)` richiede obbligatoriamente l'autenticazione remota per sbloccare la connessione (`is_supabase_cloud_authenticated()`). | Connesso direttamente alla sessione cloud post-autenticazione con token JWT e rotazione automatica del refresh token. |
+| **Modalità Demo / Didattica** | Iniezione atomica di archetipi didattici completi (*Young Accumulator*, *FIRE Decumulation*, *HNWI Family Office*) nel database locale. | **Modalità Demo Sandbox 1-Click**: esplorazione istituzionale in memoria RAM con i 3 archetipi senza scrivere su database altrui. |
+| **Ottimizzazioni Prestazionali** | **Zero Latency**: eliminati colli di bottiglia e blocchi sincroni da scraper web nella barra laterale, cache multi-tier intelligente per prezzi storici, DuckDB C++ zero-copy. | Caching HTTP e query compattate per minimizzare il consumo di banda e roundtrip cloud. |
+
+---
+
+### 🛡️ Approfondimento di Sicurezza: Flusso di Connessione a Supabase da Postazione Locale
+
+Quando si avvia ARGUS sulla propria workstation locale:
+1. **Accesso Immediato Titolare**: L'utente titolare può entrare immediatamente con 1-click senza digitare email e password. L'identità locale viene impostata con ruolo `owner` e profilo patrimoniale `profile_id = 1` associato a SQLite o MySQL locale.
+2. **Flag di Stato Cloud Iniziale**: In sessione locale il flag `st.session_state["supabase_cloud_authenticated"]` è impostato tassativamente a `False` e non è presente alcun token JWT remoto.
+3. **Guardrail su "Database & Rete"**: Se dall'interno della piattaforma l'utente apre le `⚙️ Impostazioni Globali` e seleziona **Supabase Cloud (PostgreSQL)** come sorgente dati, il sistema attiva la funzione di controllo `is_supabase_cloud_authenticated()`.
+4. **Blocco e Richiesta Credenziali**: Rilevando la sessione solo locale, ARGUS mostra un avviso esplicito (*"⚠️ Per connetterti a Supabase Cloud è richiesta l'autenticazione. Sblocca la connessione nel riquadro sottostante."*) e blocca la sincronizzazione.
+5. **Autenticazione Remota e Sblocco**: L'utente espande il pannello `☁️ Cloud Supabase & Deploy Online` e inserisce le proprie credenziali GoTrue (email/password del vault cloud). Il client Supabase valida le credenziali, scarica il JWT crittografico e abilita lo switch al database cloud con isolamento multi-tenant garantito.
 
 ---
 
@@ -563,6 +624,7 @@ ARGUS è progettato con un'architettura ibrida a zero-frizione che supporta quat
 Per la massima comodità su ambienti Windows 10/11 senza digitare comandi da terminale:
 1. **Setup Iniziale (1-Click)**: Fai doppio clic su `setup_desktop.bat` per installare le dipendenze e generare l'icona sul Desktop.
 2. **Avvio Applicativo**: Fai doppio clic su `start_dashboard.bat`. Lo script rileva automaticamente l'interprete Python del sistema e avvia la finestra nativa accelerata via hardware (PyWebView2) con fallback trasparente sul browser web predefinito.
+3. **Accesso Immediato Titolare**: In ambiente locale, la schermata di login presenta la card **💻 Accesso Diretto Postazione Locale**. Clicca su **⚡ Entra Subito al Terminale (Alessandro)** per accedere istantaneamente senza digitare alcuna credenziale. Spuntando la casella *"Ricorda ed entra sempre in automatico all'avvio su questo PC"*, nei lanci successivi il sistema accederà direttamente alla Control Room.
 
 ---
 
@@ -574,7 +636,7 @@ Per sviluppatori e quant researcher che utilizzano il terminale standard:
 git clone https://github.com/Alessandro-Sal/argus-risk-analytics.git
 cd argus-risk-analytics
 
-# 2. Crea e attiva l'ambiente virtuale (Python 3.11 o 3.12 raccomandato)
+# 2. Crea e attiva l'ambiente virtuale (Python 3.11, 3.12, 3.13 o 3.14)
 python -m venv .venv
 
 # Su Linux/macOS:
@@ -592,6 +654,8 @@ pip install -r requirements.txt
 streamlit run src/0_Control_Room.py
 ```
 La dashboard si aprirà automaticamente all'indirizzo `http://localhost:8501`.
+- **Comportamento di Login Locale**: Accesso immediato a 1-click come proprietario con persistenza su SQLite locale (`data/argus_local.db` e `data/argus_wealth.db`).
+- **Connessione Protetta a Supabase Cloud**: Per collegarti a Supabase dalla postazione locale, apri la barra laterale, clicca su `⚙️ Impostazioni Globali -> Tab 3: Database & Rete`, seleziona *Supabase Cloud (PostgreSQL)* e completa l'autenticazione crittografica nel pannello espandibile dedicato.
 
 ---
 
@@ -609,11 +673,22 @@ L'applicazione risponde su `http://localhost:8501` e il database su porta `3306`
 
 ---
 
-### ☁️ Opzione 4: Streamlit Community Cloud (Zero-Ops)
+### ☁️ Opzione 4: Streamlit Community Cloud (Zero-Ops Multi-Tenant)
+Per la distribuzione in cloud aperta ad analisti o clienti:
 1. Forka o collega il repository al tuo account [Streamlit Community Cloud](https://share.streamlit.io/).
 2. Configura il Main file path su: `src/0_Control_Room.py`.
-3. Inserisci le eventuali credenziali opzionali (Gemini, OpenAI) nella sezione *App Settings -> Secrets*.
+3. Inserisci le credenziali di Supabase e le API key opzionali (Gemini, OpenAI) nella sezione *App Settings -> Secrets*:
+   ```toml
+   [supabase]
+   url = "https://your-project.supabase.co"
+   anon_key = "your-anon-key"
+   service_role_key = "your-service-role-key"
+
+   [gemini]
+   api_key = "your-gemini-key"
+   ```
 4. Clicca su **Deploy**.
+- **Comportamento di Sicurezza Cloud**: Su Streamlit Cloud l'accesso locale non autenticato è rigorosamente disabilitato. Gli utenti possono creare un proprio account isolato, accedere al proprio vault crittografico PBKDF2-SHA256, oppure esplorare la piattaforma in **Modalità Demo Sandbox (1-Click)** con dati didattici sintetici in memoria RAM.
 
 ---
 
@@ -1055,7 +1130,7 @@ argus-risk-analytics/
 
 ## 🧪 Esecuzione della Test Suite Automatizzata
 
-Il progetto include **864 test automatizzati PyTest** distribuiti su 134 file di test (inclusi l'ottimizzatore Michaud Resampled Efficient Frontier e API expansion `test_michaud_and_api_expansion.py`, i controlli pre-trade MiFID II RTS 28 `test_pretrade_compliance_and_scenarios.py`, i test istituzionali di validazione Basilea IV, EVT POT-GPD e ottimizzatori MDP/Min-CVaR `test_risk_engine_institutional.py`, la generazione del Dossier PDF a 4 pagine `test_personal_balance_sheet_pdf.py`, test property-based con **Hypothesis**, audit normativo fiscale TUIR/L. 197/2022, test di resilienza SRE Circuit Breaker/Jitter, simulazioni successorie del Codice Civile / TUS, test DBRE di migrazione/rollback, la suite di logging strutturato con mascheramento PII/finanziario e Support Bundle, il generatore di portafogli realistici ed archetipi didattici, la suite di internazionalizzazione e cambi `test_i18n_and_fx_engine.py`, il framework di esecuzione algoritmica e Pre/Post-Trade TCA `test_tca_and_optimal_execution.py`, e il motore di persistenza bitemporale e audit crittografico `test_bitemporal_engine.py`) con copertura end-to-end del 100%:
+Il progetto include **959 test automatizzati PyTest** distribuiti su 140+ file di test (inclusi l'ottimizzatore Michaud Resampled Efficient Frontier e API expansion `test_michaud_and_api_expansion.py`, i controlli pre-trade MiFID II RTS 28 `test_pretrade_compliance_and_scenarios.py`, i test istituzionali di validazione Basilea IV, EVT POT-GPD e ottimizzatori MDP/Min-CVaR `test_risk_engine_institutional.py`, la generazione del Dossier PDF a 4 pagine `test_personal_balance_sheet_pdf.py`, test property-based con **Hypothesis**, audit normativo fiscale TUIR/L. 197/2022, test di resilienza SRE Circuit Breaker/Jitter, simulazioni successorie del Codice Civile / TUS, test DBRE di migrazione/rollback, la suite di logging strutturato con mascheramento PII/finanziario e Support Bundle, il generatore di portafogli realistici ed archetipi didattici, la suite di internazionalizzazione e cambi `test_i18n_and_fx_engine.py`, il framework di esecuzione algoritmica e Pre/Post-Trade TCA `test_tca_and_optimal_execution.py`, e il motore di persistenza bitemporale e audit crittografico `test_bitemporal_engine.py`) con copertura end-to-end del 100%:
 
 ```bash
 py -m pytest
@@ -1063,7 +1138,7 @@ py -m pytest
 
 Output atteso:
 ```text
-======================= 864 passed in ~45.00s (100%) =======================
+======================= 959 passed in ~45.00s (100%) =======================
 ```
 
 ---
@@ -1074,4 +1149,4 @@ Questo progetto è distribuito sotto licenza open-source **MIT License**. Consul
 
 ---
 
-*ARGUS — Institutional Risk & Wealth Intelligence Ecosystem v9.19.0 Institutional Enterprise Release.*
+*ARGUS — Institutional Risk & Wealth Intelligence Ecosystem v10.0.0+ Institutional Enterprise Release.*

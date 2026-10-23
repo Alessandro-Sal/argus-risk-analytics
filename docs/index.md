@@ -169,6 +169,12 @@ Pension and Total Wealth Asset-Liability Management verifying Redington's (1952)
 ### 43. Hybrid Cloud Multi-Tenant Persistence, PBKDF2-SHA256 Auth Gate & Italian Fiscal Suite (v10.0.0)
 Unified dual-dialect persistence engine (`core/cloud_db.py`) seamlessly bridging **Supabase PostgreSQL 16 (SSL QueuePool)** and **Local SQLite (`data/argus_local.db`)**, paired with a pre-splash institutional authentication gate (`core/cloud_auth.py`), PBKDF2-HMAC-SHA256 (120,000 iterations) user vault, strict multi-tenant row-level isolation across 30+ Wealth & Risk tables, BYOD dedicated database override, and comprehensive Italian TUIR / Quadro RW / IVAFE / IVIE / Crypto 2026 fiscal intelligence.
 
+### 44. Dual-Mode Architecture: Local Workstation (Zero-Friction 1-Click) vs Multi-Tenant Cloud (GoTrue JWT & Zero-Leakage Isolation)
+Deterministic runtime environment detection (`is_local_environment()` vs `is_streamlit_cloud()`) tailored for high-security, low-latency institutional operations:
+- **Local Workstation Mode**: Instantaneous 1-click passwordless access for the owner (`login_local_owner`), optional persistent auto-login (`data/.argus_local_session.json`), offline-first relational persistence on SQLite (`data/argus_local.db` & `data/argus_wealth.db`) or local MySQL 8.0, and sub-millisecond in-process analytics via DuckDB C++ and PyArrow zero-copy tables across Windows, macOS, and Linux.
+- **In-Session Authenticated Cloud Escalation**: When operating in local workstation mode, transitioning to Supabase Cloud via sidebar settings (`⚙️ Global Settings -> Tab 3: Database & Network`) triggers the security guardrail (`is_supabase_cloud_authenticated()`). It blocks unauthenticated cloud queries and presents an integrated credentials drawer, guaranteeing that remote cloud vaults cannot be accessed without valid GoTrue JWT tokens.
+- **Multi-Tenant Cloud Mode**: Full-screen institutional pre-splash gate on Streamlit Community Cloud and web servers enforcing PBKDF2-HMAC-SHA256 (120,000 iterations) or Supabase GoTrue authentication, strict tenant segregation across 30+ database tables via cryptographic `user_id` UUID, and 1-click in-memory Sandbox Demo exploration without persistent mutations.
+
 ---
 
 ## Quick Navigation

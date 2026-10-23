@@ -45,6 +45,10 @@ ARGUS implementa un'architettura difensiva a più livelli (*Defense-in-Depth*) c
 - **Isolamento Rigoroso dei Portafogli (Zero-Leakage Multi-Tenancy)**: Tutte le query SQL sul patrimonio (`core/wealth/wealth_db.py`) e sui portafogli di rischio (`core/db_exporter.py`) applicano un filtro dinamico (`_resolve_isolated_portfolio_filter`) basato sull'identità autenticata in sessione, impedendo qualsiasi accesso trasversale ai dati di altri utenti o al profilo riservato del proprietario (`profile_id = 1`).
 - **Connessioni Cloud Cifrate (TLS/SSL)**: Le connessioni verso Supabase PostgreSQL utilizzano obbligatoriamente `sslmode=require` e supporto **BYOD (Bring Your Own Database)** isolato in memoria di sessione.
 
+### 7. Modello di Sicurezza Locale vs Cloud & Escalation Protetta
+- **Bypass Locale Confinato**: La modalità di accesso diretto senza password per il titolare (`login_local_owner`) è strettamente limitata all'esecuzione locale su workstation (`is_local_environment()`). Non è esportabile né attivabile in alcun modo su istanze Streamlit Cloud o container accessibili pubblicamente.
+- **Transizione Protetta a Supabase Cloud**: Una sessione locale opera con identificativo fittizio `local-owner` e senza token crittografico remoto. Qualora l'utente locale decida di switchare il motore relazionale su **Supabase Cloud (PostgreSQL)** tramite la barra laterale (`Tab 3: Database & Rete`), il sistema intercetta la richiesta (`is_supabase_cloud_authenticated()`) e blocca la connessione, richiedendo obbligatoriamente l'autenticazione con credenziali reali Supabase (GoTrue) per generare un token JWT verificato e garantire che i dati cloud non siano esposti a utenti fisicamente presenti sulla macchina locale privi di autorizzazione.
+
 ---
 
 ## Segnalazione di Vulnerabilità (Responsible Disclosure)
