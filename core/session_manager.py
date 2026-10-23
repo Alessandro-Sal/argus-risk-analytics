@@ -188,9 +188,22 @@ class ArgusSessionManager:
         return set_active_portfolio(portfolio_id, engine=engine)
 
     @classmethod
-    def render_portfolio_selector(cls, key: str = "sidebar_active_portfolio_select", label: str = "Portafoglio Attivo", help_text: Optional[str] = None):
+    def render_portfolio_selector(
+        cls,
+        key: str = "sidebar_active_portfolio_select",
+        label: str = "Portafoglio Attivo",
+        help_text: Optional[str] = None,
+        only_if_multiple: bool = False,
+        show_fallback: bool = False,
+    ):
         """Renderizza il selettore dei portafogli dell'utente autenticato."""
-        return render_portfolio_selector(key=key, label=label, help_text=help_text)
+        return render_portfolio_selector(
+            key=key,
+            label=label,
+            help_text=help_text,
+            only_if_multiple=only_if_multiple,
+            show_fallback=show_fallback,
+        )
 
     @classmethod
     def reset_session(cls) -> None:

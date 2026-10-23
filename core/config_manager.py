@@ -20,6 +20,40 @@ DEFAULT_SUPABASE_POOLER_HOST = "aws-0-eu-west-1.pooler.supabase.com"
 DEFAULT_SUPABASE_POOLER_PORT = 6543
 DEFAULT_SUPABASE_URL = f"https://{DEFAULT_SUPABASE_PROJECT_REF}.supabase.co"
 
+_DOTENV_CACHE: Optional[Dict[str, Optional[str]]] = None
+_DOTENV_MTIME: float = 0.0
+
+
+def invalidate_dotenv_cache() -> None:
+    """Invalida la cache in memoria del file .env per forzare la rilettura alle prossime chiamate."""
+    global _DOTENV_CACHE, _DOTENV_MTIME
+    _DOTENV_CACHE = None
+    _DOTENV_MTIME = 0.0
+
+
+def _get_dotenv_cache() -> Dict[str, Optional[str]]:
+    """Restituisce il dizionario parsed di .env con caching in memoria ad alta velocità (validato tramite mtime)."""
+    global _DOTENV_CACHE, _DOTENV_MTIME
+    env_path = Path(__file__).resolve().parent.parent / ".env"
+    if not env_path.exists():
+        _DOTENV_CACHE = {}
+        return _DOTENV_CACHE
+
+    try:
+        mtime = env_path.stat().st_mtime
+    except Exception:
+        mtime = 0.0
+
+    if _DOTENV_CACHE is None or mtime != _DOTENV_MTIME:
+        try:
+            from dotenv import dotenv_values
+
+            _DOTENV_CACHE = dict(dotenv_values(env_path))
+            _DOTENV_MTIME = mtime
+        except Exception:
+            _DOTENV_CACHE = {}
+    return _DOTENV_CACHE
+
 
 def is_streamlit_cloud() -> bool:
     """
@@ -103,18 +137,11 @@ def get_setting(key: str, default: Any = None, cast_type: Optional[type] = None)
         if env_val is not None and str(env_val).strip() != "":
             val = env_val
         else:
-            # Fallback a caricamento diretto da .env se non ancora presente in os.environ
-            try:
-                from dotenv import dotenv_values
-
-                env_path = Path(__file__).resolve().parent.parent / ".env"
-                if env_path.exists():
-                    d_vals = dotenv_values(env_path)
-                    if key in d_vals and d_vals[key] is not None and str(d_vals[key]).strip() != "":
-                        val = d_vals[key]
-                        os.environ[key] = str(val)
-            except Exception:
-                pass
+            # Fallback a caricamento diretto da cache in memoria del file .env
+            d_vals = _get_dotenv_cache()
+            if key in d_vals and d_vals[key] is not None and str(d_vals[key]).strip() != "":
+                val = d_vals[key]
+                os.environ[key] = str(val)
 
     if val is None or (isinstance(val, str) and str(val).strip() == ""):
         return default
@@ -174,11 +201,44 @@ def get_supabase_db_url() -> str:
     return ""
 
 
+def get_local_auto_login_preference() -> bool:
+    """Restituisce True se l'utente ha salvato la preferenza di accesso locale immediato."""
+    if not is_local_environment():
+        return False
+    try:
+        pref_file = Path(__file__).resolve().parent.parent / "data" / ".argus_local_session.json"
+        if pref_file.exists():
+            with open(pref_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                return bool(data.get("auto_login", False))
+    except Exception:
+        pass
+    return False
+
+
+def set_local_auto_login_preference(enabled: bool) -> None:
+    """Salva o rimuove la preferenza di accesso rapido locale su file persistente."""
+    if not is_local_environment():
+        return
+    try:
+        data_dir = Path(__file__).resolve().parent.parent / "data"
+        data_dir.mkdir(parents=True, exist_ok=True)
+        pref_file = data_dir / ".argus_local_session.json"
+        if enabled:
+            with open(pref_file, "w", encoding="utf-8") as f:
+                json.dump({"auto_login": True, "user": "alessandro"}, f, indent=2)
+        elif pref_file.exists():
+            pref_file.unlink(missing_ok=True)
+    except Exception as ex:
+        logger.warning("Impossibile salvare la preferenza locale: %s", ex)
+
+
 def is_auth_required() -> bool:
     """
     Determina se il login è obbligatorio all'avvio.
     Ritorna True se `ARGUS_REQUIRE_LOGIN` è impostato a 'true' (o su Streamlit Cloud con credenziali attive),
     oppure se è stato forzato un logout esplicito da sessione.
+    Se in ambiente locale l'utente ha attivato l'accesso rapido locale permanente, ritorna False.
     """
     try:
         import streamlit as st
@@ -187,6 +247,9 @@ def is_auth_required() -> bool:
             return True
     except Exception:
         pass
+
+    if is_local_environment() and get_local_auto_login_preference():
+        return False
 
     req = get_setting("ARGUS_REQUIRE_LOGIN", default=None)
     if req is not None:

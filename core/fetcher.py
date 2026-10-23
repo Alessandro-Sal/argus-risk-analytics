@@ -30,6 +30,7 @@ logger = logging.getLogger("argus.fetcher")
 _BOOTSTRAPPED_ENGINES: set = set()
 _BOOTSTRAP_LOCK = threading.RLock()
 _FETCHER_ENGINE_CACHE: dict = {}
+_VERIFIED_MYSQL_DBS: set = set()
 
 
 def clear_engine_caches() -> None:
@@ -37,6 +38,7 @@ def clear_engine_caches() -> None:
     with _BOOTSTRAP_LOCK:
         _BOOTSTRAPPED_ENGINES.clear()
         _FETCHER_ENGINE_CACHE.clear()
+        _VERIFIED_MYSQL_DBS.clear()
 
 
 def _set_sqlite_pragmas(dbapi_connection, connection_record):
@@ -98,6 +100,10 @@ def dispose_engine(engine: Any) -> None:
     socket di rete e file locks sul database.
     """
     if engine is not None:
+        with _BOOTSTRAP_LOCK:
+            for k in list(_FETCHER_ENGINE_CACHE.keys()):
+                if _FETCHER_ENGINE_CACHE[k] is engine:
+                    _FETCHER_ENGINE_CACHE.pop(k, None)
         fp = "unknown"
         try:
             from core.workspace_context import get_canonical_db_fingerprint
@@ -156,6 +162,22 @@ def get_engine(
     elif session_data_env == "Local SQLite":
         offline = True
 
+    target_db_name = database if database is not None else db
+    engine_lookup_key = (
+        offline,
+        sqlite_path,
+        session_data_env,
+        session_custom_db_url,
+        is_guest_demo,
+        user,
+        host,
+        port,
+        target_db_name,
+    )
+    with _BOOTSTRAP_LOCK:
+        if engine_lookup_key in _FETCHER_ENGINE_CACHE:
+            return _FETCHER_ENGINE_CACHE[engine_lookup_key]
+
     if offline:
         os.makedirs(os.path.dirname(sqlite_path) or ".", exist_ok=True)
         sqlite_url = f"sqlite:///{sqlite_path.replace(chr(92), '/')}"
@@ -172,14 +194,24 @@ def get_engine(
         custom_mysql_requested = (host and host not in ("localhost", "127.0.0.1")) or (
             session_data_env in ("MySQL (Locale/Docker)", "MySQL (Remoto)")
         )
-        if not custom_mysql_requested:
+
+        from core.config_manager import is_local_environment
+        from core.supabase_cloud import (
+            _SUPABASE_ENGINE_CACHE,
+            create_supabase_engine,
+            get_supabase_config,
+            is_supabase_cloud_authenticated,
+            normalize_supabase_db_url,
+        )
+
+        cloud_allowed = (
+            session_data_env == "Supabase Cloud (PostgreSQL)"
+            or not is_local_environment()
+            or is_supabase_cloud_authenticated()
+        )
+
+        if not custom_mysql_requested and cloud_allowed:
             try:
-                from core.supabase_cloud import (
-                    _SUPABASE_ENGINE_CACHE,
-                    create_supabase_engine,
-                    get_supabase_config,
-                    normalize_supabase_db_url,
-                )
 
                 supa_cfg = get_supabase_config()
                 target_cloud_url = normalize_supabase_db_url(
@@ -229,18 +261,21 @@ def get_engine(
 
                 import pymysql
 
-                sys_url = f"mysql+pymysql://{user}:{password}@{host}:{port}/"
-                sys_engine = create_engine(sys_url, connect_args={"connect_timeout": 1})
-                try:
-                    with sys_engine.begin() as conn:
-                        conn.execute(
-                            text(f"CREATE DATABASE IF NOT EXISTS {db} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
-                        )
-                finally:
+                db_verif_key = f"{host}:{port}/{db}"
+                if db_verif_key not in _VERIFIED_MYSQL_DBS:
+                    sys_url = f"mysql+pymysql://{user}:{password}@{host}:{port}/"
+                    sys_engine = create_engine(sys_url, connect_args={"connect_timeout": 1})
                     try:
-                        sys_engine.dispose()
-                    except Exception:
-                        pass
+                        with sys_engine.begin() as conn:
+                            conn.execute(
+                                text(f"CREATE DATABASE IF NOT EXISTS {db} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
+                            )
+                        _VERIFIED_MYSQL_DBS.add(db_verif_key)
+                    finally:
+                        try:
+                            sys_engine.dispose()
+                        except Exception:
+                            pass
 
                 url = f"mysql+pymysql://{user}:{password}@{host}:{port}/{db}"
                 engine = create_engine(
@@ -325,6 +360,9 @@ def get_engine(
                     conn.execute(text(f"ALTER TABLE assets ADD COLUMN {col_def}"))
                 except Exception:
                     pass
+
+    with _BOOTSTRAP_LOCK:
+        _FETCHER_ENGINE_CACHE[engine_lookup_key] = engine
 
     return engine
 

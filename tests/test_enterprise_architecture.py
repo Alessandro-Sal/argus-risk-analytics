@@ -127,3 +127,68 @@ def test_get_available_local_sqlite_dbs():
     for d in dbs:
         assert "cache" not in d["filename"].lower()
 
+
+def test_get_available_mysql_dbs_info():
+    """Verifica che il rilevatore di schemi MySQL elenchi i database escludendo quelli di sistema."""
+    from core.supabase_cloud import get_available_mysql_dbs_info
+
+    dbs = get_available_mysql_dbs_info()
+    # In ambiente di sviluppo locale MySQL è attivo
+    assert isinstance(dbs, list)
+    if dbs:
+        db_names = [d["name"] for d in dbs]
+        # Nessuno schema di sistema deve essere esposto
+        for sys_schema in ["information_schema", "mysql", "performance_schema", "sys"]:
+            assert sys_schema not in db_names
+        # Ogni entry deve avere i campi standard
+        for d in dbs:
+            assert "tables_count" in d
+            assert "estimated_rows" in d
+            assert "tables" in d
+            assert d["type"] == "mysql"
+
+
+def test_local_mode_cloud_authentication_gate():
+    """
+    Verifica che l'accesso locale workstation sia isolato e che la connessione
+    a Supabase Cloud rimanga bloccata finché non viene fornito un token JWT Supabase valido.
+    """
+    from core.auth_manager import AuthManager
+    from core.supabase_cloud import get_active_account_badge_info, is_supabase_cloud_authenticated
+
+    # 1. Accesso locale workstation (1-click owner)
+    AuthManager.login_local_owner(remember_session=True)
+    assert st.session_state["authenticated"] is True
+    assert st.session_state["user_id"] == "local-owner"
+    assert st.session_state.get("supabase_cloud_authenticated") is False
+
+    # Cloud deve risultare NON autenticato
+    assert is_supabase_cloud_authenticated() is False
+
+    badge = get_active_account_badge_info()
+    assert badge["badge_label"] == "👑 OWNER (LOCALE)"
+    assert "Cloud Protetto" in badge["isolation_desc"]
+
+    # 2. Simulazione autenticazione remota Supabase Cloud riuscita
+    st.session_state["supabase_cloud_authenticated"] = True
+    st.session_state["user"] = DotDict({
+        "id": "4fb12819-68c7-4d92-98b0-5e10014b0402",
+        "user_id": "4fb12819-68c7-4d92-98b0-5e10014b0402",
+        "email": "alessandro.saladino@live.it",
+        "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+        "role": "owner",
+        "username": "alessandro",
+        "display_name": "Alessandro (Titolare)",
+    })
+
+    assert is_supabase_cloud_authenticated() is True
+    badge_cloud = get_active_account_badge_info()
+    assert badge_cloud["badge_label"] == "👑 OWNER (CLOUD)"
+    assert "Accesso Completo Cloud" in badge_cloud["isolation_desc"]
+
+    # 3. Disconnessione Cloud / Ritorno a Solo Locale
+    AuthManager.login_local_owner(remember_session=True)
+    assert is_supabase_cloud_authenticated() is False
+    badge_local = get_active_account_badge_info()
+    assert badge_local["badge_label"] == "👑 OWNER (LOCALE)"
+

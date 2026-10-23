@@ -1373,7 +1373,6 @@ def _resolve_isolated_portfolio_filter(
 
 def get_wealth_portfolios(engine: Engine) -> pd.DataFrame:
     """Recupera l'elenco dei profili patrimoniali dalla tabella dedicata wealth_profiles (con isolamento per utente)."""
-    init_wealth_db(engine)
     curr_user, curr_disp, enforce_owner = _get_active_user_isolation_context()
 
     engine_key = str(getattr(engine, "url", id(engine)))
@@ -1386,6 +1385,8 @@ def get_wealth_portfolios(engine: Engine) -> pd.DataFrame:
             ts, df_cached = cached
             if (now - ts) < 30.0:  # 30s cache TTL
                 return df_cached.copy()
+
+    init_wealth_db(engine)
 
     try:
         with engine.connect() as conn:
@@ -2643,6 +2644,8 @@ def sync_wealth_tables_between_engines(
     Tollera differenze di colonne tra dialetti inserendo solo le colonne condivise,
     normalizza i formati data e riallinea le sequenze SERIAL su PostgreSQL.
     """
+    import uuid
+
     import pandas as pd
     from sqlalchemy import inspect as sqla_inspect
     from sqlalchemy import text as sqlt
@@ -2655,22 +2658,24 @@ def sync_wealth_tables_between_engines(
         pass
     init_wealth_db(target_engine)
 
+    # Ordine topologico di sincronizzazione (le tabelle genitrici prima delle figlie)
     tables_to_sync = [
         "wealth_profiles",
-        "wealth_accounts",
+        "portfolios",
         "wealth_categories",
-        "wealth_cashflow",
+        "wealth_accounts",
+        "assets",
+        "asset_mapping",
         "wealth_physical_assets",
         "wealth_pension_plans",
         "wealth_fixed_expenses",
         "wealth_goals",
+        "wealth_cashflow",
         "wealth_networth_snapshots",
         "wealth_portfolio_risk_links",
         "tax_declarations",
         "tax_loss_carryforward",
         "tax_verification_documents",
-        "portfolios",
-        "assets",
         "transactions",
         "portfolio_snapshots",
         "snapshot_positions",
@@ -2684,6 +2689,70 @@ def sync_wealth_tables_between_engines(
     tgt_dialect = getattr(getattr(target_engine, "dialect", None), "name", "")
     is_tgt_sqlite = tgt_dialect == "sqlite"
     is_tgt_postgres = tgt_dialect == "postgresql"
+
+    # Risoluzione e validazione UUID per compatibilità PostgreSQL / Supabase
+    resolved_uuid = None
+    if user_id:
+        try:
+            resolved_uuid = str(uuid.UUID(str(user_id)))
+        except (ValueError, AttributeError, TypeError):
+            resolved_uuid = None
+
+    if not resolved_uuid and is_tgt_postgres:
+        try:
+            with target_engine.connect() as conn:
+                candidate_email = owner if (owner and "@" in str(owner)) else (user_id if (user_id and "@" in str(user_id)) else None)
+                if candidate_email:
+                    r = conn.execute(
+                        sqlt("SELECT id FROM auth.users WHERE LOWER(email) = LOWER(:em) LIMIT 1"),
+                        {"em": str(candidate_email).strip()}
+                    ).fetchone()
+                    if r and r[0]:
+                        resolved_uuid = str(r[0])
+                if not resolved_uuid:
+                    rows = conn.execute(sqlt("SELECT id, email FROM auth.users LIMIT 2")).fetchall()
+                    if len(rows) == 1 and rows[0][0]:
+                        resolved_uuid = str(rows[0][0])
+                    elif len(rows) > 1 and owner:
+                        for r in rows:
+                            if owner.lower() in str(r[1]).lower():
+                                resolved_uuid = str(r[0])
+                                break
+        except Exception:
+            pass
+
+    # Svuotamento atomico sicuro delle tabelle target rispettando i vincoli di foreign key
+    if is_tgt_postgres:
+        tables_to_clear = [tbl for tbl in reversed(tables_to_sync) if tbl in tgt_tables]
+        if tables_to_clear:
+            try:
+                with target_engine.begin() as conn:
+                    conn.execute(sqlt(f"TRUNCATE TABLE {', '.join(tables_to_clear)} CASCADE;"))
+            except Exception:
+                try:
+                    with target_engine.begin() as conn:
+                        conn.execute(sqlt("SET session_replication_role = 'replica';"))
+                        for tbl in reversed(tables_to_sync):
+                            if tbl in tgt_tables:
+                                conn.execute(sqlt(f"DELETE FROM {tbl}"))
+                        conn.execute(sqlt("SET session_replication_role = 'origin';"))
+                except Exception:
+                    pass
+    elif is_tgt_sqlite:
+        with target_engine.begin() as conn:
+            conn.execute(sqlt("PRAGMA foreign_keys = OFF;"))
+            for tbl in reversed(tables_to_sync):
+                if tbl in tgt_tables:
+                    conn.execute(sqlt(f"DELETE FROM {tbl}"))
+            conn.execute(sqlt("PRAGMA foreign_keys = ON;"))
+    else:
+        with target_engine.begin() as conn:
+            for tbl in reversed(tables_to_sync):
+                if tbl in tgt_tables:
+                    try:
+                        conn.execute(sqlt(f"DELETE FROM {tbl}"))
+                    except Exception:
+                        pass
 
     for tbl in tables_to_sync:
         if tbl not in src_tables or tbl not in tgt_tables:
@@ -2703,11 +2772,12 @@ def sync_wealth_tables_between_engines(
             df_to_insert = df[common_cols].copy()
 
             # Associazione automatica user_id e owner per isolamento multi-tenant Supabase RLS
-            if user_id and "user_id" in tgt_cols:
-                if "user_id" not in df_to_insert.columns:
-                    df_to_insert["user_id"] = str(user_id)
+            if "user_id" in tgt_cols:
+                if is_tgt_postgres:
+                    # In PostgreSQL/Supabase user_id è typed come UUID e referenzia auth.users
+                    df_to_insert["user_id"] = resolved_uuid
                 else:
-                    df_to_insert["user_id"] = df_to_insert["user_id"].fillna(str(user_id))
+                    df_to_insert["user_id"] = resolved_uuid or user_id
 
             if owner and "owner" in tgt_cols:
                 if "owner" not in df_to_insert.columns:
@@ -2735,9 +2805,18 @@ def sync_wealth_tables_between_engines(
                         )
 
             with target_engine.begin() as conn:
-                conn.execute(sqlt(f"DELETE FROM {tbl}"))
+                if is_tgt_postgres:
+                    try:
+                        conn.execute(sqlt("SET session_replication_role = 'replica';"))
+                    except Exception:
+                        pass
                 if not df_to_insert.empty:
                     df_to_insert.to_sql(tbl, conn, if_exists="append", index=False, chunksize=1000)
+                if is_tgt_postgres:
+                    try:
+                        conn.execute(sqlt("SET session_replication_role = 'origin';"))
+                    except Exception:
+                        pass
             results[tbl] = len(df_to_insert)
         except Exception as ex:
             results[tbl] = f"Error: {ex}"

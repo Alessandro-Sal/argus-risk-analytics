@@ -31,7 +31,7 @@ if _qp is not None:
         _is_splash = False
 
 st.set_page_config(
-    page_title="Control Room | ARGUS Risk Analytics",
+    page_title="ARGUS — Piattaforma di Analisi del Rischio e Gestione Patrimoniale",
     page_icon="👁️",
     layout="wide",
     initial_sidebar_state="collapsed" if (_is_splash or _is_auth_locked) else "expanded",
@@ -110,16 +110,7 @@ import core.multi_portfolio
 import core.ui_utils
 from core.cache_shield import clear_cache
 from core.db_exporter import save_snapshot_to_db
-from core.diagnostics import (
-    clean_expired_cache_records,
-    generate_support_bundle,
-    get_hardware_and_environment_specs,
-    get_recent_logs,
-    optimize_database_storage,
-    reindex_databases,
-    run_system_health_check,
-    setup_logging,
-)
+from core.diagnostics import setup_logging
 from core.fetcher import fetch_and_store, get_engine
 from core.multi_portfolio import (
     compute_multi_portfolio_comparison,
@@ -129,7 +120,6 @@ from core.multi_portfolio import (
     load_portfolio_profile,
     save_portfolio_profile,
 )
-from core.risk_engine import compute_risk
 from core.ui_utils import (
     fmt_eur,
     fmt_pct,
@@ -166,13 +156,6 @@ def fetch_yahoo_ticker_for_isin(isin: str) -> str:
 inject_custom_css()
 
 # ── Sidebar (Caricata solo dopo l'accesso al terminale) ───────
-try:
-    from core.supabase_cloud import harvest_active_streamlit_sessions_for_supabase
-
-    harvest_active_streamlit_sessions_for_supabase()
-except Exception:
-    pass
-
 from core.sidebar import render_sidebar
 
 render_sidebar()
@@ -203,19 +186,17 @@ def get_db_engine(user, password, host, port, db, data_env="Auto (Ibrido)", supa
     return get_engine(user=user, password=password, host=host, port=port, db=db, offline=is_off)
 
 
-def get_analysis_history(engine):
-    """Recupera la lista degli snapshot storici salvati nel database per il richiamo rapido (isolata per utente)."""
-    if engine is None:
+@st.cache_data(ttl=60, show_spinner=False)
+def _fetch_analysis_history_cached(_engine, role: str, uname: str, supa_fp: str):
+    if _engine is None:
         return []
     from sqlalchemy import text as sqlt
 
-    role = str(st.session_state.get("argus_auth_role", "owner") or "owner").strip().lower()
-    uname = str(st.session_state.get("argus_auth_user", "user") or "user").strip().lower()
     owner_clause = "WHERE LOWER(COALESCE(p.owner, '')) = :uowner" if role == "user" else ""
     params = {"uowner": uname} if role == "user" else {}
 
     try:
-        with engine.connect() as conn:
+        with _engine.connect() as conn:
             rows = conn.execute(
                 sqlt(f"""
                 SELECT 
@@ -241,6 +222,14 @@ def get_analysis_history(engine):
             return rows
     except Exception:
         return []
+
+
+def get_analysis_history(engine):
+    """Recupera la lista degli snapshot storici salvati nel database per il richiamo rapido (isolata per utente, con cache intelligente)."""
+    role = str(st.session_state.get("argus_auth_role", "owner") or "owner").strip().lower()
+    uname = str(st.session_state.get("argus_auth_user", "user") or "user").strip().lower()
+    supa_fp = str(st.session_state.get("argus_user_custom_db_url", "") or "")
+    return _fetch_analysis_history_cached(engine, role, uname, supa_fp)
 
 # ── Main layout Top ──────────────────────────────────────────
 
@@ -468,6 +457,8 @@ with st.expander(f"📚 Storico Snapshot & Recall Analisi ({st.session_state.get
                         results = None
                         ex_calc = None
                         try:
+                            from core.risk_engine import compute_risk
+
                             results = compute_risk(target_pid, engine_sidebar, benchmark_ticker=benchmark, risk_free_rate=rf_val, base_currency=base_curr)
                         except Exception as e_calc:
                             ex_calc = e_calc
@@ -1286,6 +1277,8 @@ with tab_ingest:
                     rf_val = st.session_state.get("active_rf_rate")
                     base_curr = st.session_state.get("base_currency", "EUR")
 
+                    from core.risk_engine import compute_risk
+
                     if offline_mode:
                         fetch_report, df_tx, df_prices = fetch_and_store(df_clean, engine, portfolio_id, benchmark_ticker=benchmark)
                         results = compute_risk(portfolio_id, engine, benchmark_ticker=benchmark, df_tx=df_tx, df_prices=df_prices, risk_free_rate=rf_val, base_currency=base_curr)
@@ -1298,6 +1291,10 @@ with tab_ingest:
                     
                     if not offline_mode:
                         save_snapshot_to_db(results, engine, portfolio_id, run_id, run_name)
+                        try:
+                            _fetch_analysis_history_cached.clear()
+                        except Exception:
+                            pass
 
                     st.session_state["pipeline_done"]  = True
                     st.session_state["portfolio_id"]   = portfolio_id
@@ -1482,6 +1479,10 @@ with tab_wealth:
     # 1. Box Salvataggio Portafoglio Attivo
     has_active_res = st.session_state.get("results") is not None and isinstance(st.session_state.get("results"), dict)
 
+    @st.cache_data(ttl=60, show_spinner=False)
+    def _get_cached_saved_profiles():
+        return list_saved_portfolio_profiles()
+
     with st.expander("💾 Salva Portafoglio Attivo nel Registro Multi-Account", expanded=False):
         if not has_active_res:
             st.info("Esegui prima un'analisi per salvare il portafoglio corrente nel registro.")
@@ -1495,13 +1496,17 @@ with tab_wealth:
                 st.markdown('<div style="height: 28px;"></div>', unsafe_allow_html=True)
                 if st.button("💾 Salva nel Registro", type="primary", use_container_width=True, key="btn_save_mp"):
                     if save_portfolio_profile(save_name_in.strip(), st.session_state["results"], tag=save_tag_in):
+                        try:
+                            _get_cached_saved_profiles.clear()
+                        except Exception:
+                            pass
                         st.success(f"Portafoglio '{save_name_in}' salvato con successo nel registro multi-account!")
                         st.rerun()
                     else:
                         st.error("Errore durante il salvataggio del profilo.")
 
     # 2. Elenco Portafogli e Azioni di Consolidamento
-    saved_profiles = list_saved_portfolio_profiles()
+    saved_profiles = _get_cached_saved_profiles()
     if saved_profiles:
         st.markdown('<div style="margin-top: 15px;"></div>', unsafe_allow_html=True)
         
@@ -1657,23 +1662,36 @@ with tab_isin_mapping:
     cfg_file = _get_config_file_path()
     
     # 1. Carica Mappature dal Database (tabella asset_mapping) e da config.json
-    db_mapping_dict = {}
     engine_curr = st.session_state.get("engine") or engine_sidebar
     
-    if engine_curr is not None:
+    if engine_curr is not None and not st.session_state.get("_db_asset_mapping_table_checked"):
         try:
             from core.models import Base
             Base.metadata.create_all(engine_curr)
-            with engine_curr.connect() as conn:
-                res_map = conn.execute(sqlt("SELECT input_ticker, yfinance_ticker, description FROM asset_mapping")).fetchall()
-                for r in res_map:
-                    db_mapping_dict[str(r[0]).strip().upper()] = {
-                        "input_ticker": str(r[0]).strip().upper(),
-                        "yfinance_ticker": str(r[1]).strip().upper(),
-                        "description": str(r[2] or "DB Record")
-                    }
+            st.session_state["_db_asset_mapping_table_checked"] = True
         except Exception:
             pass
+
+    @st.cache_data(ttl=60, show_spinner=False)
+    def _get_cached_asset_mappings(_engine, supa_fp: str):
+        db_map = {}
+        if _engine is not None:
+            try:
+                from sqlalchemy import text as sqlt
+                with _engine.connect() as conn:
+                    res_map = conn.execute(sqlt("SELECT input_ticker, yfinance_ticker, description FROM asset_mapping")).fetchall()
+                    for r in res_map:
+                        db_map[str(r[0]).strip().upper()] = {
+                            "input_ticker": str(r[0]).strip().upper(),
+                            "yfinance_ticker": str(r[1]).strip().upper(),
+                            "description": str(r[2] or "DB Record")
+                        }
+            except Exception:
+                pass
+        return db_map
+
+    supa_fp_map = str(st.session_state.get("argus_user_custom_db_url", "") or "")
+    db_mapping_dict = dict(_get_cached_asset_mappings(engine_curr, supa_fp_map))
             
     # Merge con config.json
     cfg_mapping_dict = {}
@@ -1839,6 +1857,10 @@ with tab_isin_mapping:
                     except Exception as e_dbs:
                         st.warning(f"Nota aggiornamento DB: {e_dbs}")
 
+                try:
+                    _get_cached_asset_mappings.clear()
+                except Exception:
+                    pass
                 st.success("✅ Tutte le modifiche sono state allineate su Database (`asset_mapping`) e `config.json`!")
                 st.rerun()
 
@@ -1865,6 +1887,10 @@ with tab_isin_mapping:
                                         VALUES (:input_ticker, :yfinance_ticker, :description)
                                         ON DUPLICATE KEY UPDATE yfinance_ticker = VALUES(yfinance_ticker)
                                     """), {"input_ticker": k_c, "yfinance_ticker": v_c, "description": "Sincronizzato da config.json"})
+                    try:
+                        _get_cached_asset_mappings.clear()
+                    except Exception:
+                        pass
                     st.success(f"✅ Sincronizzate con successo {len(tk_map)} mappature nella tabella DB `asset_mapping`!")
                     st.rerun()
                 except Exception as e_syn:
@@ -1913,7 +1939,22 @@ with tab_diagnostics:
 </div>
 """, button_label="💡 Come funziona la Diagnostica?")
 
-    diag_res = run_system_health_check(st.session_state.get("results"))
+    from core.diagnostics import (
+        clean_expired_cache_records,
+        generate_support_bundle,
+        get_hardware_and_environment_specs,
+        get_recent_logs,
+        optimize_database_storage,
+        reindex_databases,
+        run_system_health_check,
+    )
+
+    @st.cache_data(ttl=120, show_spinner=False)
+    def _get_cached_system_health(run_deep: bool = False):
+        return run_system_health_check(run_benchmarks=run_deep)
+
+    force_deep = bool(st.session_state.get("run_full_diag_benchmarks", False))
+    diag_res = _get_cached_system_health(run_deep=force_deep)
     cache_st = diag_res["cache_metrics"]
     storage_st = diag_res["storage_profile"]
 
@@ -2097,8 +2138,18 @@ with tab_diagnostics:
                 confirm_flush_cache_dialog()
 
     with tab_diag_lat:
-        st.markdown("##### ⚡ Latenza Algoritmi Quantitativi (Millisecondi)")
+        col_bl1, col_bl2 = st.columns([3, 1.4])
+        with col_bl1:
+            st.markdown("##### ⚡ Latenza Algoritmi Quantitativi (Millisecondi)")
+        with col_bl2:
+            if st.button("🚀 Esegui Benchmark Live", type="primary", use_container_width=True, key="btn_run_deep_bench"):
+                st.session_state["run_full_diag_benchmarks"] = True
+                _get_cached_system_health.clear()
+                st.rerun()
+
         st.dataframe(diag_res["engine_benchmarks"], use_container_width=True, hide_index=True)
+        if force_deep:
+            st.session_state["run_full_diag_benchmarks"] = False
         
         st.markdown("##### 🖥️ Specifiche Ambiente di Esecuzione")
         env_dict = diag_res["environment"]
@@ -2243,7 +2294,19 @@ with tab_duckdb:
         st.markdown('<div style="margin-top: 8px;"></div>', unsafe_allow_html=True)
         render_duckdb_modal(button_label="ℹ️ Guida al Motore DuckDB & Parquet", use_popover=False)
 
-    duck_info = duckdb_engine.get_duckdb_system_info()
+    @st.cache_data(ttl=300, show_spinner=False)
+    def _get_cached_duck_info():
+        return duckdb_engine.get_duckdb_system_info()
+
+    @st.cache_data(ttl=300, show_spinner=False)
+    def _get_cached_pq_stats(_df):
+        return duckdb_engine.get_parquet_compression_ratio(_df)
+
+    @st.cache_data(ttl=300, show_spinner=False)
+    def _get_cached_pq_bytes(_df):
+        return duckdb_engine.export_portfolio_to_parquet(_df)
+
+    duck_info = _get_cached_duck_info()
 
     # Prepara DataFrames di contesto
     pos_df = st.session_state.get("positions_df")
@@ -2273,7 +2336,7 @@ with tab_duckdb:
         "transactions": tx_df
     }
 
-    pq_stats = duckdb_engine.get_parquet_compression_ratio(pos_df)
+    pq_stats = _get_cached_pq_stats(pos_df)
 
     col_k1, col_k2, col_k3, col_k4 = st.columns(4)
     with col_k1:
@@ -2323,7 +2386,7 @@ with tab_duckdb:
     with col_btn_run:
         btn_run_sql = st.button("⚡ Esegui Query SQL (DuckDB Engine)", type="primary", use_container_width=True)
     with col_btn_pq:
-        pq_bytes = duckdb_engine.export_portfolio_to_parquet(pos_df)
+        pq_bytes = _get_cached_pq_bytes(pos_df)
         st.download_button(
             label="📦 Scarica Portafoglio in Apache Parquet (.parquet)",
             data=pq_bytes,
@@ -2332,7 +2395,7 @@ with tab_duckdb:
             use_container_width=True
         )
 
-    if btn_run_sql or "last_duck_res" not in st.session_state:
+    if btn_run_sql:
         res = duckdb_engine.run_duckdb_olap_query(custom_sql, context_dfs=context_tables)
         st.session_state["last_duck_res"] = res
 
@@ -2357,10 +2420,7 @@ with tab_bitemporal:
     st.markdown("### 🕰️ Motore di Persistenza Bitemporale & Audit Trail Crittografico")
     st.caption("Standard ISO/IEC 9075:2011 SQL Temporal, MiFID II / AIFMD Compliance & Certificazione Merkle Tree per Family Office e SGR.")
 
-    import importlib
-
     import core.bitemporal_engine
-    importlib.reload(core.bitemporal_engine)
     from core.bitemporal_engine import BitemporalLedgerEngine
 
     CURRENT_BITEMP_ENGINE_VERSION = "2026.09.11_v3_peak_deficit_stable"
@@ -2497,25 +2557,28 @@ with tab_bitemporal:
 
         return ports
 
-    user_portfolios_catalog = _get_all_available_user_portfolios()
+    @st.cache_data(ttl=60, show_spinner=False)
+    def _get_cached_bitemp_portfolios(role_act: str, uname_act: str, p_name_hint: str):
+        return _get_all_available_user_portfolios()
 
-    # Ingestione automatica trasparente nel Ledger Bitemporale DuckDB
+    role_act_val = str(st.session_state.get("argus_auth_role", "owner") or "owner").strip().lower()
+    uname_act_val = str(st.session_state.get("argus_auth_user", "user") or "user").strip().lower()
+    p_name_hint_val = str(st.session_state.get("portfolio_name", "") or "")
+    user_portfolios_catalog = _get_cached_bitemp_portfolios(role_act_val, uname_act_val, p_name_hint_val)
+
+    # Inizializzazione registro portafogli nel ledger DuckDB (Lazy on-demand per eliminare la latenza di avvio)
     if "bitemp_ingested_portfolios" not in st.session_state:
         st.session_state["bitemp_ingested_portfolios"] = set()
-
-    for p_name_item, p_df_item in user_portfolios_catalog.items():
-        p_sig = f"{p_name_item}_{len(p_df_item)}_{CURRENT_BITEMP_ENGINE_VERSION}"
-        if p_sig not in st.session_state["bitemp_ingested_portfolios"]:
-            try:
-                b_engine.ingest_portfolio_dataframe(p_df_item, portfolio_id=p_name_item, recorded_by="AUTO_SYNC_CATALOG")
-                st.session_state["bitemp_ingested_portfolios"].add(p_sig)
-            except Exception as e_auto_item:
-                logger.warning(f"Auto-ingest portafoglio '{p_name_item}': {e_auto_item}")
 
     # Portafogli disponibili nel ledger
     available_ports = b_engine.get_available_portfolios()
     if "DEMO_FAMILY_OFFICE" not in available_ports:
         available_ports.insert(0, "DEMO_FAMILY_OFFICE")
+
+    # Registra i portafogli utente nel selettore senza bloccare il caricamento globale
+    for p_cat_name in user_portfolios_catalog.keys():
+        if p_cat_name not in available_ports:
+            available_ports.append(p_cat_name)
 
     # Identificazione del portafoglio primario attivo
     preferred_active = st.session_state.get("portfolio_name")
@@ -2603,12 +2666,24 @@ with tab_bitemporal:
                     st.session_state["bitemp_ingested_portfolios"].add(active_pname)
                     st.session_state["bitemp_ingested_portfolios"].add(f"{active_pname}_{len(active_df)}_{CURRENT_BITEMP_ENGINE_VERSION}")
                     st.session_state["selected_bitemp_port"] = active_pname
+                    st.session_state.pop("bitemp_chain_verified", None)
+                    for k in list(st.session_state.keys()):
+                        if k.startswith("bitemp_counts_") or k.startswith("bitemp_recon_") or k.startswith("bitemp_drift_") or k.startswith("bitemp_merkle_"):
+                            st.session_state.pop(k, None)
+                    try:
+                        _get_cached_bitemp_portfolios.clear()
+                    except Exception:
+                        pass
                 st.success(f"✅ Sincronizzate {cnt} transazioni contabili di '{active_pname}' nel Ledger Bitemporale!")
                 st.rerun()
         else:
             if st.button("🔄 Ripristina Demo VWCE", type="secondary", use_container_width=True, key="btn_reseed_demo_top"):
                 st.session_state["bitemp_seed_info"] = b_engine.seed_demonstration_scenario()
                 st.session_state["selected_bitemp_port"] = "DEMO_FAMILY_OFFICE"
+                st.session_state.pop("bitemp_chain_verified", None)
+                for k in list(st.session_state.keys()):
+                    if k.startswith("bitemp_counts_") or k.startswith("bitemp_recon_") or k.startswith("bitemp_drift_") or k.startswith("bitemp_merkle_"):
+                        st.session_state.pop(k, None)
                 st.rerun()
 
     st.markdown('<div style="height: 6px;"></div>', unsafe_allow_html=True)
@@ -2637,13 +2712,36 @@ with tab_bitemporal:
         if st.button("🔄 Reset Demo", use_container_width=True, help="Ripristina lo scenario didattico VWCE/BTP/Immobile.", key="btn_reseed_demo_sub"):
             st.session_state["bitemp_seed_info"] = b_engine.seed_demonstration_scenario()
             st.session_state["selected_bitemp_port"] = "DEMO_FAMILY_OFFICE"
+            st.session_state.pop("bitemp_chain_verified", None)
+            for k in list(st.session_state.keys()):
+                if k.startswith("bitemp_counts_") or k.startswith("bitemp_recon_") or k.startswith("bitemp_drift_") or k.startswith("bitemp_merkle_"):
+                    st.session_state.pop(k, None)
             st.rerun()
 
-    # Verifica stato catena crittografica per il portafoglio selezionato
-    chain_ok, chain_msg, chain_cnt = b_engine.verify_audit_chain_integrity()
-    tx_port_cnt = b_engine.con.execute("SELECT COUNT(*) FROM bitemporal_transactions WHERE portfolio_id = ?", [selected_bitemp_pid]).fetchone()[0] if b_engine.con else 0
-    app_port_cnt = b_engine.con.execute("SELECT COUNT(*) FROM bitemporal_asset_appraisals WHERE portfolio_id = ?", [selected_bitemp_pid]).fetchone()[0] if b_engine.con else 0
-    audit_port_cnt = b_engine.con.execute("SELECT COUNT(*) FROM audit_decision_log WHERE entity_id = ?", [selected_bitemp_pid]).fetchone()[0] if b_engine.con else 0
+    # Ingestione on-demand istantanea del portafoglio selezionato se non ancora archiviato nel ledger
+    if selected_bitemp_pid in user_portfolios_catalog and selected_bitemp_pid not in b_engine.get_available_portfolios():
+        p_df_sel = user_portfolios_catalog[selected_bitemp_pid]
+        p_sig = f"{selected_bitemp_pid}_{len(p_df_sel)}_{CURRENT_BITEMP_ENGINE_VERSION}"
+        if p_sig not in st.session_state["bitemp_ingested_portfolios"]:
+            try:
+                b_engine.ingest_portfolio_dataframe(p_df_sel, portfolio_id=selected_bitemp_pid, recorded_by="ON_DEMAND_INSPECTION")
+                st.session_state["bitemp_ingested_portfolios"].add(p_sig)
+                st.session_state.pop("bitemp_chain_verified", None)
+            except Exception as e_sel:
+                logger.warning(f"Ingest su richiesta per '{selected_bitemp_pid}': {e_sel}")
+
+    # Verifica stato catena crittografica per il portafoglio selezionato (memoizzato in session state)
+    if "bitemp_chain_verified" not in st.session_state:
+        st.session_state["bitemp_chain_verified"] = b_engine.verify_audit_chain_integrity()
+    chain_ok, chain_msg, chain_cnt = st.session_state["bitemp_chain_verified"]
+
+    counts_key = f"bitemp_counts_{selected_bitemp_pid}"
+    if counts_key not in st.session_state:
+        tx_cnt_val = b_engine.con.execute("SELECT COUNT(*) FROM bitemporal_transactions WHERE portfolio_id = ?", [selected_bitemp_pid]).fetchone()[0] if b_engine.con else 0
+        app_cnt_val = b_engine.con.execute("SELECT COUNT(*) FROM bitemporal_asset_appraisals WHERE portfolio_id = ?", [selected_bitemp_pid]).fetchone()[0] if b_engine.con else 0
+        audit_cnt_val = b_engine.con.execute("SELECT COUNT(*) FROM audit_decision_log WHERE entity_id = ?", [selected_bitemp_pid]).fetchone()[0] if b_engine.con else 0
+        st.session_state[counts_key] = (tx_cnt_val, app_cnt_val, audit_cnt_val)
+    tx_port_cnt, app_port_cnt, audit_port_cnt = st.session_state[counts_key]
 
     col_kpi1, col_kpi2, col_kpi3, col_kpi4 = st.columns(4)
     with col_kpi1:
@@ -2773,9 +2871,14 @@ with tab_bitemporal:
                 else:
                     sys_time_input = st.text_input("Inserisci System Time (YYYY-MM-DD HH:MM:SS):", value=max_vt_str, key="txt_tt_user")
 
-        # Esecuzione della ricostruzione
-        recon = b_engine.reconstruct_portfolio_at_times(selected_bitemp_pid, valid_time_input, sys_time_input)
-        df_tt = b_engine.time_travel_query(selected_bitemp_pid, valid_time_input, sys_time_input)
+        # Esecuzione della ricostruzione (memoizzata per data e portafoglio)
+        recon_cache_key = f"bitemp_recon_{selected_bitemp_pid}_{valid_time_input}_{sys_time_input}"
+        if recon_cache_key not in st.session_state:
+            recon = b_engine.reconstruct_portfolio_at_times(selected_bitemp_pid, valid_time_input, sys_time_input)
+            df_tt = b_engine.time_travel_query(selected_bitemp_pid, valid_time_input, sys_time_input)
+            st.session_state[recon_cache_key] = (recon, df_tt)
+        else:
+            recon, df_tt = st.session_state[recon_cache_key]
 
         if is_demo:
             has_dividend = "TX_DIV_VWCE_004" in df_tt["tx_business_id"].values if not df_tt.empty else False
@@ -2871,7 +2974,12 @@ with tab_bitemporal:
         with col_d3:
             drift_s2 = st.text_input("Stato Conoscenza T2 (Dopo):", value=d_s2_val, key="drift_s2")
 
-        drift_res = b_engine.detect_retroactive_drifts(selected_bitemp_pid, drift_vt, drift_s1, drift_s2)
+        drift_cache_key = f"bitemp_drift_{selected_bitemp_pid}_{drift_vt}_{drift_s1}_{drift_s2}"
+        if drift_cache_key not in st.session_state:
+            drift_res = b_engine.detect_retroactive_drifts(selected_bitemp_pid, drift_vt, drift_s1, drift_s2)
+            st.session_state[drift_cache_key] = drift_res
+        else:
+            drift_res = st.session_state[drift_cache_key]
 
         if drift_res["has_drift"]:
             st.warning(f"⚠️ **Rilevato Drift Retroattivo**: Trovate **{drift_res['new_transactions_count']} nuove transazioni tardive** e **{drift_res['modified_transactions_count']} transazioni rettificate** tra T1 e T2!")
@@ -2936,13 +3044,16 @@ with tab_bitemporal:
         st.markdown("##### 🌲 Certificazione Merkle Tree per Report Patrimoniali Esportati")
         st.caption("Costruisce un albero Merkle foglia-per-foglia sulle consistenze attive e imprime il Root Hash nel piè di pagina della reportistica istituzionale.")
 
-        active_txs = b_engine.con.execute("""
-            SELECT * FROM bitemporal_transactions 
-            WHERE portfolio_id = ? AND sys_to = ?::TIMESTAMP
-        """, [selected_bitemp_pid, b_engine.INFINITY_TIMESTAMP]).fetchdf()
-
-        merkle_root = b_engine.generate_merkle_root(active_txs.to_dict(orient="records"))
+        merkle_cache_key = f"bitemp_merkle_{selected_bitemp_pid}"
+        if merkle_cache_key not in st.session_state:
+            active_txs = b_engine.con.execute("""
+                SELECT * FROM bitemporal_transactions 
+                WHERE portfolio_id = ? AND sys_to = ?::TIMESTAMP
+            """, [selected_bitemp_pid, b_engine.INFINITY_TIMESTAMP]).fetchdf()
+            merkle_root = b_engine.generate_merkle_root(active_txs.to_dict(orient="records"))
+            st.session_state[merkle_cache_key] = (merkle_root, len(active_txs))
+        merkle_root, n_active_txs = st.session_state[merkle_cache_key]
 
         st.code(f"MERKLE_ROOT_SEAL = \"{merkle_root}\"", language="python")
-        st.caption(f"Sigillo di integrità calcolato su {len(active_txs)} transazioni contabili attive del portafoglio '{selected_bitemp_pid}'. Verificabile in tempo sub-millisecondo.")
+        st.caption(f"Sigillo di integrità calcolato su {n_active_txs} transazioni contabili attive del portafoglio '{selected_bitemp_pid}'. Verificabile in tempo sub-millisecondo.")
 

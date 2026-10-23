@@ -410,6 +410,15 @@ def persist_supabase_credentials_to_env(
         if url:
             updates["SUPABASE_DB_URL"] = url
 
+        # Evita scritture ridondanti su disco se i valori in memoria sono già sincronizzati
+        already_synced = True
+        for k, v in updates.items():
+            if os.getenv(k) != v:
+                already_synced = False
+                break
+        if already_synced and env_path.exists():
+            return True
+
         seen_keys = set()
         new_lines: List[str] = []
         for line in lines:
@@ -427,10 +436,20 @@ def persist_supabase_credentials_to_env(
                 new_lines.append(f"{k}={v}")
 
         env_path.write_text("\n".join(new_lines).rstrip() + "\n", encoding="utf-8")
+        try:
+            from core.config_manager import invalidate_dotenv_cache
+
+            invalidate_dotenv_cache()
+        except Exception:
+            pass
         return True
     except Exception as ex:
         logger.debug("persist_supabase_credentials_to_env warning: %s", ex)
         return False
+
+
+_LAST_HARVEST_TS: float = 0.0
+_CACHED_HARVEST: Dict[str, str] = {}
 
 
 def harvest_active_streamlit_sessions_for_supabase() -> Dict[str, str]:
@@ -438,7 +457,14 @@ def harvest_active_streamlit_sessions_for_supabase() -> Dict[str, str]:
     Ispeziona tutte le sessioni Streamlit attive nel processo corrente per recuperare
     e persistere automaticamente su `.env` eventuali password o URI Supabase inseriti
     dall'utente nella UI (anche prima della chiusura della finestra modale).
+    Throttled a 20s per evitare freeze della UI su ogni get_supabase_config().
     """
+    global _LAST_HARVEST_TS, _CACHED_HARVEST
+    now = time.time()
+    if (now - _LAST_HARVEST_TS) < 20.0:
+        return _CACHED_HARVEST.copy()
+    _LAST_HARVEST_TS = now
+
     found: Dict[str, str] = {}
     try:
         from streamlit.runtime import get_instance
@@ -476,6 +502,7 @@ def harvest_active_streamlit_sessions_for_supabase() -> Dict[str, str]:
                 break
     except Exception:
         pass
+    _CACHED_HARVEST = found
     return found
 
 
@@ -609,6 +636,39 @@ def get_supabase_config() -> Dict[str, Any]:
 def is_supabase_configured() -> bool:
     """Restituisce True se un database PostgreSQL/Supabase è configurato."""
     return bool(get_supabase_config().get("is_configured"))
+
+
+def is_supabase_cloud_authenticated() -> bool:
+    """
+    Restituisce True solo se la sessione corrente ha effettuato un'autenticazione remota
+    valida con Supabase Cloud (possiede un access_token JWT attivo e un user_id reale diverso da 'local-owner').
+    Se l'utente è entrato in modalità solo locale workstation ('local-owner' senza token JWT),
+    restituisce False.
+    """
+    try:
+        import streamlit as st
+    except ImportError:
+        return False
+
+    if st.session_state.get("supabase_cloud_authenticated") is True:
+        return True
+
+    user = st.session_state.get("user")
+    token = ""
+    uid = ""
+    if user:
+        token = getattr(user, "access_token", "") if hasattr(user, "access_token") else user.get("access_token", "")
+        uid = getattr(user, "id", "") if hasattr(user, "id") else user.get("id", "")
+    if not token:
+        sess = st.session_state.get("argus_session") or {}
+        token = sess.get("access_token", "")
+        uid = sess.get("user_id", "")
+
+    if token and uid and str(uid) not in ("local-owner", "demo-guest-sandbox") and not str(uid).startswith("sandbox-"):
+        st.session_state["supabase_cloud_authenticated"] = True
+        return True
+
+    return False
 
 
 # ── 2. Engine Creation & Health Diagnostics ───────────────────
@@ -1409,27 +1469,179 @@ def get_available_local_sqlite_dbs(base_dirs: Optional[List[str]] = None) -> Lis
     return discovered
 
 
+def get_available_mysql_dbs_info(
+    host: Optional[str] = None,
+    port: Optional[int] = None,
+    user: Optional[str] = None,
+    password: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    """
+    Rileva dinamicamente i database utente attivi su MySQL locale (escludendo schemi di sistema)
+    con metadati su tabelle e record per consentire la scelta consapevole del database da migrare.
+    """
+    import urllib.parse
+
+    from sqlalchemy import create_engine
+    from sqlalchemy import text as sqlt
+
+    try:
+        import streamlit as st
+        ss = getattr(st, "session_state", None)
+    except Exception:
+        ss = None
+
+    h = host or (ss.get("db_host") if ss else None) or os.getenv("MYSQL_HOST") or "localhost"
+    p = int(port or (ss.get("db_port") if ss else None) or os.getenv("MYSQL_PORT") or 3306)
+    u = user or (ss.get("db_user") if ss else None) or os.getenv("MYSQL_USER") or "root"
+    pw = password if password is not None else ((ss.get("db_pass") if ss else None) or os.getenv("MYSQL_PASSWORD") or "root")
+
+    safe_pw = urllib.parse.quote_plus(str(pw))
+    sys_url = f"mysql+pymysql://{u}:{safe_pw}@{h}:{p}/"
+    discovered: List[Dict[str, Any]] = []
+
+    try:
+        eng_sys = create_engine(sys_url, connect_args={"connect_timeout": 3})
+        try:
+            with eng_sys.connect() as conn:
+                res = conn.execute(sqlt("SHOW DATABASES;")).fetchall()
+                ignored = {"information_schema", "mysql", "performance_schema", "sys"}
+                db_names = [row[0] for row in res if row[0] not in ignored]
+
+                curr_active_db = ss.get("db_name", "wealth") if ss else "wealth"
+
+                for db_name in db_names:
+                    try:
+                        r_res = conn.execute(
+                            sqlt("SELECT COUNT(*), SUM(TABLE_ROWS) FROM information_schema.tables WHERE TABLE_SCHEMA = :db"),
+                            {"db": db_name}
+                        ).fetchone()
+                        t_count = int(r_res[0] or 0) if r_res else 0
+                        total_rows = int(r_res[1] or 0) if r_res else 0
+
+                        t_names_res = conn.execute(
+                            sqlt("SELECT TABLE_NAME FROM information_schema.tables WHERE TABLE_SCHEMA = :db ORDER BY TABLE_NAME"),
+                            {"db": db_name}
+                        ).fetchall()
+                        tables = [r[0] for r in t_names_res]
+
+                        is_curr = (db_name == curr_active_db)
+                        discovered.append({
+                            "name": db_name,
+                            "type": "mysql",
+                            "host": h,
+                            "port": p,
+                            "user": u,
+                            "tables_count": t_count,
+                            "tables": tables,
+                            "estimated_rows": total_rows,
+                            "is_current": is_curr,
+                            "summary": f"{t_count} tabelle • ~{total_rows:,} record",
+                        })
+                    except Exception:
+                        discovered.append({
+                            "name": db_name,
+                            "type": "mysql",
+                            "host": h,
+                            "port": p,
+                            "user": u,
+                            "tables_count": 0,
+                            "tables": [],
+                            "estimated_rows": 0,
+                            "is_current": (db_name == curr_active_db),
+                            "summary": "schema accessibile",
+                        })
+        finally:
+            try:
+                eng_sys.dispose()
+            except Exception:
+                pass
+
+        discovered.sort(key=lambda x: (not x.get("is_current", False), x["name"]))
+    except Exception:
+        pass
+
+    return discovered
+
+
+def resolve_supabase_user_uuid(
+    target_engine: Optional[Engine] = None,
+    user_id: Optional[str] = None,
+    owner: Optional[str] = None,
+) -> Optional[str]:
+    """
+    Risolve e valida un UUID valido per Supabase auth.users.
+    Se user_id è già un UUID valido, lo restituisce.
+    Se user_id è una stringa non-UUID (es. 'local-owner'), cerca l'utente reale in auth.users su Supabase
+    o restituisce None se nessun account associabile è presente.
+    """
+    import uuid
+
+    if user_id:
+        try:
+            return str(uuid.UUID(str(user_id)))
+        except (ValueError, AttributeError, TypeError):
+            pass
+
+    if target_engine is not None:
+        try:
+            tgt_dialect = getattr(getattr(target_engine, "dialect", None), "name", "")
+            if tgt_dialect == "postgresql":
+                with target_engine.connect() as conn:
+                    # 1. Match per email se owner o user_id contiene '@'
+                    candidate_email = (
+                        owner
+                        if (owner and "@" in str(owner))
+                        else (user_id if (user_id and "@" in str(user_id)) else None)
+                    )
+                    if candidate_email:
+                        row = conn.execute(
+                            sqlt("SELECT id FROM auth.users WHERE LOWER(email) = LOWER(:em) LIMIT 1"),
+                            {"em": str(candidate_email).strip()},
+                        ).fetchone()
+                        if row and row[0]:
+                            return str(row[0])
+
+                    # 2. Se c'è un solo utente registrato su auth.users, usa quello
+                    rows = conn.execute(sqlt("SELECT id, email FROM auth.users LIMIT 2")).fetchall()
+                    if len(rows) == 1 and rows[0][0]:
+                        return str(rows[0][0])
+                    elif len(rows) > 1 and owner:
+                        for r in rows:
+                            if owner.lower() in str(r[1]).lower():
+                                return str(r[0])
+        except Exception:
+            pass
+
+    return None
+
+
 def migrate_local_to_supabase(
-    sqlite_path: str = "data/argus_local.db",
+    sqlite_path: Optional[str] = "data/argus_local.db",
     target_db_url: Optional[str] = None,
     target_engine: Optional[Engine] = None,
     include_market_prices: bool = False,
     user_id: Optional[str] = None,
     owner: Optional[str] = None,
+    source_type: str = "sqlite",
+    mysql_db_name: Optional[str] = None,
+    mysql_host: Optional[str] = None,
+    mysql_port: Optional[int] = None,
+    mysql_user: Optional[str] = None,
+    mysql_pass: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
-    Esegue il travaso completo 1-click dal database locale SQLite specificato
+    Esegue il travaso completo 1-click dal database locale (SQLite oppure MySQL)
     al database cloud Supabase PostgreSQL (o ad un `target_engine` specificato).
     - Inizializza tutte le tabelle sul target.
     - Trasferisce tutti i dati Wealth, Risk e Dichiarazioni/Certificazioni Fiscali.
     - Associa opzionalmente user_id e owner per isolamento Supabase RLS.
     - Riallinea le sequenze SERIAL di PostgreSQL (`reset_postgres_sequences`).
     """
-    from core.fetcher import get_engine
-    from core.wealth.wealth_db import sync_wealth_tables_between_engines
+    import urllib.parse
 
-    if not Path(sqlite_path).exists():
-        raise FileNotFoundError(f"Database SQLite sorgente non trovato: {sqlite_path}")
+    from sqlalchemy import create_engine
+
+    from core.wealth.wealth_db import sync_wealth_tables_between_engines
 
     # Risoluzione automatica di user_id e owner se non specificati
     if not user_id or not owner:
@@ -1451,7 +1663,24 @@ def migrate_local_to_supabase(
         except Exception:
             pass
 
-    src_engine = get_engine(offline=True, sqlite_path=sqlite_path)
+    if source_type == "mysql" or mysql_db_name:
+        m_host = mysql_host or os.getenv("MYSQL_HOST") or "localhost"
+        m_port = int(mysql_port or os.getenv("MYSQL_PORT") or 3306)
+        m_user = mysql_user or os.getenv("MYSQL_USER") or "root"
+        m_pass = mysql_pass if mysql_pass is not None else (os.getenv("MYSQL_PASSWORD") or "root")
+        m_db = mysql_db_name or "wealth"
+        safe_pass = urllib.parse.quote_plus(str(m_pass))
+        mysql_url = f"mysql+pymysql://{m_user}:{safe_pass}@{m_host}:{m_port}/{m_db}"
+        src_engine = create_engine(mysql_url, echo=False, connect_args={"connect_timeout": 5})
+        source_label = f"MySQL schema '{m_db}'"
+    else:
+        if not sqlite_path or not Path(sqlite_path).exists():
+            raise FileNotFoundError(f"Database SQLite sorgente non trovato: {sqlite_path}")
+        from core.fetcher import get_engine
+
+        src_engine = get_engine(offline=True, sqlite_path=sqlite_path)
+        source_label = f"SQLite file '{sqlite_path}'"
+
     tgt_engine = target_engine
 
     try:
@@ -1459,8 +1688,12 @@ def migrate_local_to_supabase(
             tgt_engine = create_supabase_engine(target_db_url, use_cache=True)
 
         SupabaseAuthManager.ensure_users_table(tgt_engine)
+
+        # Risoluzione protetta UUID per PostgreSQL / Supabase
+        valid_user_uuid = resolve_supabase_user_uuid(tgt_engine, user_id=user_id, owner=owner)
+
         sync_results = sync_wealth_tables_between_engines(
-            src_engine, tgt_engine, user_id=user_id, owner=owner
+            src_engine, tgt_engine, user_id=valid_user_uuid, owner=owner
         )
 
         if include_market_prices:
@@ -1477,13 +1710,15 @@ def migrate_local_to_supabase(
         seq_synced = reset_postgres_sequences(tgt_engine)
         record_cloud_heartbeat(
             tgt_engine,
-            source="sqlite_to_supabase_migration",
-            details=f"Migrated {sum(v for v in sync_results.values() if isinstance(v, int))} rows",
+            source=f"{source_type}_to_supabase_migration",
+            details=f"Migrated {sum(v for v in sync_results.values() if isinstance(v, int))} rows from {source_label}",
         )
 
         total_migrated = sum(v for v in sync_results.values() if isinstance(v, int))
         return {
             "ok": True,
+            "source_type": source_type,
+            "source_label": source_label,
             "total_rows_migrated": total_migrated,
             "tables": sync_results,
             "sequences_reset": seq_synced,
@@ -2271,15 +2506,18 @@ def get_active_account_badge_info() -> Dict[str, str]:
         role, uname, disp, custom_db = "owner", "alessandro", "Alessandro (Titolare)", ""
 
     if role == "owner":
+        cloud_active = is_supabase_cloud_authenticated()
+        badge_lbl = "👑 OWNER (CLOUD)" if cloud_active else "👑 OWNER (LOCALE)"
+        desc = "Accesso Completo Cloud & Locale" if cloud_active else "Workstation Locale • Cloud Protetto"
         return {
             "role": "owner",
             "username": "alessandro" if uname in ("user", "owner", "") else uname,
             "display_name": disp,
-            "badge_label": "👑 OWNER VAULT",
+            "badge_label": badge_lbl,
             "badge_color": "#f59e0b",
             "badge_bg": "rgba(245, 158, 11, 0.16)",
             "badge_border": "rgba(245, 158, 11, 0.38)",
-            "isolation_desc": "Accesso Completo (Personale + Archetipi)",
+            "isolation_desc": desc,
         }
     if role == "guest_demo":
         return {
@@ -2351,6 +2589,105 @@ def render_supabase_cloud_panel(engine: Optional[Engine] = None) -> None:
         unsafe_allow_html=True,
     )
 
+    is_cloud_auth = is_supabase_cloud_authenticated()
+    if not is_cloud_auth:
+        st.markdown(
+            """
+            <div style="padding:12px 14px;border-radius:8px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.32);margin-bottom:12px;">
+                <div style="font-size:0.80rem;font-weight:700;color:#fbbf24;display:flex;align-items:center;gap:6px;">
+                    🔒 Autenticazione Cloud Supabase Richiesta
+                </div>
+                <div style="font-size:0.74rem;color:#cbd5e1;margin-top:4px;line-height:1.45;">
+                    Sei attualmente autenticato in <b>Modalità Locale Workstation</b> (dati locali MySQL/SQLite protetti e isolati).<br/>
+                    Per connetterti al database PostgreSQL remoto Supabase, testare la rete cloud, sincronizzare o migrare schemi,
+                    inserisci le tue credenziali Supabase.
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        with st.form("sb_cloud_auth_gate_form"):
+            c_auth_mail, c_auth_pwd = st.columns([1.1, 1.1])
+            with c_auth_mail:
+                cloud_email = st.text_input(
+                    "Email Supabase",
+                    value=st.session_state.get("argus_auth_email", "alessandro.saladino@live.it"),
+                    key="sb_cloud_gate_email",
+                    placeholder="alessandro.saladino@live.it",
+                ).strip()
+            with c_auth_pwd:
+                cloud_pwd = st.text_input(
+                    "Password Supabase",
+                    type="password",
+                    key="sb_cloud_gate_pwd",
+                    placeholder="Password del tuo account Supabase...",
+                ).strip()
+
+            submit_cloud_auth = st.form_submit_button(
+                "🔑 Autentica e Sblocca Connessione Cloud",
+                use_container_width=True,
+            )
+
+        if submit_cloud_auth:
+            if not cloud_pwd:
+                st.error("⚠️ Inserisci la password per completare l'autenticazione Cloud.")
+            else:
+                with st.spinner("Verifica credenziali con Supabase GoTrue Auth..."):
+                    from core.auth_manager import AuthManager
+
+                    res = AuthManager.login(cloud_email, cloud_pwd, remember_session=True)
+                    if res.get("ok"):
+                        st.session_state["supabase_cloud_authenticated"] = True
+                        st.session_state["argus_auth_verified"] = True
+                        st.session_state["authenticated"] = True
+                        st.success("✅ Autenticazione Cloud Supabase completata con successo! Connessione sbloccata.")
+                        import time
+
+                        time.sleep(0.4)
+                        st.rerun()
+                    else:
+                        st.error(f"❌ Autenticazione fallita: {res.get('error', 'Credenziali errate.')}")
+
+        return
+
+    # Se autenticato con Supabase Cloud:
+    auth_user = st.session_state.get("user")
+    auth_email = ""
+    if auth_user:
+        auth_email = getattr(auth_user, "email", "") if hasattr(auth_user, "email") else auth_user.get("email", "")
+    if not auth_email:
+        auth_email = st.session_state.get("argus_auth_email", "alessandro.saladino@live.it")
+
+    c_status, c_disconnect = st.columns([1.8, 1.2])
+    with c_status:
+        st.markdown(
+            f"""
+            <div style="padding:6px 10px;border-radius:6px;background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.30);display:flex;align-items:center;gap:6px;">
+                <span style="font-size:0.75rem;color:#34d399;font-weight:600;">
+                    🟢 Cloud Autenticato: <code>{auth_email}</code>
+                </span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with c_disconnect:
+        if st.button(
+            "🔒 Torna a Solo Locale",
+            key="sb_btn_disconnect_cloud",
+            use_container_width=True,
+            help="Disconnette l'account Supabase Cloud e reimposta la sessione su workstation locale protetta.",
+        ):
+            from core.auth_manager import AuthManager
+
+            AuthManager.login_local_owner(remember_session=True)
+            st.session_state["supabase_cloud_authenticated"] = False
+            st.info("ℹ️ Cloud disconnesso. Sei tornato in modalità Solo Locale.")
+            import time
+
+            time.sleep(0.3)
+            st.rerun()
+
     curr_db_pass = st.session_state.get("supabase_db_password", "") or _read_secret_or_env("SUPABASE_DB_PASSWORD")
     new_db_pass = st.text_input(
         f"🔑 Password Database Supabase (Progetto `{proj_ref}`)",
@@ -2412,66 +2749,125 @@ def render_supabase_cloud_panel(engine: Optional[Engine] = None) -> None:
         else:
             st.error(f"❌ Connessione fallita: {diag['error']}")
 
-    with st.expander("🚀 Migrazione SQLite Locale ➔ Supabase Cloud", expanded=False):
+    with st.expander("🚀 Migrazione Database Locale ➔ Supabase Cloud", expanded=False):
         st.markdown(
             "<div style='font-size:0.75rem;color:#94a3b8;margin-bottom:8px;'>"
-            "Seleziona quale database SQLite locale trasferire su Supabase. "
+            "Seleziona quale database locale (schema MySQL locale o file SQLite) trasferire su Supabase. "
             "I dati migrati verranno protetti con Row-Level Security (RLS) e associati al tuo account."
             "</div>",
             unsafe_allow_html=True,
         )
 
-        discovered_dbs = get_available_local_sqlite_dbs()
-        db_options = []
-        db_map = {}
-        for d in discovered_dbs:
-            pref = "⭐ " if d["is_default"] else "📁 "
-            lbl = f"{pref}{d['path']} ({d['summary']})"
-            db_options.append(lbl)
-            db_map[lbl] = d
-
-        db_options.append("📂 Inserisci percorso personalizzato...")
-        db_options.append("📤 Carica file .db SQLite...")
-
-        selected_lbl = st.selectbox(
-            "Database SQLite sorgente:",
-            options=db_options,
-            index=0 if db_options else 0,
-            key="sb_select_local_sqlite_db",
-            help="Scegli quale file .db locale contiene i dati (portafogli, conti, transazioni) che desideri migrare.",
+        source_kind = st.radio(
+            "Tipo di origine locale:",
+            options=["🐬 Database MySQL Locale", "📁 File SQLite Locale (.db)"],
+            index=0,
+            horizontal=True,
+            key="sb_migration_source_kind",
         )
 
+        selected_source_type = "mysql" if "MySQL" in str(source_kind) else "sqlite"
         selected_sqlite_path = None
-        if selected_lbl == "📂 Inserisci percorso personalizzato...":
-            custom_path = st.text_input(
-                "Percorso file SQLite locale:",
-                value="data/argus_local.db",
-                key="sb_custom_sqlite_input",
-                placeholder="es. data/mio_portafoglio.db",
-            ).strip()
-            selected_sqlite_path = custom_path
-        elif selected_lbl == "📤 Carica file .db SQLite...":
-            uploaded_file = st.file_uploader(
-                "Trascina qui il file .db",
-                type=["db", "sqlite", "sqlite3"],
-                key="sb_uploaded_sqlite_file",
-            )
-            if uploaded_file is not None:
-                os.makedirs("data", exist_ok=True)
-                uploaded_path = os.path.join("data", f"uploaded_{uploaded_file.name}")
-                with open(uploaded_path, "wb") as f:
-                    f.write(uploaded_file.getbuffer())
-                selected_sqlite_path = uploaded_path
-                st.info(f"File caricato con successo: `{uploaded_file.name}` ({len(uploaded_file.getbuffer()) / 1024:.1f} KB)")
+        selected_mysql_db = None
+
+        if selected_source_type == "mysql":
+            mysql_dbs = get_available_mysql_dbs_info()
+            if mysql_dbs:
+                m_options = []
+                m_map = {}
+                for m in mysql_dbs:
+                    pref = "⭐ " if m.get("is_current") else "🐬 "
+                    lbl = f"{pref}{m['name']} ({m['summary']})"
+                    m_options.append(lbl)
+                    m_map[lbl] = m
+
+                m_options.append("➕ Altro schema / Credenziali personalizzate...")
+
+                sel_m_lbl = st.selectbox(
+                    "Schema MySQL locale sorgente:",
+                    options=m_options,
+                    index=0,
+                    key="sb_select_mysql_db",
+                    help="Seleziona quale database MySQL locale (es. wealth, investment_risk_bi) desideri migrare su Supabase.",
+                )
+
+                if sel_m_lbl == "➕ Altro schema / Credenziali personalizzate...":
+                    c_col1, c_col2 = st.columns(2)
+                    with c_col1:
+                        st.text_input("Host MySQL:", value="localhost", key="sb_custom_m_host")
+                        st.text_input("Utente MySQL:", value="root", key="sb_custom_m_user")
+                    with c_col2:
+                        st.number_input("Porta MySQL:", value=3306, step=1, key="sb_custom_m_port")
+                        st.text_input("Password MySQL:", value="root", type="password", key="sb_custom_m_pass")
+                    selected_mysql_db = st.text_input("Nome Database/Schema MySQL:", value="wealth", key="sb_custom_m_db").strip()
+                else:
+                    m_meta = m_map.get(sel_m_lbl)
+                    if m_meta:
+                        selected_mysql_db = m_meta["name"]
+                        with st.expander("📊 Anteprima contenuto schema MySQL", expanded=False):
+                            st.write(f"**Schema**: `{m_meta['name']}`")
+                            st.write(f"**Host**: `{m_meta.get('host', 'localhost')}:{m_meta.get('port', 3306)}`")
+                            st.write(f"**Tabelle ({m_meta['tables_count']})**: {', '.join(m_meta['tables'][:20])}{' ...' if len(m_meta['tables']) > 20 else ''}")
+                            st.write(f"**Record totali stimati**: `~{m_meta['estimated_rows']:,}`")
+            else:
+                st.warning("⚠️ Nessun database MySQL locale rilevato automaticamente su localhost:3306.")
+                selected_mysql_db = st.text_input(
+                    "Nome database MySQL:",
+                    value=st.session_state.get("db_name", "wealth"),
+                    key="sb_fallback_mysql_db",
+                    help="Inserisci il nome del database MySQL locale da migrare (es. wealth o investment_risk_bi).",
+                ).strip()
         else:
-            selected_meta = db_map.get(selected_lbl)
-            if selected_meta:
-                selected_sqlite_path = selected_meta["path"]
-                with st.expander("📊 Anteprima contenuto database", expanded=False):
-                    st.write(f"**Percorso**: `{selected_meta['path']}`")
-                    st.write(f"**Dimensione**: `{selected_meta['size_str']}`")
-                    st.write(f"**Tabelle ({selected_meta['tables_count']})**: {', '.join(selected_meta['tables'])}")
-                    st.write(f"**Record totali stimati**: `~{selected_meta['estimated_rows']:,}`")
+            discovered_dbs = get_available_local_sqlite_dbs()
+            db_options = []
+            db_map = {}
+            for d in discovered_dbs:
+                pref = "⭐ " if d["is_default"] else "📁 "
+                lbl = f"{pref}{d['path']} ({d['summary']})"
+                db_options.append(lbl)
+                db_map[lbl] = d
+
+            db_options.append("📂 Inserisci percorso personalizzato...")
+            db_options.append("📤 Carica file .db SQLite...")
+
+            selected_lbl = st.selectbox(
+                "Database SQLite sorgente:",
+                options=db_options,
+                index=0 if db_options else 0,
+                key="sb_select_local_sqlite_db",
+                help="Scegli quale file .db locale contiene i dati (portafogli, conti, transazioni) che desideri migrare.",
+            )
+
+            if selected_lbl == "📂 Inserisci percorso personalizzato...":
+                custom_path = st.text_input(
+                    "Percorso file SQLite locale:",
+                    value="data/argus_local.db",
+                    key="sb_custom_sqlite_input",
+                    placeholder="es. data/mio_portafoglio.db",
+                ).strip()
+                selected_sqlite_path = custom_path
+            elif selected_lbl == "📤 Carica file .db SQLite...":
+                uploaded_file = st.file_uploader(
+                    "Trascina qui il file .db",
+                    type=["db", "sqlite", "sqlite3"],
+                    key="sb_uploaded_sqlite_file",
+                )
+                if uploaded_file is not None:
+                    os.makedirs("data", exist_ok=True)
+                    uploaded_path = os.path.join("data", f"uploaded_{uploaded_file.name}")
+                    with open(uploaded_path, "wb") as f:
+                        f.write(uploaded_file.getbuffer())
+                    selected_sqlite_path = uploaded_path
+                    st.info(f"File caricato con successo: `{uploaded_file.name}` ({len(uploaded_file.getbuffer()) / 1024:.1f} KB)")
+            else:
+                selected_meta = db_map.get(selected_lbl)
+                if selected_meta:
+                    selected_sqlite_path = selected_meta["path"]
+                    with st.expander("📊 Anteprima contenuto database SQLite", expanded=False):
+                        st.write(f"**Percorso**: `{selected_meta['path']}`")
+                        st.write(f"**Dimensione**: `{selected_meta['size_str']}`")
+                        st.write(f"**Tabelle ({selected_meta['tables_count']})**: {', '.join(selected_meta['tables'])}")
+                        st.write(f"**Record totali stimati**: `~{selected_meta['estimated_rows']:,}`")
 
         # Target user preview for RLS visibility
         user_sess = st.session_state.get("user")
@@ -2479,35 +2875,77 @@ def render_supabase_cloud_panel(engine: Optional[Engine] = None) -> None:
         if user_sess:
             target_label = (
                 getattr(user_sess, "email", None)
-                or getattr(user_sess, "id", None)
                 or (user_sess.get("email") if isinstance(user_sess, dict) else None)
+                or getattr(user_sess, "username", None)
+                or (user_sess.get("username") if isinstance(user_sess, dict) else None)
+                or getattr(user_sess, "id", None)
                 or (user_sess.get("id") if isinstance(user_sess, dict) else None)
                 or "Utente Attivo"
             )
+        if target_label in ("local-owner", "Utente Attivo"):
+            target_label = "alessandro.saladino@live.it (Titolare)"
         st.caption(f"👤 **Account Supabase Destinazione**: `{target_label}` (Isolamento RLS attivo)")
+
+        has_valid_source = (
+            bool(selected_mysql_db) if selected_source_type == "mysql"
+            else (bool(selected_sqlite_path) and os.path.exists(selected_sqlite_path))
+        )
 
         if st.button(
             "🚀 Avvia Migrazione su Supabase",
             use_container_width=True,
             key="sb_btn_migrate_supa",
-            disabled=not bool(active_target_url) or not bool(selected_sqlite_path),
+            disabled=not bool(active_target_url) or not has_valid_source,
             help="Copia conti, transazioni, movimenti, asset e documenti fiscali nel tuo DB Supabase.",
         ):
-            if not selected_sqlite_path or not os.path.exists(selected_sqlite_path):
+            if selected_source_type == "sqlite" and (not selected_sqlite_path or not os.path.exists(selected_sqlite_path)):
                 st.error(f"❌ File database non trovato: `{selected_sqlite_path}`")
+            elif selected_source_type == "mysql" and not selected_mysql_db:
+                st.error("❌ Nessun database MySQL selezionato per la migrazione.")
             else:
                 try:
-                    with st.spinner(f"Migrazione crittografata da '{selected_sqlite_path}' verso Supabase in corso..."):
-                        mig_res = migrate_local_to_supabase(
-                            sqlite_path=selected_sqlite_path,
-                            target_db_url=active_target_url,
+                    src_descr = f"MySQL '{selected_mysql_db}'" if selected_source_type == "mysql" else f"'{selected_sqlite_path}'"
+                    with st.spinner(f"Migrazione crittografata da {src_descr} verso Supabase in corso..."):
+                        if selected_source_type == "mysql":
+                            c_host = st.session_state.get("sb_custom_m_host")
+                            c_port = st.session_state.get("sb_custom_m_port")
+                            c_user = st.session_state.get("sb_custom_m_user")
+                            c_pass = st.session_state.get("sb_custom_m_pass")
+                            mig_res = migrate_local_to_supabase(
+                                source_type="mysql",
+                                mysql_db_name=selected_mysql_db,
+                                mysql_host=c_host,
+                                mysql_port=c_port,
+                                mysql_user=c_user,
+                                mysql_pass=c_pass,
+                                target_db_url=active_target_url,
+                            )
+                        else:
+                            mig_res = migrate_local_to_supabase(
+                                source_type="sqlite",
+                                sqlite_path=selected_sqlite_path,
+                                target_db_url=active_target_url,
+                            )
+
+                    tables_res = mig_res.get("tables", {})
+                    err_tables = [t for t, c in tables_res.items() if str(c).startswith("Error")]
+
+                    if err_tables:
+                        st.warning(
+                            f"⚠️ Migrazione parziale: **{mig_res['total_rows_migrated']}** record trasferiti, "
+                            f"ma {len(err_tables)} tabelle hanno restituito anomalie."
                         )
-                    st.success(
-                        f"🎉 Migrazione completata! **{mig_res['total_rows_migrated']}** record trasferiti su Supabase da `{selected_sqlite_path}`."
-                    )
+                    else:
+                        st.success(
+                            f"🎉 Migrazione completata con successo! **{mig_res['total_rows_migrated']}** record trasferiti su Supabase da {src_descr}."
+                        )
+
                     with st.expander("📋 Riepilogo tabelle trasferite", expanded=True):
-                        for tbl, cnt in mig_res.get("tables", {}).items():
-                            st.write(f"- `{tbl}`: **{cnt}**")
+                        for tbl, cnt in tables_res.items():
+                            if str(cnt).startswith("Error"):
+                                st.markdown(f"- ❌ `{tbl}`: {cnt}")
+                            else:
+                                st.markdown(f"- ✅ `{tbl}`: **{cnt}** record")
                 except Exception as ex:
                     st.error(f"Errore durante la migrazione verso Supabase: {ex}")
 

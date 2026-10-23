@@ -1075,6 +1075,13 @@ def render_settings_dialog(current_module: str = "risk") -> None:
         curr_env = st.session_state.get("data_environment", "Auto (Ibrido)")
         env_idx = env_opts.index(curr_env) if curr_env in env_opts else 0
         sel_env = st.selectbox("Sorgente Dati", env_opts, index=env_idx, key="sb_data_environment")
+
+        from core.supabase_cloud import is_supabase_cloud_authenticated
+
+        is_cloud_auth = is_supabase_cloud_authenticated()
+        if sel_env == "Supabase Cloud (PostgreSQL)" and not is_cloud_auth:
+            st.warning("⚠️ Per connetterti a Supabase Cloud è richiesta l'autenticazione. Sblocca la connessione nel riquadro sottostante.")
+
         if sel_env != curr_env:
             st.session_state.data_environment = sel_env
             force_off = sel_env == "Local SQLite"
@@ -1112,11 +1119,11 @@ def render_settings_dialog(current_module: str = "risk") -> None:
 
         # Pannello Cloud Supabase (€0/mese)
         try:
-            from core.supabase_cloud import is_supabase_configured, render_supabase_cloud_panel
+            from core.supabase_cloud import render_supabase_cloud_panel
 
             with st.expander(
                 "☁️ Cloud Supabase & Deploy Online (€0/mese)",
-                expanded=is_supabase_configured() or sel_env == "Supabase Cloud (PostgreSQL)",
+                expanded=sel_env == "Supabase Cloud (PostgreSQL)",
             ):
                 render_supabase_cloud_panel(engine=st.session_state.get("engine"))
         except Exception as supa_ui_ex:
@@ -1768,12 +1775,6 @@ def render_sidebar():
             import logging
             logging.getLogger(__name__).warning("Command Palette injection notice: %s", _e_cp)
 
-        # ── 0.1 SINGLE SOURCE OF TRUTH: PORTFOLIO SELECTOR ──
-        try:
-            from core.workspace_context import render_portfolio_selector
-            render_portfolio_selector(key="sb_unified_portfolio_selector", label="💼 Portafoglio Attivo")
-        except Exception as _e_psel:
-            logger.debug("Sidebar portfolio selector notice: %s", _e_psel)
 
         # ── 1. MODALITÀ DI ESECUZIONE & ENGINE PARAMETERS (IN ALTO) ─────
         init_settings_session_state(is_wealth_mode=is_wealth_mode)
@@ -1922,11 +1923,10 @@ def render_sidebar():
         )
         active_port_label = port_label if len(port_label) <= 26 else f"{port_label[:24]}..."
         active_eng = st.session_state.get("engine")
-        is_pg_engine = (
-            active_eng is not None
-            and getattr(getattr(active_eng, "dialect", None), "name", "") == "postgresql"
-        )
-        is_supa_cloud = (not st.session_state.offline_mode) and (is_pg_engine or is_supabase_configured())
+        active_dialect = getattr(getattr(active_eng, "dialect", None), "name", "").lower()
+        is_pg_engine = (active_eng is not None and active_dialect == "postgresql")
+        is_mysql_engine = (active_eng is not None and "mysql" in active_dialect)
+        is_supa_cloud = (not st.session_state.offline_mode) and is_pg_engine
 
         if is_wealth_mode:
             w_needs = int(st.session_state.get("wealth_budget_needs_pct", 50))
@@ -1937,12 +1937,15 @@ def render_sidebar():
             if is_offline:
                 w_status_badge = '<span style="font-size:10px; font-weight:800; color:#ff9900; background:rgba(255, 153, 0, 0.15); padding: 2px 7px; border-radius:12px; letter-spacing:0.5px;">🟡 OFFLINE</span>'
                 w_db_label = "SQLite Locale"
-            elif is_supa_cloud:
+            elif is_pg_engine:
                 w_status_badge = '<span style="font-size:10px; font-weight:800; color:#38bdf8; background:rgba(56, 189, 248, 0.20); padding: 2px 7px; border-radius:12px; letter-spacing:0.5px;">☁️ SUPABASE</span>'
-                w_db_label = "Supabase Cloud"
+                w_db_label = "PostgreSQL Cloud"
+            elif is_mysql_engine:
+                w_status_badge = '<span style="font-size:10px; font-weight:800; color:#10b981; background:rgba(16, 185, 129, 0.20); padding: 2px 7px; border-radius:12px; letter-spacing:0.5px;">🐬 MYSQL</span>'
+                w_db_label = f"localhost ({st.session_state.get('db_name', 'wealth')})"
             else:
                 w_status_badge = '<span style="font-size:10px; font-weight:800; color:#34d399; background:rgba(16, 185, 129, 0.20); padding: 2px 7px; border-radius:12px; letter-spacing:0.5px;">🟢 LIVE DB</span>'
-                w_db_label = f"{st.session_state.db_name}"
+                w_db_label = f"{st.session_state.get('db_name', 'wealth')}"
 
             st.markdown(
                 f"""
@@ -2116,19 +2119,30 @@ def render_sidebar():
             is_offline = st.session_state.offline_mode
             status_bg = "rgba(255, 153, 0, 0.08)" if is_offline else "rgba(35, 134, 54, 0.10)"
             status_border = "rgba(255, 153, 0, 0.35)" if is_offline else "rgba(46, 160, 67, 0.35)"
-            status_badge_bg = (
-                "rgba(255, 153, 0, 0.15)"
-                if is_offline
-                else ("rgba(56, 189, 248, 0.20)" if is_supa_cloud else "rgba(46, 160, 67, 0.20)")
-            )
-            status_badge_color = "#ff9900" if is_offline else ("#38bdf8" if is_supa_cloud else "#3fb950")
-            status_text = "OFFLINE" if is_offline else ("SUPABASE" if is_supa_cloud else "LIVE DB")
-            status_icon = "🟡" if is_offline else ("☁️" if is_supa_cloud else "🟢")
-            active_db_label = (
-                "In-Memory"
-                if is_offline
-                else ("Supabase Cloud" if is_supa_cloud else f"{st.session_state.db_name}")
-            )
+            if is_offline:
+                status_badge_bg = "rgba(255, 153, 0, 0.15)"
+                status_badge_color = "#ff9900"
+                status_text = "OFFLINE"
+                status_icon = "🟡"
+                active_db_label = "In-Memory"
+            elif is_pg_engine:
+                status_badge_bg = "rgba(56, 189, 248, 0.20)"
+                status_badge_color = "#38bdf8"
+                status_text = "SUPABASE"
+                status_icon = "☁️"
+                active_db_label = "PostgreSQL Cloud"
+            elif is_mysql_engine:
+                status_badge_bg = "rgba(16, 185, 129, 0.20)"
+                status_badge_color = "#10b981"
+                status_text = "MYSQL"
+                status_icon = "🐬"
+                active_db_label = f"localhost ({st.session_state.get('db_name', 'investment_risk_bi')})"
+            else:
+                status_badge_bg = "rgba(46, 160, 67, 0.20)"
+                status_badge_color = "#3fb950"
+                status_text = "LIVE DB"
+                status_icon = "🟢"
+                active_db_label = f"{st.session_state.get('db_name', 'investment_risk_bi')}"
 
             st.markdown(
                 f"""
@@ -2158,6 +2172,19 @@ def render_sidebar():
             """,
                 unsafe_allow_html=True,
             )
+
+            # Selettore Rapido Portafoglio (visibile solo se l'utente ha 2+ portafogli salvati nel DB)
+            try:
+                from core.workspace_context import render_portfolio_selector
+
+                render_portfolio_selector(
+                    key="sb_unified_portfolio_selector",
+                    label="💼 Seleziona Portafoglio",
+                    only_if_multiple=True,
+                    show_fallback=False,
+                )
+            except Exception as _e_psel:
+                logger.debug("Sidebar portfolio selector notice: %s", _e_psel)
 
         st.markdown(
             '<div class="sidebar-section-header" style="margin-top: 10px; margin-bottom: 4px; font-size: 10px; font-weight: 800; color: #8b949e; text-transform: uppercase; letter-spacing: 0.8px;">CAMBIA AMBIENTE</div>',

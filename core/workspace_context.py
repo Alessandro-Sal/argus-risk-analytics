@@ -18,6 +18,11 @@ from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 import pandas as pd
 
+try:
+    import streamlit as st
+except ImportError:
+    st = None
+
 logger = logging.getLogger("argus.workspace")
 
 
@@ -1262,58 +1267,60 @@ def set_active_portfolio(portfolio_id: Union[str, int], engine: Optional[Any] = 
     port_name = port_meta.get("name", f"Portafoglio #{portfolio_id}") if port_meta else f"Portafoglio #{portfolio_id}"
     base_curr = port_meta.get("base_currency", "EUR") if port_meta else "EUR"
 
-    # 3. Calcolo o recupero posizioni & metriche
+    # 3. Calcolo o recupero posizioni & metriche (Priorità 1: Snapshot DB a latenza sub-secondo)
     results_bundle = None
     try:
-        from core.risk_engine import compute_risk
+        from core.db_exporter import get_snapshot_positions_by_id
 
-        rf_val = st.session_state.get("active_rf_rate", 0.03) if st else 0.03
-        bm = st.session_state.get("benchmark", "SPY") if st else "SPY"
-        results_bundle = compute_risk(
-            target_pid, engine, benchmark_ticker=bm, risk_free_rate=rf_val, base_currency=base_curr
-        )
-    except Exception as e_calc:
-        logger.info("compute_risk su portafoglio %s ha richiesto fallback snapshot: %s", target_pid, e_calc)
-        try:
-            from core.db_exporter import get_snapshot_positions_by_id
-
-            with engine.connect() as conn:
-                snap_row = conn.execute(
-                    sqlt(
-                        "SELECT * FROM portfolio_snapshots WHERE portfolio_id = :pid ORDER BY calc_date DESC, snapshot_id DESC LIMIT 1"
-                    ),
-                    {"pid": target_pid},
-                ).mappings().fetchone()
-            if snap_row:
-                sid = snap_row.get("snapshot_id")
-                df_pos = get_snapshot_positions_by_id(engine, sid)
-                tot_val = float(snap_row.get("total_value") or 0.0)
-                results_bundle = {
-                    "portfolio_id": target_pid,
-                    "portfolio_name": port_name,
-                    "base_currency": base_curr,
-                    "computed_at": str(snap_row.get("calc_date")),
-                    "total_value": tot_val,
-                    "portfolio_value": tot_val,
-                    "positions": df_pos if df_pos is not None else pd.DataFrame(),
-                    "metrics": {
-                        "returns": {
-                            "total_value": tot_val,
-                            "cagr_pct": float(snap_row.get("cagr_pct") or 0.0),
-                            "sharpe_ratio": float(snap_row.get("sharpe_ratio") or 0.0),
-                            "total_pnl": float(snap_row.get("total_pnl") or 0.0),
-                        },
-                        "market_risk": {
-                            "volatility_annual_pct": float(snap_row.get("volatility_annual_pct") or 0.0),
-                            "max_drawdown_pct": float(snap_row.get("max_drawdown_pct") or 0.0),
-                            "var_95": float(snap_row.get("var_95_pct") or 0.0),
-                            "cvar_95": float(snap_row.get("cvar_95_pct") or 0.0),
-                            "beta": float(snap_row.get("ff_beta_mkt") or 1.0),
-                        },
+        with engine.connect() as conn:
+            snap_row = conn.execute(
+                sqlt(
+                    "SELECT * FROM portfolio_snapshots WHERE portfolio_id = :pid ORDER BY calc_date DESC, snapshot_id DESC LIMIT 1"
+                ),
+                {"pid": target_pid},
+            ).mappings().fetchone()
+        if snap_row:
+            sid = snap_row.get("snapshot_id")
+            df_pos = get_snapshot_positions_by_id(engine, sid)
+            tot_val = float(snap_row.get("total_value") or 0.0)
+            results_bundle = {
+                "portfolio_id": target_pid,
+                "portfolio_name": port_name,
+                "base_currency": base_curr,
+                "computed_at": str(snap_row.get("calc_date")),
+                "total_value": tot_val,
+                "portfolio_value": tot_val,
+                "positions": df_pos if df_pos is not None else pd.DataFrame(),
+                "metrics": {
+                    "returns": {
+                        "total_value": tot_val,
+                        "cagr_pct": float(snap_row.get("cagr_pct") or 0.0),
+                        "sharpe_ratio": float(snap_row.get("sharpe_ratio") or 0.0),
+                        "total_pnl": float(snap_row.get("total_pnl") or 0.0),
                     },
-                }
-        except Exception as e_snap:
-            logger.debug("Recupero snapshot fallito: %s", e_snap)
+                    "market_risk": {
+                        "volatility_annual_pct": float(snap_row.get("volatility_annual_pct") or 0.0),
+                        "max_drawdown_pct": float(snap_row.get("max_drawdown_pct") or 0.0),
+                        "var_95": float(snap_row.get("var_95_pct") or 0.0),
+                        "cvar_95": float(snap_row.get("cvar_95_pct") or 0.0),
+                        "beta": float(snap_row.get("ff_beta_mkt") or 1.0),
+                    },
+                },
+            }
+    except Exception as e_snap:
+        logger.debug("Recupero snapshot DB veloce fallito: %s", e_snap)
+
+    if results_bundle is None:
+        try:
+            from core.risk_engine import compute_risk
+
+            rf_val = st.session_state.get("active_rf_rate", 0.03) if st else 0.03
+            bm = st.session_state.get("benchmark", "SPY") if st else "SPY"
+            results_bundle = compute_risk(
+                target_pid, engine, benchmark_ticker=bm, risk_free_rate=rf_val, base_currency=base_curr
+            )
+        except Exception as e_calc:
+            logger.info("compute_risk su portafoglio %s non riuscito: %s", target_pid, e_calc)
 
     if results_bundle is None:
         results_bundle = {
@@ -1376,10 +1383,45 @@ def set_active_portfolio(portfolio_id: Union[str, int], engine: Optional[Any] = 
     return True
 
 
+def _fetch_user_portfolios(
+    _engine: Any, engine_key: str, uid: Optional[str], uname: str, role: str
+) -> List[Dict[str, Any]]:
+    from sqlalchemy import text as sqlt
+
+    with _engine.connect() as conn:
+        cols_raw = conn.execute(sqlt("SELECT * FROM portfolios LIMIT 0")).keys()
+        has_uid = "user_id" in cols_raw
+        has_owner = "owner" in cols_raw
+
+        if role == "owner" or (not has_uid and not has_owner):
+            q = "SELECT portfolio_id, name, base_currency FROM portfolios ORDER BY portfolio_id ASC"
+            rows = conn.execute(sqlt(q)).mappings().fetchall()
+        elif has_uid and uid and uid != "local-owner":
+            q = "SELECT portfolio_id, name, base_currency FROM portfolios WHERE user_id = :uid ORDER BY portfolio_id ASC"
+            rows = conn.execute(sqlt(q), {"uid": uid}).mappings().fetchall()
+            if not rows and has_owner:
+                q = "SELECT portfolio_id, name, base_currency FROM portfolios WHERE LOWER(TRIM(owner)) = LOWER(TRIM(:u)) ORDER BY portfolio_id ASC"
+                rows = conn.execute(sqlt(q), {"u": uname}).mappings().fetchall()
+        elif has_owner:
+            q = "SELECT portfolio_id, name, base_currency FROM portfolios WHERE LOWER(TRIM(owner)) = LOWER(TRIM(:u)) ORDER BY portfolio_id ASC"
+            rows = conn.execute(sqlt(q), {"u": uname}).mappings().fetchall()
+        else:
+            rows = []
+        return [dict(r) for r in rows]
+
+
+if st is not None and hasattr(st, "cache_data"):
+    _fetch_user_portfolios_cached = st.cache_data(ttl=60, show_spinner=False)(_fetch_user_portfolios)
+else:
+    _fetch_user_portfolios_cached = _fetch_user_portfolios
+
+
 def render_portfolio_selector(
     key: str = "global_active_portfolio_selector",
     label: str = "💼 Portafoglio Attivo",
     help_text: str = "Seleziona il portafoglio: sincronizza istantaneamente Risk Engine, Live Terminal e Wealth Engine.",
+    only_if_multiple: bool = False,
+    show_fallback: bool = False,
 ) -> Optional[Any]:
     """
     Componente UI universale per la selezione del portafoglio attivo (Single Source of Truth).
@@ -1392,8 +1434,6 @@ def render_portfolio_selector(
         return None
 
     # Recupera l'elenco dei portafogli appartenenti all'utente
-    from sqlalchemy import text as sqlt
-
     engine = st.session_state.get("engine")
     if engine is None:
         try:
@@ -1405,7 +1445,7 @@ def render_portfolio_selector(
         except Exception:
             engine = None
 
-    portfolios_list = []
+    portfolios_list: List[Dict[str, Any]] = []
     if engine is not None:
         try:
             user = st.session_state.get("user")
@@ -1416,31 +1456,14 @@ def render_portfolio_selector(
                 else st.session_state.get("argus_auth_user", "alessandro")
             )
             role = user.role if user and hasattr(user, "role") else st.session_state.get("argus_auth_role", "owner")
-
-            with engine.connect() as conn:
-                cols_raw = conn.execute(sqlt("SELECT * FROM portfolios LIMIT 0")).keys()
-                has_uid = "user_id" in cols_raw
-                has_owner = "owner" in cols_raw
-
-                if role == "owner" or (not has_uid and not has_owner):
-                    q = "SELECT portfolio_id, name, base_currency FROM portfolios ORDER BY portfolio_id ASC"
-                    rows = conn.execute(sqlt(q)).mappings().fetchall()
-                elif has_uid and uid and uid != "local-owner":
-                    q = "SELECT portfolio_id, name, base_currency FROM portfolios WHERE user_id = :uid ORDER BY portfolio_id ASC"
-                    rows = conn.execute(sqlt(q), {"uid": uid}).mappings().fetchall()
-                    if not rows and has_owner:
-                        q = "SELECT portfolio_id, name, base_currency FROM portfolios WHERE LOWER(TRIM(owner)) = LOWER(TRIM(:u)) ORDER BY portfolio_id ASC"
-                        rows = conn.execute(sqlt(q), {"u": uname}).mappings().fetchall()
-                elif has_owner:
-                    q = "SELECT portfolio_id, name, base_currency FROM portfolios WHERE LOWER(TRIM(owner)) = LOWER(TRIM(:u)) ORDER BY portfolio_id ASC"
-                    rows = conn.execute(sqlt(q), {"u": uname}).mappings().fetchall()
-                else:
-                    rows = []
-                portfolios_list = [dict(r) for r in rows]
+            eng_key = f"{getattr(engine, 'url', '')}_{st.session_state.get('db_name')}"
+            portfolios_list = _fetch_user_portfolios_cached(
+                engine, eng_key, str(uid) if uid else None, str(uname), str(role)
+            )
         except Exception as e_fetch:
             logger.debug("Fetch portfolio list in selector notice: %s", e_fetch)
 
-    # Se nessun portafoglio presente nel database
+    # Se nessun portafoglio presente nel database ma presente in session_state
     if not portfolios_list:
         current_pid = st.session_state.get("active_portfolio_id") or st.session_state.get("portfolio_id")
         current_name = st.session_state.get("portfolio_name", "Nessun portafoglio")
@@ -1453,28 +1476,40 @@ def render_portfolio_selector(
                 }
             ]
 
+    # Nessun portafoglio disponibile: non renderizzare sporcizia a schermo a meno che esplicitamente richiesto
     if not portfolios_list:
-        st.markdown(
-            f"""
-            <div style="font-size:11.5px; color:#94a3b8; padding:6px 8px; border-radius:6px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08);">
-                <b>{label}</b>: <span style="color:#f59e0b;">Nessun portafoglio caricato</span>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+        if show_fallback:
+            st.markdown(
+                f"""
+                <div style="font-size:11.5px; line-height:1.3; color:#94a3b8; padding:6px 8px; margin:4px 0 6px 0; border-radius:6px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); display:block;">
+                    <b>{label}</b>: <span style="color:#f59e0b;">Nessun portafoglio caricato</span>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
         return None
 
-    # Mappatura e selezione
-    p_options = [p["portfolio_id"] for p in portfolios_list]
+    # Se richiesto solo per multi-portafoglio e ce n'è al più uno, non renderizzare widget ridondanti
+    if only_if_multiple and len(portfolios_list) <= 1:
+        return portfolios_list[0]["portfolio_id"]
+
+    # Mappatura e selezione (include placeholder None per evitare cambi forzati all'avvio)
+    p_options = [None] + [p["portfolio_id"] for p in portfolios_list]
     p_format = {p["portfolio_id"]: f"💼 {p['name']} (#{p['portfolio_id']})" for p in portfolios_list}
+    p_format[None] = "-- Seleziona Portafoglio --"
 
     active_id = st.session_state.get("active_portfolio_id") or st.session_state.get("portfolio_id")
     cur_idx = 0
     if active_id is not None:
         for idx, pid in enumerate(p_options):
-            if str(pid) == str(active_id):
+            if pid is not None and str(pid) == str(active_id):
                 cur_idx = idx
                 break
+
+    def _on_port_selector_change():
+        sel_val = st.session_state.get(key)
+        if sel_val is not None and str(sel_val) != str(st.session_state.get("active_portfolio_id")):
+            set_active_portfolio(sel_val, engine=engine)
 
     selected_pid = st.selectbox(
         label,
@@ -1483,11 +1518,8 @@ def render_portfolio_selector(
         format_func=lambda x: p_format.get(x, f"Portafoglio #{x}"),
         key=key,
         help=help_text,
+        on_change=_on_port_selector_change,
     )
-
-    if selected_pid is not None and str(selected_pid) != str(active_id):
-        set_active_portfolio(selected_pid, engine=engine)
-        st.rerun()
 
     return selected_pid
 

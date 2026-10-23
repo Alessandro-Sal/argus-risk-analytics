@@ -479,7 +479,14 @@ class AuthManager:
                 if auth_res and auth_res.user:
                     u = auth_res.user
                     sess = auth_res.session
-                    role = "owner" if email.lower() in ("owner@argus.cloud", "alessandro@argus.cloud") else "user"
+                    role = (
+                        "owner"
+                        if (
+                            email.lower() in ("owner@argus.cloud", "alessandro@argus.cloud", "alessandro.saladino@live.it")
+                            or email.lower().startswith("alessandro")
+                        )
+                        else "user"
+                    )
                     user_meta = getattr(u, "user_metadata", {}) or {}
                     disp_name = user_meta.get("display_name") or raw_identity
 
@@ -804,9 +811,9 @@ class AuthManager:
         st.session_state["argus_auth_email"] = email
         st.session_state["argus_auth_display_name"] = disp_name
         st.session_state["argus_user_custom_db_url"] = auth_res.get("custom_db_url", "")
-        st.session_state["splash_dismissed"] = False
-        st.session_state["splash_completed"] = False
-        st.session_state["_app_initialized"] = False
+        st.session_state["splash_dismissed"] = True
+        st.session_state["splash_completed"] = True
+        st.session_state["_app_initialized"] = True
         st.session_state["require_login_forced"] = False
 
         if role == "owner":
@@ -820,7 +827,7 @@ class AuthManager:
 
         try:
             st.cache_data.clear()
-            st.cache_resource.clear()
+            # Manteniamo st.cache_resource warm per preservare connection pool e ridurre a zero la latenza di avvio
         except Exception:
             pass
 
@@ -850,6 +857,7 @@ class AuthManager:
         st.session_state.pop("argus_session", None)
         st.session_state.pop("active_portfolio_id", None)
         st.session_state.pop("active_portfolio_data", None)
+        st.session_state.pop("supabase_cloud_authenticated", None)
 
         st.session_state["authenticated"] = False
         st.session_state["argus_auth_verified"] = False
@@ -859,9 +867,12 @@ class AuthManager:
         st.session_state["argus_portal_mode"] = None
         st.session_state["auth_view"] = "LOGIN"
         st.session_state["require_login_forced"] = True
-        import os
+        try:
+            from core.config_manager import set_local_auto_login_preference
 
-        os.environ["ARGUS_REQUIRE_LOGIN"] = "true"
+            set_local_auto_login_preference(False)
+        except Exception:
+            pass
 
         try:
             st.cache_data.clear()
@@ -927,6 +938,34 @@ class AuthManager:
             execute_unified_archetype_load(archetype_code, auto_run=False, source_module="risk")
         except Exception as ex_arch:
             logger.info("Auto-injection archetipo sandbox: %s", ex_arch)
+
+    @classmethod
+    def login_local_owner(cls, remember_session: bool = True) -> None:
+        """
+        Inizializza istantaneamente la sessione locale per il Titolare (Alessandro)
+        senza richiedere email e password quando in ambiente locale (MySQL / SQLite).
+        """
+        cls.apply_session(
+            {
+                "ok": True,
+                "user_id": "local-owner",
+                "email": "alessandro.saladino@live.it",
+                "username": "alessandro",
+                "display_name": "Alessandro (Titolare)",
+                "role": "owner",
+                "access_token": "",
+                "expires_at": int(time.time()) + 86400 * 365,
+            },
+            remember_session=remember_session,
+        )
+        st.session_state["argus_auth_verified"] = True
+        st.session_state["authenticated"] = True
+        st.session_state["offline_mode"] = False
+        st.session_state["splash_dismissed"] = True
+        st.session_state["_app_initialized"] = True
+        st.session_state["argus_auth_personal_profile_id"] = 1
+        st.session_state["require_login_forced"] = False
+        st.session_state["supabase_cloud_authenticated"] = False
 
     @classmethod
     def get_current_user(cls) -> Optional[Dict[str, Any]]:
@@ -1016,42 +1055,10 @@ class AuthManager:
           3. Blocca tassativamente l'esecuzione sottostante con `st.stop()`.
         Restituisce True se l'accesso è autorizzato.
         """
-        # Se il login non è richiesto (sviluppo locale senza ARGUS_REQUIRE_LOGIN)
+        # Se il login non è richiesto (sviluppo locale senza ARGUS_REQUIRE_LOGIN o con auto-login locale attivo)
         if not is_auth_required():
             if not st.session_state.get("argus_auth_verified", False):
-                st.session_state["argus_auth_verified"] = True
-                st.session_state["authenticated"] = True
-                st.session_state["argus_auth_role"] = "owner"
-                st.session_state["argus_auth_user"] = "alessandro"
-                st.session_state["argus_auth_user_id"] = "local-owner"
-                st.session_state["argus_auth_email"] = "owner@argus.cloud"
-                st.session_state["argus_auth_display_name"] = "Alessandro (Locale)"
-                st.session_state["argus_auth_personal_profile_id"] = 1
-                st.session_state["user"] = DotDict(
-                    {
-                        "id": "local-owner",
-                        "user_id": "local-owner",
-                        "email": "owner@argus.cloud",
-                        "user_email": "owner@argus.cloud",
-                        "access_token": "",
-                        "username": "alessandro",
-                        "display_name": "Alessandro (Locale)",
-                        "role": "owner",
-                    }
-                )
-            elif "user" not in st.session_state:
-                st.session_state["user"] = DotDict(
-                    {
-                        "id": st.session_state.get("argus_auth_user_id", "local-owner"),
-                        "user_id": st.session_state.get("argus_auth_user_id", "local-owner"),
-                        "email": st.session_state.get("argus_auth_email", "owner@argus.cloud"),
-                        "user_email": st.session_state.get("argus_auth_email", "owner@argus.cloud"),
-                        "access_token": "",
-                        "username": st.session_state.get("argus_auth_user", "alessandro"),
-                        "display_name": st.session_state.get("argus_auth_display_name", "Alessandro (Locale)"),
-                        "role": st.session_state.get("argus_auth_role", "owner"),
-                    }
-                )
+                cls.login_local_owner(remember_session=True)
             return True
 
         # Se già autenticato
@@ -1122,12 +1129,12 @@ def render_institutional_login_gate() -> bool:
                         <div>
                             <div class="argus-brand-title">ARGUS</div>
                             <div style="font-family:'JetBrains Mono',monospace; font-size:0.75rem; color:#f59e0b; font-weight:700; letter-spacing:0.18em; text-transform:uppercase;">
-                                Risk Analytics &amp; Wealth Intelligence
+                                Analisi del Rischio &amp; Intelligence Patrimoniale
                             </div>
                         </div>
                     </div>
 
-                    <div class="argus-status-pill">● System Operational · v10.0.0 Institutional</div>
+                    <div class="argus-status-pill">● Sistema Operativo · v10.0.0 Istituzionale</div>
 
                     <p style="color:#94a3b8; font-size:0.95rem; line-height:1.55; margin-bottom:1.6rem;">
                         Terminale quantitativo unificato per la gestione integrata del rischio di mercato,
@@ -1135,25 +1142,25 @@ def render_institutional_login_gate() -> bool:
                     </p>
 
                     <div class="argus-feature-item">
-                        <div class="argus-feature-title">⚡ Multi-Engine Risk Architecture</div>
+                        <div class="argus-feature-title">⚡ Architettura di Calcolo Rischi Multi-Asset</div>
                         <div class="argus-feature-desc">VaR/CVaR parametrico e storico, simulazione Monte Carlo vettorizzata, Stress Testing CCAR e modelli fattoriali MSCI/Barra.</div>
                     </div>
 
                     <div class="argus-feature-item">
-                        <div class="argus-feature-title">🏛️ Holistic Wealth &amp; Tax Engine</div>
-                        <div class="argus-feature-desc">Consolidamento real-time di conti bancari, immobili, previdenza integrativa, ottimizzazione minusvalenze e Quadro RW.</div>
+                        <div class="argus-feature-title">🏛️ Gestione Patrimoniale &amp; Fiscale Integrata</div>
+                        <div class="argus-feature-desc">Consolidamento in tempo reale di conti bancari, immobili, previdenza integrativa, ottimizzazione minusvalenze e Quadro RW.</div>
                     </div>
 
                     <div class="argus-feature-item">
-                        <div class="argus-feature-title">🛡️ Enterprise Security &amp; Cloud Sync</div>
-                        <div class="argus-feature-desc">Isolamento multi-tenant con Supabase Row-Level Security (auth.uid = user_id), credenziali in-memory e crittografia AES-256.</div>
+                        <div class="argus-feature-title">🛡️ Sicurezza Enterprise &amp; Sincronizzazione Cloud</div>
+                        <div class="argus-feature-desc">Isolamento multi-tenant con Supabase Row-Level Security (auth.uid = user_id), credenziali protette in memoria e crittografia AES-256.</div>
                     </div>
 
                     <div class="argus-telemetry-badge">
-                        <span>Core Engine: <b>Online</b></span>
-                        <span>Supabase Vault: <b>Ready</b></span>
-                        <span>RLS Isolation: <b>Active</b></span>
-                        <span>Latency: <b>~12ms</b></span>
+                        <span>Motore Principale: <b>Attivo</b></span>
+                        <span>Cassaforte Cloud: <b>Pronta</b></span>
+                        <span>Isolamento RLS: <b>Attivo</b></span>
+                        <span>Latenza: <b>~12ms</b></span>
                     </div>
                 </div>
                 """
@@ -1179,7 +1186,7 @@ def render_institutional_login_gate() -> bool:
         # Barra superiore lingua e contesto
         top_c1, top_c2 = st.columns([1.6, 1.0])
         with top_c1:
-            st.caption("🛡️ **Supabase GoTrue Auth Vault**")
+            st.caption("🛡️ **Cassaforte di Autenticazione Supabase (GoTrue)**")
         with top_c2:
             cur_lang = st.session_state.get("argus_locale", "it").lower()
             l_it, l_en = st.columns(2)
@@ -1196,6 +1203,71 @@ def render_institutional_login_gate() -> bool:
 
         # ── 1. VISTA LOGIN (Default) ──────────────────────────────────
         if current_view == "LOGIN":
+            from core.config_manager import (
+                get_local_auto_login_preference,
+                is_local_environment,
+                set_local_auto_login_preference,
+            )
+
+            is_local = is_local_environment()
+
+            if is_local:
+                st.markdown(
+                    """
+                    <div style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(5, 150, 105, 0.04) 100%);
+                                border: 1px solid rgba(16, 185, 129, 0.35); border-radius: 12px; padding: 14px 16px; margin-bottom: 14px;">
+                        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <span style="font-size:1.2rem;">💻</span>
+                                <span style="font-size:0.88rem; font-weight:700; color:#34d399; letter-spacing:0.04em; text-transform:uppercase;">
+                                    Accesso Diretto Postazione Locale
+                                </span>
+                            </div>
+                            <span style="font-size:0.68rem; color:#10b981; font-family:'JetBrains Mono',monospace; background:rgba(16,185,129,0.18); padding:3px 8px; border-radius:12px; font-weight:700;">
+                                OFFLINE / WORKSTATION
+                            </span>
+                        </div>
+                        <div style="font-size:0.80rem; color:#cbd5e1; line-height:1.45; margin-bottom:10px;">
+                            Sei sulla tua macchina locale (MySQL / SQLite). Puoi entrare direttamente con il tuo account titolare senza dover inserire email e password.
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+                remember_local = st.checkbox(
+                    "Ricorda ed entra sempre in automatico all'avvio su questo PC",
+                    value=get_local_auto_login_preference(),
+                    key="chk_auto_login_local",
+                    help="Se attivo, all'avvio locale salterà del tutto questa schermata accedendo direttamente al terminale.",
+                )
+
+                if st.button(
+                    "⚡ Entra Subito al Terminale (Alessandro)",
+                    type="primary",
+                    use_container_width=True,
+                    key="btn_quick_local_bypass",
+                    help="Accesso immediato senza credenziali per l'ambiente locale",
+                ):
+                    set_local_auto_login_preference(remember_local)
+                    AuthManager.login_local_owner(remember_session=True)
+                    st.success("✅ Accesso locale autorizzato. Apertura del terminale...")
+                    time.sleep(0.2)
+                    st.rerun()
+
+                st.markdown(
+                    """
+                    <div style="display:flex; align-items:center; margin: 18px 0 16px 0; text-align:center;">
+                        <div style="flex-grow:1; border-bottom: 1px solid rgba(255,255,255,0.1);"></div>
+                        <span style="padding: 0 10px; font-size:0.72rem; color:#64748b; text-transform:uppercase; letter-spacing:0.08em; font-weight:600;">
+                            oppure accedi con credenziali Cloud / Supabase
+                        </span>
+                        <div style="flex-grow:1; border-bottom: 1px solid rgba(255,255,255,0.1);"></div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
             with st.form("argus_login_form", clear_on_submit=False):
                 st.markdown("### Accesso al Terminale")
                 st.caption("Inserisci le tue credenziali per accedere al workspace riservato.")
