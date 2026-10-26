@@ -401,7 +401,10 @@ def fetch_and_store(df_clean: pd.DataFrame, engine, portfolio_id: int = None, be
     end_date = datetime.today().strftime("%Y-%m-%d")
 
     # ── Mappatura Ticker (SaaS MVP: normalization) ────────────
-    mapping_dict = {}
+    mapping_dict = {
+        "BMW": "BMW.DE",
+        "DE0005190003": "BMW.DE",
+    }
     try:
         # Load from config.json if exists
         cfg_file = _get_config_file_path()

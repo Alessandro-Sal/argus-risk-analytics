@@ -683,6 +683,27 @@ def _compute_positions(df_tx: pd.DataFrame, df_prices: pd.DataFrame, warnings_li
 
         last_price_eur = last_price * current_fx_rate if last_price else None
 
+        # Sanity check difensivo su anomalie estreme / quotazioni obsolete (es. ticker delistato)
+        if last_price_eur and avg_cost > 0:
+            divergence_ratio = last_price_eur / avg_cost
+            latest_px_date = ticker_prices["price_date"].max() if not ticker_prices.empty else None
+            last_tx_date = grp["tx_date"].max() if "tx_date" in grp.columns and not grp.empty else None
+            is_stale_px = False
+            if latest_px_date is not None and last_tx_date is not None:
+                try:
+                    delta_days = (pd.to_datetime(last_tx_date) - pd.to_datetime(latest_px_date)).days
+                    if delta_days > 180:
+                        is_stale_px = True
+                except Exception:
+                    pass
+            if (divergence_ratio > 30.0 or divergence_ratio < 0.03) and is_stale_px:
+                if warnings_list is not None:
+                    warnings_list.append(
+                        f"Anomalia quotazione per {ticker}: prezzo storico {last_price_eur:.2f} EUR obsoleto (>180gg rispetto all'operazione) e divergente ({divergence_ratio:.1f}x) dal costo d'acquisto ({avg_cost:.2f} EUR). Utilizzato avg_cost come fallback."
+                    )
+                last_price_eur = avg_cost
+                last_price = avg_cost
+
         # ADV e DTL (Days to Liquidate)
         adv = 0.0
         days_to_liquidate = 0.0

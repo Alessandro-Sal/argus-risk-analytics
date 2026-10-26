@@ -360,6 +360,8 @@ def normalize_gsheet_columns(df_raw: pd.DataFrame, is_crypto: bool = False, defa
         "EPA:DFND": "DFND.PA",
         "PRX": "PRX.AS",
         "IMAE": "IMEA.SW",
+        "BMW": "BMW.DE",
+        "DE0005190003": "BMW.DE",
     }
 
     for idx, r in df_raw.iterrows():
