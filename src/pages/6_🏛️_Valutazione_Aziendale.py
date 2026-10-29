@@ -492,6 +492,15 @@ Rapporto tra multiplo P/E e tasso di crescita atteso degli utili (EPS Growth). V
         else:
             st.info("Dati di Upside non disponibili per gli asset attuali.")
 
+        val_inputs = {
+            "assets_evaluated": int(len(df_upside)) if not df_upside.empty else 0,
+        }
+        val_outputs = {
+            "median_upside_pct": round(float(df_upside["Upside %"].median() * 100), 2) if not df_upside.empty else 0.0,
+            "undervalued_count": int((df_upside["Upside %"] > 0).sum()) if not df_upside.empty else 0,
+            "overvalued_count": int((df_upside["Upside %"] < 0).sum()) if not df_upside.empty else 0,
+        }
+
         render_sr117_audit_drawer(
             engine_name="Consensus Valuation & Analyst Target Price Model",
             latex_formulas=[
@@ -499,6 +508,8 @@ Rapporto tra multiplo P/E e tasso di crescita atteso degli utili (EPS Growth). V
                 r"\text{Margin of Safety} = \frac{\text{Consensus Target Price} - P_{\text{spot}}}{P_{\text{spot}}} \times 100",
                 r"\text{Fair PEG Ratio} = \frac{\text{P/E}}{\text{EPS Growth Rate}} \quad (\text{Benchmark: } \le 1.5\text{x})"
             ],
+            inputs_dict=val_inputs,
+            outputs_dict=val_outputs,
             assumptions=[
                 "Consensus istituzionale derivato dalla mediana dei report degli analisti sell-side (Wall Street & Borsa Italiana).",
                 "Target price normalizzati in valuta di portafoglio (EUR) con i tassi di cambio spot della BCE.",

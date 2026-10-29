@@ -2316,12 +2316,6 @@ def build_sr117_audit_record(
         "inputs": inputs_dict or {},
         "outputs": outputs_dict or {},
     }
-    if assumptions:
-        payload["assumptions"] = assumptions
-    if risk_limits:
-        payload["risk_limits"] = risk_limits
-    if benchmark_supervisory:
-        payload["benchmark_supervisory"] = benchmark_supervisory
 
     canonical_payload = json.dumps(
         payload,
@@ -2394,7 +2388,17 @@ def render_sr117_audit_drawer(
             for rl in risk_limits:
                 st.markdown(f"- ⚠️ {rl}")
 
-        st.code(record["canonical_json"][:1200], language="json")
+        has_telemetry = bool(inputs_dict) or bool(outputs_dict)
+        if has_telemetry:
+            telemetry_payload = {
+                "engine": engine_name,
+                "version": APP_VERSION,
+                "inputs": inputs_dict or {},
+                "outputs": outputs_dict or {},
+            }
+            formatted_json = json.dumps(telemetry_payload, indent=2, ensure_ascii=False, default=str)
+            st.markdown("**Parametri di Esecuzione & Telemetria Modello (Execution Payload):**")
+            st.code(formatted_json, language="json")
     return record
 
 
