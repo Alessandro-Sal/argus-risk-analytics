@@ -73,8 +73,8 @@ gsheets_sync_subproject/logs/
 
 # PyInstaller builds & Release Archives
 build/
-dist/*
-!dist/ARGUS_v10.0.0.zip
+dist/
+*.zip
 *.spec
 !argus_desktop.spec
 

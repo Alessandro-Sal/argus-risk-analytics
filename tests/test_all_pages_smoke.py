@@ -55,6 +55,16 @@ def test_empty_state_guard_isolation_and_resilience():
     # Simula stato con portafoglio demo attivo
     seed_unified_demo_scenario(target_portfolio_name="SMOKE_TEST_PORTFOLIO")
 
-    # In presenza di dati, empty_state_guard ritorna True e non blocca
-    can_render = empty_state_guard(portal="risk")
-    assert can_render is True
+    try:
+        # In presenza di dati, empty_state_guard ritorna True e non blocca
+        can_render = empty_state_guard(portal="risk")
+        assert can_render is True
+    finally:
+        import streamlit as st
+
+        from core.workspace_context import WorkspaceContext
+
+        st.session_state.clear()
+        ws = WorkspaceContext.get_current()
+        ws.flush_risk_domain()
+        ws.flush_wealth_domain()

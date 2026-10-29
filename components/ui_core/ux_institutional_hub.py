@@ -1,0 +1,2731 @@
+"""ARGUS Institutional Terminal UX/UI Hub (Release v9.16.0).
+
+Provides the 6 Institutional UX/UI Pillars:
+1. Segmented Domain Workspace Switcher & @st.fragment Reactive Isolation
+2. Global Telemetry Top-Ribbon (Bloomberg Launchpad Sticky Header)
+3. 1-Click Live Portfolio Auto-Binding (Real Position & Return Extraction)
+4. Unified Institutional Plotly Styling (Glassmorphic + Magnetic Crosshairs)
+5. Scenario Pin & Delta Comparator (Baseline Snapshot vs Current Simulation)
+6. Executive Traffic-Light CRO Radar (6-Pillar Regulatory & Risk Appetite Matrix)
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import re
+from datetime import datetime
+from typing import Any
+
+import numpy as np
+import pandas as pd
+
+try:
+    import streamlit as st
+except ImportError:  # pragma: no cover
+    st = None  # type: ignore[assignment]
+
+APP_VERSION: str = "10.0.0"
+
+INSTITUTIONAL_PALETTE: list[str] = [
+    "#10b981",  # Emerald
+    "#3b82f6",  # Royal Blue
+    "#f59e0b",  # Amber Gold
+    "#ef4444",  # Crimson Risk
+    "#6366f1",  # Indigo
+    "#ec4899",  # Rose
+    "#06b6d4",  # Cyan
+    "#a855f7",  # Purple
+]
+
+
+def _resolve_active_portfolio_bundle(
+    session_state_dict: dict[str, Any] | None = None,
+    risk_data: dict[str, Any] | None = None,
+) -> tuple[dict[str, Any], str]:
+    """Resolve the active portfolio risk bundle and portfolio name from session_state or explicit risk_data."""
+    state = session_state_dict if session_state_dict is not None else (
+        dict(st.session_state) if st is not None and hasattr(st, "session_state") else {}
+    )
+    res: dict[str, Any] = {}
+    if isinstance(risk_data, dict) and risk_data:
+        res = risk_data
+    elif isinstance(state.get("results"), dict) and state.get("results"):
+        res = state["results"]
+    elif isinstance(state.get("last_results"), dict) and state.get("last_results"):
+        res = state["last_results"]
+    elif st is not None and session_state_dict is None:
+        try:
+            from components.ui_core.ui_utils import ensure_portfolio_loaded
+
+            loaded_res, _ = ensure_portfolio_loaded(module_type="risk")
+            if isinstance(loaded_res, dict):
+                res = loaded_res
+        except Exception:
+            pass
+
+    raw_profile = str(
+        state.get("portfolio_name")
+        or state.get("wealth_active_profile_name")
+        or state.get("active_portfolio_name")
+        or state.get("selected_portfolio_name")
+        or res.get("portfolio_name")
+        or res.get("sandbox_name")
+        or "Portafoglio Principale (Institutional)"
+    )
+    if raw_profile in ("Master Wealth Google Sheets", "Google Sheets Portfolio"):
+        profile_name = "Master Wealth"
+    elif raw_profile.endswith(" Google Sheets"):
+        profile_name = raw_profile[:-14].strip() or "Master Wealth"
+    else:
+        profile_name = raw_profile
+    return res, profile_name
+
+
+def build_telemetry_ribbon_state(
+    session_state_dict: dict[str, Any] | None = None,
+    page_badge: str = "INSTITUTIONAL TERMINAL",
+    risk_data: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Extract live portfolio telemetry from session state with institutional fallbacks."""
+    last_res, profile_name = _resolve_active_portfolio_bundle(
+        risk_data=risk_data,
+        session_state_dict=session_state_dict,
+    )
+    metrics_block = last_res.get("metrics") if isinstance(last_res.get("metrics"), dict) else {}
+    ret_block = (
+        metrics_block.get("returns")
+        if isinstance(metrics_block.get("returns"), dict)
+        else (last_res.get("returns") if isinstance(last_res.get("returns"), dict) else {})
+    )
+    mk_block = (
+        metrics_block.get("market_risk")
+        if isinstance(metrics_block.get("market_risk"), dict)
+        else (last_res.get("market_risk") if isinstance(last_res.get("market_risk"), dict) else {})
+    )
+
+    nav_eur = float(
+        ret_block.get("portfolio_value")
+        or metrics_block.get("total_market_value")
+        or metrics_block.get("total_value")
+        or metrics_block.get("portfolio_value")
+        or last_res.get("portfolio_value")
+        or last_res.get("total_value")
+        or 0.0
+    )
+    pos_df = last_res.get("positions")
+    if isinstance(pos_df, list):
+        pos_df = pd.DataFrame(pos_df)
+    if nav_eur <= 0.0 and isinstance(pos_df, pd.DataFrame) and not pos_df.empty:
+        for vcol in ("current_value", "market_value", "valore_mercato"):
+            if vcol in pos_df.columns:
+                nav_eur = float(pd.to_numeric(pos_df[vcol], errors="coerce").fillna(0.0).sum())
+                if nav_eur > 0.0:
+                    break
+        if nav_eur <= 0.0 and "qty_net" in pos_df.columns and "last_price" in pos_df.columns:
+            nav_eur = float((pos_df["qty_net"].fillna(0.0) * pos_df["last_price"].fillna(0.0)).sum())
+
+    if nav_eur <= 0.0:
+        nav_eur = 1_250_000.0
+
+    raw_var95 = abs(
+        float(
+            mk_block.get("var_95")
+            or mk_block.get("var_95_pct")
+            or metrics_block.get("var_95_pct")
+            or metrics_block.get("var_95")
+            or last_res.get("var_95_pct")
+            or 0.0
+        )
+    )
+    if 0.0 < raw_var95 < 0.50:
+        raw_var95 *= 100.0
+
+    raw_var99 = abs(
+        float(
+            mk_block.get("var_99")
+            or mk_block.get("var_99_pct")
+            or metrics_block.get("var_99_pct")
+            or metrics_block.get("var_99")
+            or last_res.get("var_99_pct")
+            or (raw_var95 * 1.38 if raw_var95 > 0.0 else 1.84)
+        )
+    )
+    if 0.0 < raw_var99 < 0.50:
+        raw_var99 *= 100.0
+
+    var_95_pct = raw_var95 if raw_var95 > 0.0 else round(raw_var99 / 1.38, 2)
+    var_95_eur = nav_eur * (abs(var_95_pct) / 100.0)
+    var_99_pct = raw_var99
+    var_99_eur = nav_eur * (abs(var_99_pct) / 100.0)
+
+    has_live = bool(ret_block or mk_block or metrics_block or (isinstance(pos_df, pd.DataFrame) and not pos_df.empty))
+    if has_live and (
+        "sharpe_ratio" in ret_block
+        or "sharpe_ratio" in mk_block
+        or "sharpe_ratio" in metrics_block
+        or "sharpe_ratio" in last_res
+    ):
+        sharpe = float(
+            ret_block.get(
+                "sharpe_ratio",
+                mk_block.get(
+                    "sharpe_ratio",
+                    metrics_block.get("sharpe_ratio", last_res.get("sharpe_ratio", 0.0)),
+                ),
+            )
+            or 0.0
+        )
+    else:
+        sharpe = float(last_res.get("sharpe_ratio", 1.42) or 1.42)
+
+    raw_vol = abs(
+        float(
+            mk_block.get("volatility_pct")
+            or mk_block.get("volatility_annual_pct")
+            or mk_block.get("volatility_annual")
+            or metrics_block.get("volatility_pct")
+            or metrics_block.get("volatility_annual_pct")
+            or ret_block.get("volatility_pct")
+            or last_res.get("annual_volatility_pct")
+            or 12.6
+        )
+    )
+    if 0.0 < raw_vol < 1.50:
+        raw_vol *= 100.0
+    ann_vol_pct = raw_vol
+
+    if ann_vol_pct >= 22.0 or abs(var_95_pct) >= 2.20 or abs(var_99_pct) >= 3.0:
+        regime_label = "🔴 STRESS / HIGH VOL"
+        regime_color = "#ef4444"
+    elif ann_vol_pct >= 15.5:
+        regime_label = "🟡 TRANSITIONAL / ELEVATED"
+        regime_color = "#f59e0b"
+    else:
+        regime_label = "🟢 BULL / NORMAL"
+        regime_color = "#10b981"
+
+    return {
+        "app_version": APP_VERSION,
+        "page_badge": page_badge,
+        "profile_name": profile_name,
+        "portfolio_name": profile_name,
+        "nav_eur": round(nav_eur, 2),
+        "var_95_pct": round(abs(var_95_pct), 2),
+        "var_95_eur": round(var_95_eur, 2),
+        "var_99_pct": round(abs(var_99_pct), 2),
+        "var_99_eur": round(var_99_eur, 2),
+        "sharpe_ratio": round(sharpe, 2),
+        "annual_volatility_pct": round(ann_vol_pct, 2),
+        "regime_label": regime_label,
+        "regime_color": regime_color,
+        "timestamp_utc": datetime.now().strftime("%H:%M:%S"),
+    }
+
+
+def _compact_html(raw: str) -> str:
+    """Collapse multi-line HTML into a single line to prevent CommonMark 4-space code block parsing."""
+    return " ".join(line.strip() for line in raw.splitlines() if line.strip())
+
+
+def build_telemetry_ribbon_html(
+    telemetry: dict[str, Any],
+    shock_info: dict[str, Any] | None = None,
+) -> str:
+    """Build single-line, zero-indent HTML for the sticky institutional telemetry ribbon."""
+    s_info = shock_info if shock_info is not None else get_active_macro_shock()
+    nav_val = float(telemetry.get("nav_eur", 0.0))
+    if nav_val < 1_000_000.0:
+        int_p, dec_p = f"{nav_val:,.2f}".split(".")
+        nav_str = f"€ {int_p.replace(',', '.')},{dec_p}"
+    else:
+        nav_str = f"€ {nav_val:,.0f}".replace(",", ".")
+
+    var95_pct = float(telemetry.get("var_95_pct", telemetry.get("var_99_pct", 2.50) / 1.38))
+    var95_eur = float(telemetry.get("var_95_eur", nav_val * var95_pct / 100.0))
+    var_str = f"€ {var95_eur:,.0f}".replace(",", ".")
+    vol_pct = float(telemetry.get("annual_volatility_pct", 12.6))
+
+    shock_pill_html = ""
+    if s_info.get("is_active"):
+        shock_pill_html = (
+            f'<span style="background: rgba(168, 85, 247, 0.22); border: 1px solid #a855f7; '
+            f'color: #e9d5ff; font-size: 10.5px; font-weight: 800; padding: 2px 8px; border-radius: 12px;">'
+            f'⚡ SHOCK: {s_info["label"]}</span>'
+        )
+
+    is_offline = bool(telemetry.get("offline_mode", False))
+    feed_label = "🟡 CACHE SHIELD" if is_offline else "🟢 FEED LIVE"
+    feed_border = "#f59e0b" if is_offline else "#10b981"
+    feed_color = "#fde68a" if is_offline else "#a7f3d0"
+    feed_pill_html = (
+        f'<span style="background: rgba(16, 185, 129, 0.12); border: 1px solid {feed_border}; '
+        f'color: {feed_color}; font-size: 10px; font-weight: 800; padding: 2px 7px; border-radius: 10px;">'
+        f'{feed_label}</span>'
+    )
+
+    raw_html = f"""
+    <div class="institutional-telemetry-ribbon"
+         style="background: linear-gradient(90deg, rgba(15, 23, 42, 0.96) 0%, rgba(22, 27, 34, 0.96) 100%);
+                border: 1px solid rgba(99, 102, 241, 0.32);
+                border-left: 4px solid #6366f1;
+                border-radius: 10px;
+                padding: 8px 14px;
+                margin-top: 6px;
+                margin-bottom: 14px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                flex-wrap: wrap;
+                gap: 10px;
+                box-shadow: 0 4px 16px rgba(0,0,0,0.35);">
+        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+            <span style="background: rgba(99, 102, 241, 0.18); border: 1px solid rgba(99, 102, 241, 0.45);
+                         color: #818cf8; font-size: 10.5px; font-weight: 800; padding: 2px 8px;
+                         border-radius: 6px; font-family: 'JetBrains Mono', monospace;">
+                ARGUS v{telemetry['app_version']}
+            </span>
+            <span style="color: #e2e8f0; font-size: 12px; font-weight: 700;">
+                🏛️ {telemetry['profile_name']}
+            </span>
+            <span style="color: #64748b; font-size: 11px;">|</span>
+            <span style="color: #94a3b8; font-size: 11px; font-weight: 600;">
+                {telemetry['page_badge']}
+            </span>
+            {feed_pill_html}
+            {shock_pill_html}
+        </div>
+        <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap; font-family: 'JetBrains Mono', monospace;">
+            <span style="font-size: 11.5px; color: #cbd5e1;">
+                NAV: <b style="color: #10b981;">{nav_str}</b>
+            </span>
+            <span style="font-size: 11.5px; color: #cbd5e1;">
+                VaR 95%: <b style="color: #f59e0b;">{var_str} ({var95_pct:.2f}%)</b>
+            </span>
+            <span style="font-size: 11.5px; color: #cbd5e1;">
+                Vol: <b style="color: #e2e8f0;">{vol_pct:.2f}%</b>
+            </span>
+            <span style="font-size: 11.5px; color: #cbd5e1;">
+                Sharpe: <b style="color: #38bdf8;">{telemetry['sharpe_ratio']:.2f}</b>
+            </span>
+            <span style="background: rgba(255,255,255,0.04); border: 1px solid {telemetry['regime_color']};
+                         color: {telemetry['regime_color']}; font-size: 10.5px; font-weight: 800;
+                         padding: 2px 8px; border-radius: 12px;">
+                {telemetry['regime_label']}
+            </span>
+        </div>
+    </div>
+    """
+    return _compact_html(raw_html)
+
+
+def render_institutional_telemetry_ribbon(
+    page_badge: str = "INSTITUTIONAL TERMINAL",
+    risk_data: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Render sticky Bloomberg Launchpad-style top telemetry ribbon in Streamlit."""
+    telemetry = build_telemetry_ribbon_state(page_badge=page_badge, risk_data=risk_data)
+    shock_info = get_active_macro_shock()
+    telemetry["active_macro_shock"] = shock_info["preset_key"]
+    if st is None:
+        return telemetry
+
+    density_mode = str(st.session_state.get("ux_density_mode", "COMPACT_DESK"))
+    inject_density_mode_css(density_mode)
+
+    # Avoid rendering a duplicate top bar on the Control Room (which already renders render_command_bar + render_control_room_hero)
+    if "CONTROL ROOM" not in page_badge.upper():
+        st.markdown(build_telemetry_ribbon_html(telemetry, shock_info), unsafe_allow_html=True)
+    return telemetry
+
+
+def build_wealth_telemetry_ribbon_state(
+    nw_summary: Any = None,
+    session_state_dict: dict[str, Any] | None = None,
+    page_badge: str = "WEALTH DESK",
+    profile_name: str | None = None,
+) -> dict[str, Any]:
+    """Extract wealth telemetry metrics (Net Worth, Liquid Cash, Runway, Financials, Real Estate, Debt)."""
+    state = session_state_dict if session_state_dict is not None else (
+        dict(st.session_state) if st is not None and hasattr(st, "session_state") else {}
+    )
+    raw_p_name = profile_name or state.get("wealth_active_profile_name") or state.get("active_portfolio_name") or "Family Office Portfolio"
+    if raw_p_name in ("Master Wealth Google Sheets", "Google Sheets Portfolio"):
+        p_name = "Master Wealth"
+    elif raw_p_name.endswith(" Google Sheets"):
+        p_name = raw_p_name[:-14].strip() or "Master Wealth"
+    else:
+        p_name = raw_p_name
+
+    tot_nw = float(getattr(nw_summary, "total_net_worth", 0.0) if nw_summary is not None else state.get("wealth_total_net_worth", 1_250_000.0))
+    liq_cash = float(getattr(nw_summary, "liquid_cash", 0.0) if nw_summary is not None else state.get("wealth_liquid_cash", 120_000.0))
+    runway_m = float(getattr(nw_summary, "runway_months", 0.0) if nw_summary is not None else state.get("wealth_runway_months", 14.5))
+    fin_inv = float(getattr(nw_summary, "financial_investments", 0.0) if nw_summary is not None else state.get("wealth_financial_investments", 650_000.0))
+    real_est = float(getattr(nw_summary, "real_estate_total", 0.0) if nw_summary is not None else state.get("wealth_real_estate_total", 480_000.0))
+    liab = float(getattr(nw_summary, "total_liabilities", 0.0) if nw_summary is not None else state.get("wealth_total_liabilities", 110_000.0))
+
+    macro_key = str(state.get("global_macro_shock", "NONE")).upper().strip()
+    shock_res: dict[str, Any] = {}
+    if macro_key and macro_key != "NONE":
+        try:
+            from core.wealth.unified_stress_bridge import evaluate_active_wealth_macro_shock
+
+            snapshot = {
+                "total_net_worth": tot_nw,
+                "liquid_cash": liq_cash,
+                "financial_investments": fin_inv,
+                "real_estate_total": real_est,
+                "total_liabilities": liab,
+                "runway_months": runway_m,
+                "fixed_mortgages_balance": float(getattr(nw_summary, "fixed_mortgages_balance", liab * 0.7)),
+                "variable_mortgages_balance": float(getattr(nw_summary, "variable_mortgages_balance", liab * 0.3)),
+            }
+            pos_df = state.get("last_portfolio_result", {}).get("positions") if isinstance(state.get("last_portfolio_result"), dict) else None
+            shock_res = evaluate_active_wealth_macro_shock(snapshot, session_state_dict=state, portfolio_positions=pos_df)
+        except Exception:
+            shock_res = {}
+
+    if runway_m >= 12.0:
+        solvency_label = "🟢 EXCELLENT RUNWAY"
+        solvency_color = "#10b981"
+    elif runway_m >= 6.0:
+        solvency_label = "🟡 ADEQUATE RUNWAY"
+        solvency_color = "#f59e0b"
+    else:
+        solvency_label = "🔴 VULNERABLE RUNWAY"
+        solvency_color = "#ef4444"
+
+    return {
+        "app_version": APP_VERSION,
+        "page_badge": page_badge,
+        "profile_name": p_name,
+        "total_net_worth": round(tot_nw, 2),
+        "liquid_cash": round(liq_cash, 2),
+        "runway_months": round(runway_m, 1),
+        "financial_investments": round(fin_inv, 2),
+        "real_estate_total": round(real_est, 2),
+        "total_liabilities": round(liab, 2),
+        "solvency_label": solvency_label,
+        "solvency_color": solvency_color,
+        "macro_shock_active": bool(shock_res.get("is_shock_active", False)),
+        "macro_shock_key": macro_key,
+        "macro_shock_name": shock_res.get("scenario_name", ""),
+        "stressed_net_worth": shock_res.get("post_stress_net_worth", tot_nw),
+        "macro_shock_pnl_pct": shock_res.get("total_net_worth_pnl_pct", 0.0),
+        "macro_shock_pnl_eur": shock_res.get("total_wealth_pnl_eur", 0.0),
+        "stressed_runway_months": shock_res.get("stressed_runway_months", runway_m),
+        "solvency_warning": shock_res.get("solvency_warning", False),
+        "timestamp_utc": datetime.now().strftime("%H:%M:%S"),
+    }
+
+
+def build_wealth_telemetry_ribbon_html(
+    telemetry: dict[str, Any],
+) -> str:
+    """Build single-line, zero-indent HTML for the wealth institutional telemetry ribbon."""
+    nw_val = float(telemetry.get("total_net_worth", 0.0))
+    nw_str = f"€ {nw_val:,.0f}".replace(",", ".")
+    liq_val = float(telemetry.get("liquid_cash", 0.0))
+    liq_str = f"€ {liq_val:,.0f}".replace(",", ".")
+    fin_val = float(telemetry.get("financial_investments", 0.0))
+    fin_str = f"€ {fin_val:,.0f}".replace(",", ".")
+    runway_m = float(telemetry.get("runway_months", 12.0))
+
+    shock_pill_html = ""
+    if telemetry.get("macro_shock_active"):
+        s_nw = float(telemetry.get("stressed_net_worth", 0.0))
+        s_nw_str = f"€ {s_nw:,.0f}".replace(",", ".")
+        pnl_pct = float(telemetry.get("macro_shock_pnl_pct", 0.0))
+        s_color = "#ef4444" if pnl_pct < -10 else "#f59e0b"
+        shock_pill_html = (
+            f'<span style="background: rgba(239, 68, 68, 0.22); border: 1px solid {s_color}; '
+            f'color: #fca5a5; font-size: 10.5px; font-weight: 800; padding: 2px 8px; border-radius: 12px;">'
+            f'⚡ STRESSED NW: {s_nw_str} ({pnl_pct:+.1f}%)</span>'
+        )
+
+    raw_html = f"""
+    <div class="institutional-telemetry-ribbon"
+         style="background: linear-gradient(90deg, rgba(15, 23, 42, 0.96) 0%, rgba(22, 27, 34, 0.96) 100%);
+                border: 1px solid rgba(16, 185, 129, 0.32);
+                border-left: 4px solid #10b981;
+                border-radius: 10px;
+                padding: 8px 14px;
+                margin-top: 6px;
+                margin-bottom: 14px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.35);">
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <span style="background: #10b981; color: #022c22; font-size: 10.5px; font-weight: 800;
+                         padding: 2px 8px; border-radius: 4px; letter-spacing: 0.5px;">ARGUS WEALTH</span>
+            <span style="color: #e2e8f0; font-size: 12px; font-weight: 700;">
+                🏛️ {telemetry['profile_name']}
+            </span>
+            <span style="color: #64748b; font-size: 11px;">|</span>
+            <span style="color: #94a3b8; font-size: 11px; font-weight: 600;">
+                {telemetry['page_badge']}
+            </span>
+            {shock_pill_html}
+        </div>
+        <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap; font-family: 'JetBrains Mono', monospace;">
+            <span style="font-size: 11.5px; color: #cbd5e1;">
+                Net Worth: <b style="color: #10b981;">{nw_str}</b>
+            </span>
+            <span style="font-size: 11.5px; color: #cbd5e1;">
+                Liquidità: <b style="color: #38bdf8;">{liq_str}</b> ({runway_m:.1f}m)
+            </span>
+            <span style="font-size: 11.5px; color: #cbd5e1;">
+                Finanziari: <b style="color: #f59e0b;">{fin_str}</b>
+            </span>
+            <span style="background: rgba(255,255,255,0.04); border: 1px solid {telemetry['solvency_color']};
+                         color: {telemetry['solvency_color']}; font-size: 10.5px; font-weight: 800;
+                         padding: 2px 8px; border-radius: 12px;">
+                {telemetry['solvency_label']}
+            </span>
+        </div>
+    </div>
+    """
+    return _compact_html(raw_html)
+
+
+def render_wealth_telemetry_ribbon(
+    nw_summary: Any = None,
+    page_badge: str = "WEALTH MANAGEMENT",
+    profile_name: str | None = None,
+) -> dict[str, Any]:
+    """Render sticky wealth management telemetry ribbon in Streamlit."""
+    telemetry = build_wealth_telemetry_ribbon_state(
+        nw_summary=nw_summary,
+        page_badge=page_badge,
+        profile_name=profile_name,
+    )
+    if st is None:
+        return telemetry
+
+    density_mode = str(st.session_state.get("ux_density_mode", "COMPACT_DESK"))
+    inject_density_mode_css(density_mode)
+
+    if "CONTROL ROOM" not in page_badge.upper():
+        st.markdown(build_wealth_telemetry_ribbon_html(telemetry), unsafe_allow_html=True)
+    return telemetry
+
+
+def extract_live_portfolio_binding(
+    session_state_dict: dict[str, Any] | None = None,
+    risk_data: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Extract live portfolio ticker, spot price, quantity, volatility, and NAV for 1-click auto-binding."""
+    last_res, profile_name = _resolve_active_portfolio_bundle(
+        risk_data=risk_data,
+        session_state_dict=session_state_dict,
+    )
+    pos_df = last_res.get("positions")
+    if isinstance(pos_df, list):
+        pos_df = pd.DataFrame(pos_df)
+
+    metrics_block = last_res.get("metrics") if isinstance(last_res.get("metrics"), dict) else {}
+    mk_block = (
+        metrics_block.get("market_risk")
+        if isinstance(metrics_block.get("market_risk"), dict)
+        else (last_res.get("market_risk") if isinstance(last_res.get("market_risk"), dict) else {})
+    )
+
+    has_live = False
+    top_ticker = "SOL-USD"
+    top_spot = 74.16
+    top_shares = 250.0
+    total_nav = float(
+        metrics_block.get("total_market_value")
+        or metrics_block.get("portfolio_value")
+        or metrics_block.get("total_value")
+        or 64_233.31
+    )
+    ann_vol_pct = float(
+        mk_block.get("volatility_pct")
+        or mk_block.get("volatility_annual_pct")
+        or metrics_block.get("volatility_pct")
+        or metrics_block.get("volatility_annual_pct")
+        or 26.25
+    )
+    if 0.0 < ann_vol_pct < 1.50:
+        ann_vol_pct *= 100.0
+    annual_vol = float(np.clip(ann_vol_pct / 100.0, 0.05, 1.20))
+    daily_vol = float(np.clip(annual_vol / np.sqrt(252.0), 0.004, 0.08))
+    positions_count = 0
+
+    if isinstance(pos_df, pd.DataFrame) and not pos_df.empty and "ticker" in pos_df.columns:
+        has_live = True
+        df_sorted = pos_df.copy()
+        if "qty_net" in df_sorted.columns:
+            df_sorted = df_sorted[df_sorted["qty_net"] > 1e-6]
+        positions_count = len(df_sorted)
+        if "current_value" not in df_sorted.columns and "qty_net" in df_sorted.columns and "last_price" in df_sorted.columns:
+            df_sorted["current_value"] = df_sorted["qty_net"].fillna(0.0) * df_sorted["last_price"].fillna(0.0)
+        if "current_value" in df_sorted.columns and not df_sorted.empty:
+            df_sorted = df_sorted.sort_values("current_value", ascending=False)
+            total_nav = max(float(df_sorted["current_value"].fillna(0.0).sum()), 100.0)
+        if not df_sorted.empty:
+            row0 = df_sorted.iloc[0]
+            top_ticker = str(row0.get("ticker", "SOL-USD") or "SOL-USD")
+            top_spot = max(float(row0.get("last_price", 74.16) or 74.16), 0.01)
+            top_shares = max(float(row0.get("qty_net", 250.0) or 250.0), 0.0001)
+
+    rets_df = last_res.get("returns")
+    if isinstance(rets_df, pd.DataFrame) and not rets_df.empty:
+        has_live = True
+        if top_ticker in rets_df.columns:
+            s_std = float(rets_df[top_ticker].dropna().std())
+            if s_std > 1e-5:
+                daily_vol = float(np.clip(s_std, 0.005, 0.06))
+                annual_vol = float(np.clip(s_std * np.sqrt(252.0), 0.08, 0.85))
+
+    return {
+        "has_live_portfolio": has_live,
+        "portfolio_name": profile_name,
+        "positions_count": positions_count,
+        "asset_count": positions_count,
+        "top_ticker": top_ticker,
+        "top_spot_price": round(top_spot, 4),
+        "top_shares": round(top_shares, 4),
+        "total_nav_eur": round(total_nav, 2),
+        "daily_volatility": round(daily_vol, 4),
+        "annual_volatility": round(annual_vol, 4),
+        "adv_shares": round(max(top_shares * 25.0, 50_000.0), 0),
+        "adv_shares_estimate": round(max(top_shares * 25.0, 50_000.0), 0),
+    }
+
+
+def render_live_portfolio_autobind_banner(
+    key_prefix: str,
+    model_label: str = "Motore Quantitativo",
+    risk_data: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Render 1-Click Live Portfolio Auto-Bind control and return bound parameters."""
+    binding = extract_live_portfolio_binding(risk_data=risk_data)
+    if st is None:
+        return binding
+
+    c1, c2 = st.columns([1.6, 2.4])
+    with c1:
+        use_live = st.toggle(
+            f"🔗 Sincronizza da {binding['portfolio_name']} ({binding['top_ticker']})",
+            value=binding["has_live_portfolio"],
+            key=f"autobind_toggle_{key_prefix}",
+            help=f"Popola automaticamente {model_label} con i dati reali del portafoglio attivo ({binding['portfolio_name']}).",
+        )
+    with c2:
+        mode_txt = (
+            f"🟢 <b>Auto-Binding Attivo ({binding['portfolio_name']} · {binding['positions_count']} asset)</b>: "
+            f"Top Holding <code>{binding['top_ticker']}</code> "
+            f"(Spot € {binding['top_spot_price']:,.2f} | Q.tà {binding['top_shares']:g} | Vol Annua {binding['annual_volatility']*100:.2f}% | NAV € {binding['total_nav_eur']:,.2f})"
+            if use_live
+            else "⚪ <b>Modalità Sandbox Istituzionale</b>: Parametri manuali personalizzabili indipendenti dal portafoglio."
+        )
+        st.markdown(
+            f"<div style='font-size:11.5px; color:#cbd5e1; padding-top:6px;'>{mode_txt}</div>",
+            unsafe_allow_html=True,
+        )
+    binding["autobind_enabled"] = bool(use_live)
+    return binding
+
+
+def ensure_webgl_scatter(fig: Any, threshold: int = 2000) -> Any:
+    """Converte automaticamente i trace Scatter ad alta densità (>= threshold punti) in Scattergl per accelerazione WebGL."""
+    if fig is None or not hasattr(fig, "to_dict"):
+        return fig
+    try:
+        fig_dict = fig.to_dict()
+        has_dense = False
+        for tr in fig_dict.get("data", []):
+            if tr.get("type") == "scatter":
+                x_len = len(tr.get("x") or [])
+                y_len = len(tr.get("y") or [])
+                if max(x_len, y_len) >= threshold:
+                    tr["type"] = "scattergl"
+                    has_dense = True
+        if has_dense:
+            import plotly.graph_objects as go
+
+            return go.Figure(fig_dict)
+    except Exception:
+        pass
+    return fig
+
+
+def style_institutional_chart(
+    fig: Any,
+    title: str | None = None,
+    height: int = 390,
+    unified_hover: bool = True,
+) -> Any:
+    """Apply ARGUS Institutional Terminal styling, transparent glassmorphic canvas, and magnetic crosshairs."""
+    if fig is None or not hasattr(fig, "update_layout"):
+        return fig
+
+    layout_kwargs: dict[str, Any] = {
+        "template": "plotly_dark",
+        "height": height,
+        "paper_bgcolor": "rgba(0,0,0,0)",
+        "plot_bgcolor": "rgba(15, 23, 42, 0.35)",
+        "font": {"family": "Outfit, JetBrains Mono, sans-serif", "color": "#e2e8f0", "size": 12},
+        "margin": {"l": 16, "r": 16, "t": 44 if title else 24, "b": 20},
+        "hovermode": "x unified" if unified_hover else "closest",
+        "colorway": INSTITUTIONAL_PALETTE,
+        "legend": {
+            "orientation": "h",
+            "yanchor": "bottom",
+            "y": 1.02,
+            "xanchor": "left",
+            "x": 0.0,
+            "bgcolor": "rgba(22, 27, 34, 0.75)",
+            "bordercolor": "rgba(255,255,255,0.12)",
+            "borderwidth": 1,
+            "font": {"size": 11, "color": "#f1f5f9"},
+        },
+    }
+    if title:
+        layout_kwargs["title"] = {
+            "text": f"<b>{title}</b>",
+            "font": {"size": 14, "color": "#f8fafc"},
+            "x": 0.0,
+            "xanchor": "left",
+        }
+
+    fig.update_layout(**layout_kwargs)
+    if hasattr(fig, "update_xaxes"):
+        fig.update_xaxes(
+            gridcolor="rgba(255,255,255,0.06)",
+            zerolinecolor="rgba(255,255,255,0.12)",
+            showspikes=True,
+            spikemode="across",
+            spikesnap="cursor",
+            spikecolor="rgba(99, 102, 241, 0.55)",
+            spikethickness=1,
+        )
+    if hasattr(fig, "update_yaxes"):
+        fig.update_yaxes(
+            gridcolor="rgba(255,255,255,0.06)",
+            zerolinecolor="rgba(255,255,255,0.12)",
+        )
+    fig = ensure_webgl_scatter(fig)
+    return fig
+
+
+apply_institutional_plotly_theme = style_institutional_chart
+
+
+def compute_scenario_delta_comparison(
+    baseline_metrics: dict[str, float],
+    current_metrics: dict[str, float],
+    higher_is_better_map: dict[str, bool] | None = None,
+) -> dict[str, Any]:
+    """Compute side-by-side absolute and percentage deltas between Pinned Baseline and Current Run."""
+    hib = higher_is_better_map or {}
+    rows: list[dict[str, Any]] = []
+    improved_count = 0
+
+    for metric_name, curr_val in current_metrics.items():
+        base_val = float(baseline_metrics.get(metric_name, curr_val))
+        curr_f = float(curr_val)
+        delta_abs = curr_f - base_val
+        denom = abs(base_val) if abs(base_val) > 1e-9 else 1.0
+        delta_pct = (delta_abs / denom) * 100.0
+        higher_better = bool(hib.get(metric_name, True))
+
+        if abs(delta_abs) < 1e-8:
+            status = "UNCHANGED"
+            is_favorable = True
+        else:
+            is_favorable = (delta_abs > 0) if higher_better else (delta_abs < 0)
+            status = "IMPROVED" if is_favorable else "DEGRADED"
+            if is_favorable:
+                improved_count += 1
+
+        rows.append(
+            {
+                "metric": metric_name,
+                "baseline": round(base_val, 4),
+                "current": round(curr_f, 4),
+                "delta_abs": round(delta_abs, 4),
+                "delta_pct": round(delta_pct, 2),
+                "higher_is_better": higher_better,
+                "is_favorable": is_favorable,
+                "status": status,
+            }
+        )
+
+    return {
+        "has_baseline": bool(baseline_metrics),
+        "metrics_count": len(rows),
+        "improved_count": improved_count,
+        "comparisons": rows,
+    }
+
+
+def render_scenario_delta_comparator(
+    scenario_key: str,
+    scenario_title: str,
+    current_metrics: dict[str, float],
+    higher_is_better_map: dict[str, bool] | None = None,
+) -> dict[str, Any]:
+    """Render interactive Pin Baseline button and side-by-side Delta Comparator bar."""
+    store_key = f"_pinned_baseline_{scenario_key}"
+    if st is None:
+        return compute_scenario_delta_comparison(current_metrics, current_metrics, higher_is_better_map)
+
+    pinned = st.session_state.get(store_key)
+    c_btn1, c_btn2, c_info = st.columns([1.1, 0.9, 2.5])
+    with c_btn1:
+        if st.button(
+            "📌 Fissa come Baseline",
+            key=f"btn_pin_{scenario_key}",
+            use_container_width=True,
+            help="Salva i risultati attuali come Baseline di riferimento per confrontare l'effetto di modifiche ai parametri.",
+        ):
+            st.session_state[store_key] = dict(current_metrics)
+            pinned = st.session_state[store_key]
+    with c_btn2:
+        if pinned and st.button(
+            "🧹 Reset Baseline",
+            key=f"btn_rst_{scenario_key}",
+            use_container_width=True,
+        ):
+            del st.session_state[store_key]
+            pinned = None
+    with c_info:
+        if pinned:
+            st.caption(rf"⚖️ **Scenario Delta Comparator attivo** per *{scenario_title}* — Modifica i parametri per osservare i differenziali $\Delta$ rispetto alla Baseline fissata.")
+        else:
+            st.caption(f"💡 Clicca **📌 Fissa come Baseline** per congelare *{scenario_title}* e confrontare scenari Prima vs Dopo.")
+
+    if not pinned:
+        return compute_scenario_delta_comparison(current_metrics, current_metrics, higher_is_better_map)
+
+    comp = compute_scenario_delta_comparison(pinned, current_metrics, higher_is_better_map)
+    cols = st.columns(min(max(len(comp["comparisons"]), 1), 4))
+    for idx, item in enumerate(comp["comparisons"][:4]):
+        col = cols[idx % len(cols)]
+        color = "#10b981" if item["is_favorable"] else "#ef4444"
+        if item["status"] == "UNCHANGED":
+            color = "#94a3b8"
+        sign = "+" if item["delta_abs"] >= 0 else ""
+        with col:
+            st.markdown(
+                f"""
+                <div style="background: rgba(22, 27, 34, 0.8); border: 1px solid rgba(255,255,255,0.08);
+                            border-top: 3px solid {color}; border-radius: 8px; padding: 8px 10px; margin-bottom: 8px;">
+                    <div style="font-size: 10.5px; color: #94a3b8; font-weight: 700;">{item['metric']}</div>
+                    <div style="font-size: 14px; font-weight: 800; color: #f8fafc; margin-top: 2px;">
+                        {item['current']:,.2f} <span style="font-size: 11px; color: #64748b;">(Base: {item['baseline']:,.2f})</span>
+                    </div>
+                    <div style="font-size: 11px; font-weight: 700; color: {color}; font-family: 'JetBrains Mono', monospace;">
+                        Δ {sign}{item['delta_abs']:,.2f} ({sign}{item['delta_pct']:.2f}%)
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+    return comp
+
+
+def compute_executive_traffic_light_radar(
+    metrics_override: dict[str, float] | None = None,
+    session_state_dict: dict[str, Any] | None = None,
+    risk_data: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Compute 6-Pillar Executive CRO Traffic-Light Radar reactive to Live Portfolio & Global Macro Shocks."""
+    last_res, _ = _resolve_active_portfolio_bundle(session_state_dict=session_state_dict, risk_data=risk_data)
+    metrics_block = last_res.get("metrics") if isinstance(last_res.get("metrics"), dict) else {}
+    ret_block = (
+        metrics_block.get("returns")
+        if isinstance(metrics_block.get("returns"), dict)
+        else (last_res.get("returns") if isinstance(last_res.get("returns"), dict) else {})
+    )
+    mk = (
+        metrics_block.get("market_risk")
+        if isinstance(metrics_block.get("market_risk"), dict)
+        else (last_res.get("market_risk") if isinstance(last_res.get("market_risk"), dict) else {})
+    )
+    pos_raw = last_res.get("positions")
+    pos_df = pd.DataFrame(pos_raw) if isinstance(pos_raw, list) else pos_raw
+    has_live_portfolio = bool(
+        last_res and (mk or ret_block or metrics_block or (isinstance(pos_df, pd.DataFrame) and not pos_df.empty))
+    )
+
+    # 1. Extract NAV (€)
+    nav_eur = float(
+        ret_block.get("portfolio_value")
+        or metrics_block.get("total_value")
+        or metrics_block.get("portfolio_value")
+        or last_res.get("portfolio_value")
+        or last_res.get("total_value")
+        or 0.0
+    )
+    if nav_eur <= 0.0 and isinstance(pos_df, pd.DataFrame) and not pos_df.empty:
+        for vcol in ("market_value", "current_value", "valore_mercato"):
+            if vcol in pos_df.columns:
+                nav_eur = float(pd.to_numeric(pos_df[vcol], errors="coerce").fillna(0.0).sum())
+                if nav_eur > 0.0:
+                    break
+    if nav_eur <= 0.0:
+        nav_eur = 125_000_000.0
+
+    # 2. Extract Real Daily VaR 95% & VaR 99% (handling negative decimals like -0.0250 or pct like 2.50)
+    raw_var95 = abs(
+        float(
+            mk.get("var_95")
+            or mk.get("var_95_pct")
+            or metrics_block.get("var_95")
+            or last_res.get("var_95_pct")
+            or 0.0
+        )
+    )
+    if 0.0 < raw_var95 < 0.50:
+        raw_var95 *= 100.0
+    raw_var99 = abs(
+        float(
+            mk.get("var_99")
+            or mk.get("var_99_pct")
+            or metrics_block.get("var_99")
+            or last_res.get("var_99_pct")
+            or 0.0
+        )
+    )
+    if 0.0 < raw_var99 < 0.50:
+        raw_var99 *= 100.0
+    if raw_var99 <= 0.0:
+        live_var = round(raw_var95 * 1.38, 2) if raw_var95 > 0.0 else 1.84
+    else:
+        live_var = round(raw_var99, 2)
+
+    # 3. Extract Real Annualized Volatility %, Max Drawdown %, and Sharpe Ratio
+    raw_vol = abs(
+        float(
+            mk.get("volatility_pct")
+            or mk.get("volatility_annual_pct")
+            or mk.get("volatility_annual")
+            or mk.get("annual_volatility")
+            or ret_block.get("volatility_pct")
+            or metrics_block.get("volatility_annual_pct")
+            or metrics_block.get("volatility_annual")
+            or last_res.get("annual_volatility_pct")
+            or 0.0
+        )
+    )
+    if 0.0 < raw_vol < 1.50:
+        raw_vol *= 100.0
+    live_vol = round(raw_vol, 2) if raw_vol > 0.0 else 12.6
+
+    raw_mdd = abs(
+        float(
+            mk.get("max_drawdown_pct")
+            or mk.get("max_drawdown")
+            or ret_block.get("max_drawdown_pct")
+            or metrics_block.get("max_drawdown_pct")
+            or metrics_block.get("max_drawdown")
+            or last_res.get("max_drawdown_pct")
+            or 0.0
+        )
+    )
+    if 0.0 < raw_mdd < 1.50:
+        raw_mdd *= 100.0
+    live_mdd = round(raw_mdd, 2) if raw_mdd > 0.0 else 9.8
+
+    if has_live_portfolio and (
+        "sharpe_ratio" in ret_block
+        or "sharpe_ratio" in mk
+        or "sharpe_ratio" in metrics_block
+        or "sharpe_ratio" in last_res
+    ):
+        live_sharpe = round(
+            float(
+                ret_block.get(
+                    "sharpe_ratio",
+                    mk.get(
+                        "sharpe_ratio",
+                        metrics_block.get("sharpe_ratio", last_res.get("sharpe_ratio", 1.42)),
+                    ),
+                )
+            ),
+            2,
+        )
+    else:
+        live_sharpe = 1.42
+
+    # 4. Extract Real HHI Concentration % from positions
+    live_hhi = 16.5
+    if isinstance(pos_df, pd.DataFrame) and not pos_df.empty:
+        w_series = None
+        for wcol in ("weight", "weight_pct", "peso_pct"):
+            if wcol in pos_df.columns:
+                w_series = pd.to_numeric(pos_df[wcol], errors="coerce").fillna(0.0)
+                break
+        if w_series is None:
+            for vcol in ("market_value", "current_value", "valore_mercato"):
+                if vcol in pos_df.columns:
+                    vals = pd.to_numeric(pos_df[vcol], errors="coerce").fillna(0.0).abs()
+                    if vals.sum() > 0:
+                        w_series = vals / vals.sum()
+                        break
+        if w_series is not None and w_series.sum() > 0:
+            w_norm = w_series / w_series.sum()
+            hhi_calc = float((w_norm**2).sum() * 100.0)
+            if hhi_calc > 0.5:
+                live_hhi = round(hhi_calc, 1)
+
+    # 5. Compute Real PRIIPs SRI (1-7) & CET1 / Liquidity adjustments from portfolio risk
+    base_sri = 3.0
+    if live_vol >= 40.0 or live_mdd >= 32.0:
+        base_sri = 6.0
+    elif live_vol >= 25.0 or live_mdd >= 22.0:
+        base_sri = 5.0
+    elif live_vol >= 15.0 or live_mdd >= 14.0:
+        base_sri = 4.0
+
+    base_cet1 = 10.25
+    if live_sharpe < 0.35 or live_mdd >= 25.0:
+        base_cet1 = 8.85
+    elif live_sharpe < 0.70 or live_mdd >= 18.0:
+        base_cet1 = 9.35
+
+    base_cva = round(14.2 + max(0.0, (live_vol - 14.0) * 0.65), 1)
+
+    shock = get_active_macro_shock(session_state_dict=session_state_dict)
+    s_key = str(shock.get("preset_key", "NONE"))
+
+    var_shock_add = 0.0
+    lcr_shock_add = 0.0
+    nsfr_shock_add = 0.0
+    cet1_shock_add = 0.0
+    sri_shock_add = 0.0
+    hhi_shock_add = 0.0
+    cva_shock_add = 0.0
+
+    if s_key == "GFC_2008":
+        var_shock_add = 1.45
+        lcr_shock_add = -38.0
+        nsfr_shock_add = -16.0
+        cet1_shock_add = -2.40
+        sri_shock_add = 2.0
+        hhi_shock_add = 7.5
+        cva_shock_add = 38.0
+    elif s_key == "STAGFLATION_SHOCK":
+        var_shock_add = 0.82
+        lcr_shock_add = -22.0
+        nsfr_shock_add = -9.5
+        cet1_shock_add = -1.15
+        sri_shock_add = 1.0
+        hhi_shock_add = 4.5
+        cva_shock_add = 18.5
+    elif s_key == "LIQUIDITY_FREEZE":
+        var_shock_add = 0.65
+        lcr_shock_add = -46.0
+        nsfr_shock_add = -19.5
+        cet1_shock_add = -0.85
+        sri_shock_add = 1.0
+        hhi_shock_add = 9.0
+        cva_shock_add = 26.0
+
+    m = {
+        "var_99_daily_pct": round(live_var + var_shock_add, 2),
+        "var_limit_pct": 2.50,
+        "basel_lcr_pct": round(142.5 + lcr_shock_add, 1),
+        "basel_nsfr_pct": round(118.4 + nsfr_shock_add, 1),
+        "ccar_stressed_cet1_pct": round(base_cet1 + cet1_shock_add, 2),
+        "ccar_mda_hurdle_pct": 9.50,
+        "priips_sri_score": min(7.0, max(1.0, base_sri + sri_shock_add)),
+        "hhi_concentration_pct": round(live_hhi + hhi_shock_add, 1),
+        "counterparty_cva_bps": round(base_cva + cva_shock_add, 1),
+    }
+    if metrics_override:
+        m.update(metrics_override)
+
+    pillars: list[dict[str, Any]] = []
+
+    # 1. Market Risk VaR 99% Gate
+    var_val = float(m["var_99_daily_pct"])
+    var_lim = float(m["var_limit_pct"])
+    var_util = min(100.0, (var_val / max(var_lim, 0.01)) * 100.0)
+    var_status = "PASS" if var_val <= var_lim * 0.85 else ("WARNING" if var_val <= var_lim else "BREACH")
+    pillars.append(
+        {
+            "pillar_id": "market_var",
+            "title": "Market Risk VaR 99% (1d)",
+            "reg_framework": "BCBS-352 / FRTB",
+            "value_label": f"VaR {var_val:.2f}% / Lim {var_lim:.2f}%",
+            "delta_label": (
+                f"Δ +{var_shock_add:.2f}% Shock"
+                if var_shock_add > 0
+                else (f"VaR 95%: {raw_var95:.2f}%" if raw_var95 > 0 else "Baseline Compliant")
+            ),
+            "utilization_pct": round(var_util, 1),
+            "sparkline": [1.45, 1.62, 1.84, max(1.84, live_var * 0.9), var_val],
+            "status": var_status,
+            "target_page": "pages/2_🔴_Analisi_Rischio.py",
+            "badge_color": "#10b981" if var_status == "PASS" else ("#f59e0b" if var_status == "WARNING" else "#ef4444"),
+        }
+    )
+
+    # 2. Basel III Liquidity LCR & NSFR
+    lcr = float(m["basel_lcr_pct"])
+    nsfr = float(m["basel_nsfr_pct"])
+    liq_util = min(100.0, max(12.0, (150.0 - lcr) / 50.0 * 100.0))
+    liq_status = "PASS" if (lcr >= 110.0 and nsfr >= 105.0) else ("WARNING" if (lcr >= 100.0 and nsfr >= 100.0) else "BREACH")
+    pillars.append(
+        {
+            "pillar_id": "basel_liquidity",
+            "title": "Basel III LCR & NSFR",
+            "reg_framework": "CRR II / Basel III",
+            "value_label": f"LCR {lcr:.1f}% · NSFR {nsfr:.0f}%",
+            "delta_label": f"Δ {lcr_shock_add:+.1f}% LCR" if lcr_shock_add != 0 else "Min 100% Buffer OK",
+            "utilization_pct": round(liq_util, 1),
+            "sparkline": [148.0, 145.0, 143.5, 142.5, lcr],
+            "status": liq_status,
+            "target_page": "pages/7_🌪️_Stress_Testing.py",
+            "badge_color": "#10b981" if liq_status == "PASS" else ("#f59e0b" if liq_status == "WARNING" else "#ef4444"),
+        }
+    )
+
+    # 3. Fed CCAR / EBA Stressed CET1 & Sharpe Efficiency
+    cet1 = float(m["ccar_stressed_cet1_pct"])
+    mda = float(m["ccar_mda_hurdle_pct"])
+    ccar_util = min(100.0, max(15.0, (mda / max(cet1, 1.0)) * 84.0))
+    ccar_status = "PASS" if (cet1 >= mda + 0.5 and live_sharpe >= 0.70) else ("WARNING" if (cet1 >= 8.5 and live_sharpe >= 0.15) else "BREACH")
+    if metrics_override and "ccar_stressed_cet1_pct" in metrics_override:
+        ccar_status = "PASS" if cet1 >= mda + 0.5 else ("WARNING" if cet1 >= 6.0 else "BREACH")
+    pillars.append(
+        {
+            "pillar_id": "ccar_capital",
+            "title": "Stressed CET1 & Sharpe",
+            "reg_framework": "EBA / Hurdle Rf",
+            "value_label": f"CET1 {cet1:.2f}% · SR {live_sharpe:.2f}",
+            "delta_label": (
+                f"Sharpe {live_sharpe:.2f} < 0.70 Hurdle"
+                if live_sharpe < 0.70
+                else (f"Δ {cet1_shock_add:+.2f}% CET1" if cet1_shock_add != 0 else f"+{cet1 - mda:.2f}% vs MDA")
+            ),
+            "utilization_pct": round(ccar_util, 1),
+            "sparkline": [12.4, 11.8, 11.1, 10.25, cet1],
+            "status": ccar_status,
+            "target_page": "pages/7_🌪️_Stress_Testing.py",
+            "badge_color": "#10b981" if ccar_status == "PASS" else ("#f59e0b" if ccar_status == "WARNING" else "#ef4444"),
+        }
+    )
+
+    # 4. PRIIPs KID SRI & Max Drawdown Gate
+    sri = int(round(float(m["priips_sri_score"])))
+    sri_util = round((sri / 7.0) * 100.0, 1)
+    sri_status = "PASS" if (sri <= 4 and live_mdd <= 22.0) else ("WARNING" if (sri == 5 and live_mdd <= 28.0) else "BREACH")
+    pillars.append(
+        {
+            "pillar_id": "priips_sri",
+            "title": "PRIIPs SRI & Drawdown",
+            "reg_framework": "EU PRIIPs / MDD",
+            "value_label": f"SRI {sri}/7 · MDD {live_mdd:.1f}%",
+            "delta_label": (
+                f"Vol {live_vol:.1f}% (>25%) · MDD {live_mdd:.1f}%"
+                if (live_vol > 25.0 or live_mdd > 22.0)
+                else "Target SRI ≤ 4/7"
+            ),
+            "utilization_pct": sri_util,
+            "sparkline": [3.0, 3.0, 4.0, base_sri, float(sri)],
+            "status": sri_status,
+            "target_page": "pages/13_🏛️_Patrimonio_e_NetWorth.py",
+            "badge_color": "#10b981" if sri_status == "PASS" else ("#f59e0b" if sri_status == "WARNING" else "#ef4444"),
+        }
+    )
+
+    # 5. Portfolio Concentration HHI
+    hhi = float(m["hhi_concentration_pct"])
+    hhi_util = min(100.0, (hhi / 25.0) * 100.0)
+    hhi_status = "PASS" if hhi <= 20.0 else ("WARNING" if hhi <= 30.0 else "BREACH")
+    pillars.append(
+        {
+            "pillar_id": "hhi_concentration",
+            "title": "Concentrazione HHI & UCITS",
+            "reg_framework": "UCITS V 5/10/40",
+            "value_label": f"HHI {hhi:.1f}% / Max 25%",
+            "delta_label": f"Δ +{hhi_shock_add:.1f}% Corr." if hhi_shock_add > 0 else "Diversificato",
+            "utilization_pct": round(hhi_util, 1),
+            "sparkline": [14.0, 15.2, 16.0, live_hhi, hhi],
+            "status": hhi_status,
+            "target_page": "pages/4_🔬_Modelli_Quantitativi.py",
+            "badge_color": "#10b981" if hhi_status == "PASS" else ("#f59e0b" if hhi_status == "WARNING" else "#ef4444"),
+        }
+    )
+
+    # 6. Bilateral XVA & Credit IRB
+    cva_bps = float(m["counterparty_cva_bps"])
+    xva_util = min(100.0, (cva_bps / 50.0) * 100.0)
+    xva_status = "PASS" if cva_bps <= 25.0 else ("WARNING" if cva_bps <= 50.0 else "BREACH")
+    pillars.append(
+        {
+            "pillar_id": "xva_credit",
+            "title": "Counterparty XVA & Credit IRB",
+            "reg_framework": "ISDA SIMM v2.6",
+            "value_label": f"CVA {cva_bps:.1f} bps / Lim 50",
+            "delta_label": f"Δ +{cva_shock_add:.1f} bps" if cva_shock_add > 0 else "Soglia 50 bps",
+            "utilization_pct": round(xva_util, 1),
+            "sparkline": [11.5, 12.4, 13.5, base_cva, cva_bps],
+            "status": xva_status,
+            "target_page": "pages/7_🌪️_Stress_Testing.py",
+            "badge_color": "#10b981" if xva_status == "PASS" else ("#f59e0b" if xva_status == "WARNING" else "#ef4444"),
+        }
+    )
+
+    pass_cnt = sum(1 for p in pillars if p["status"] == "PASS")
+    warn_cnt = sum(1 for p in pillars if p["status"] == "WARNING")
+    breach_cnt = sum(1 for p in pillars if p["status"] == "BREACH")
+    readiness_score = max(15, int(round(100 - warn_cnt * 12 - breach_cnt * 22)))
+
+    overall = "GREEN - ALL REGULATORY GATES COMPLIANT"
+    if breach_cnt > 0:
+        overall = f"RED - {breach_cnt} REGULATORY BREACH(ES) & {warn_cnt} WATCH ITEM(S)"
+    elif warn_cnt > 0:
+        overall = f"AMBER - {warn_cnt} SUPERVISORY WATCH ITEM(S)"
+
+    return {
+        "overall_status": overall,
+        "readiness_score": readiness_score,
+        "active_macro_shock": s_key,
+        "nav_eur": nav_eur,
+        "metrics": m,
+        "pass_count": pass_cnt,
+        "warning_count": warn_cnt,
+        "breach_count": breach_cnt,
+        "pillars": pillars,
+    }
+
+
+def _safe_page_link(page_path: str, label: str) -> None:
+    """Safely render st.page_link using path relative to the src/ entrypoint directory."""
+    if st is None or not hasattr(st, "page_link") or not page_path:
+        return
+    rel_path = page_path[4:] if page_path.startswith("src/") else page_path
+    try:
+        st.page_link(rel_path, label=label, use_container_width=True)
+    except Exception:
+        pass
+
+
+def render_executive_traffic_light_radar(
+    key_prefix: str = "cro_radar",
+    metrics_override: dict[str, float] | None = None,
+    include_board_pack: bool = False,
+    default_expanded: bool = False,
+    risk_data: dict[str, Any] | None = None,
+    factsheet_pdf_bytes: bytes | None = None,
+) -> dict[str, Any]:
+    """Render upgraded CRO Traffic-Light Radar, Global Macro Shock Console & 1-Click Board-Pack."""
+    eff_risk_data, resolved_port_name = _resolve_active_portfolio_bundle(risk_data=risk_data)
+    radar = compute_executive_traffic_light_radar(
+        metrics_override=metrics_override,
+        risk_data=eff_risk_data,
+    )
+    if st is None:
+        return radar
+
+    cur_shock = str(st.session_state.get("global_macro_shock", "NONE"))
+    shock_badge = f" · ⚡ SHOCK: {cur_shock}" if cur_shock != "NONE" else ""
+    score = int(radar.get("readiness_score", 96))
+    expander_title = (
+        f"🏛️ Console Istituzionale CRO & Stress Broadcast — Readiness {score}/100 "
+        f"({radar['pass_count']} PASS · {radar['warning_count']} WATCH · {radar['breach_count']} BREACH){shock_badge}"
+    )
+
+    with st.expander(expander_title, expanded=default_expanded):
+        score_col = "#10b981" if score >= 85 else ("#f59e0b" if score >= 60 else "#ef4444")
+        shock_lbl = MACRO_SHOCK_PRESETS.get(cur_shock, MACRO_SHOCK_PRESETS["NONE"])["label"]
+        top_strip_html = _compact_html(
+            f"""
+            <div style="background: linear-gradient(90deg, rgba(15,23,42,0.95) 0%, rgba(30,41,59,0.90) 100%);
+                        border: 1px solid rgba(148,163,184,0.20); border-left: 4px solid {score_col};
+                        border-radius: 10px; padding: 10px 16px; margin-bottom: 12px;
+                        display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                    <span style="background:rgba(255,255,255,0.06); border:1px solid {score_col}; color:{score_col};
+                                 font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:800; padding:3px 10px; border-radius:8px;">
+                        CRO READINESS: {score}/100
+                    </span>
+                    <span style="font-size:12px; font-weight:700; color:#f8fafc;">{radar['overall_status']}</span>
+                </div>
+                <div style="font-size:11.5px; color:#cbd5e1; font-family:'JetBrains Mono',monospace;">
+                    NAV: <b style="color:#10b981;">€ {radar['nav_eur']:,.2f}</b> &bull; Scenario: <b style="color:#a855f7;">{shock_lbl}</b>
+                </div>
+            </div>
+            """
+        )
+        st.markdown(top_strip_html, unsafe_allow_html=True)
+
+        # Row 1: Perfectly Aligned 3-Column Controls
+        c_cmd, c_shk, c_den = st.columns([2.1, 2.2, 1.2])
+        with c_cmd:
+            cmd_input = st.text_input(
+                "⌨️ Bloomberg Command Launcher `<GO>`",
+                value="",
+                placeholder="SIMM <GO>, SVI <GO>, ALM <GO>, CDS <GO>, VPIN <GO>, SHOCK 2008...",
+                key=f"{key_prefix}_go_in",
+            )
+            if cmd_input.strip():
+                res = resolve_terminal_command(cmd_input)
+                if res.get("macro_shock"):
+                    st.session_state["global_macro_shock"] = res["macro_shock"]
+                st.info(f"**{res['command']}** → {res['description']}")
+                if res.get("target_page"):
+                    _safe_page_link(res["target_page"], f"🚀 Apri {res['command']} ({res['workspace']})")
+        with c_shk:
+            preset_keys = list(MACRO_SHOCK_PRESETS.keys())
+            idx = preset_keys.index(cur_shock) if cur_shock in preset_keys else 0
+            chosen_shock = st.selectbox(
+                "⚡ Global Macro Shock Broadcast (Cross-Page)",
+                options=preset_keys,
+                format_func=lambda k: MACRO_SHOCK_PRESETS[k]["label"],
+                index=idx,
+                key=f"{key_prefix}_shock_sel",
+            )
+            if chosen_shock != cur_shock:
+                st.session_state["global_macro_shock"] = chosen_shock
+                st.rerun()
+        with c_den:
+            cur_density = str(st.session_state.get("ux_density_mode", "COMPACT_DESK"))
+            chosen_density = st.selectbox(
+                "🖥️ Densità Terminale",
+                options=["COMPACT_DESK", "BOARDROOM"],
+                format_func=lambda m: "Compact Quant Desk" if m == "COMPACT_DESK" else "Boardroom HD Mode",
+                index=0 if cur_density == "COMPACT_DESK" else 1,
+                key=f"{key_prefix}_density_sel",
+            )
+            st.session_state["ux_density_mode"] = chosen_density
+
+        # Row 2: 1-Click Quick-Jump Institutional Module Bar
+        if hasattr(st, "page_link"):
+            qj1, qj2, qj3, qj4, qj5, qj6 = st.columns(6)
+            with qj1:
+                _safe_page_link("pages/7_🌪️_Stress_Testing.py", "🛡️ ISDA SIMM v2.6")
+            with qj2:
+                _safe_page_link("pages/4_🔬_Modelli_Quantitativi.py", "🌊 Rough Vol & SVI")
+            with qj3:
+                _safe_page_link("pages/13_🏛️_Patrimonio_e_NetWorth.py", "🏛️ ALM / LDI LP")
+            with qj4:
+                _safe_page_link("pages/4_🔬_Modelli_Quantitativi.py", "💳 CDS & Tranches")
+            with qj5:
+                _safe_page_link("pages/13_🏛️_Patrimonio_e_NetWorth.py", "⚡ Market-Making VPIN")
+            with qj6:
+                _safe_page_link("pages/7_🌪️_Stress_Testing.py", "🌪️ Fed CCAR 9Q")
+
+        # Row 3: 6 Rich Bento CRO Pillar Cards (Single-Line Value Label, SVG Sparkline & Limit Bar)
+        cols = st.columns(3)
+        for idx_p, p in enumerate(radar["pillars"]):
+            icon = "🟢" if p["status"] == "PASS" else ("🟡" if p["status"] == "WARNING" else "🔴")
+            spark_svg = build_svg_sparkline(p.get("sparkline", [1.0, 1.1, 1.05]), color=p["badge_color"], width=86, height=22)
+            util_pct = float(p.get("utilization_pct", 50.0))
+            pillar_id = p.get("pillar_id", f"p_{idx_p}")
+            unique_p_id = hashlib.md5(f"cro_pillar_{pillar_id}_{p['title']}".encode("utf-8")).hexdigest()[:8]
+            try:
+                from components.ui_core.ui_utils import resolve_metric_knowledge
+
+                raw_p_content = resolve_metric_knowledge(p["title"])
+            except Exception:
+                raw_p_content = f"<p><b>{p['title']}</b>: Pilastro di adeguatezza patrimoniale e tolleranza al rischio (Risk Appetite Framework).</p>"
+            cleaned_p = re.sub(r"<!--.*?-->", "", raw_p_content, flags=re.DOTALL)
+            safe_p_content = _compact_html(cleaned_p)
+            p_info_svg = (
+                '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+                'stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" style="display:block;">'
+                '<circle cx="12" cy="12" r="10"></circle>'
+                '<line x1="12" y1="16" x2="12" y2="12"></line>'
+                '<line x1="12" y1="8" x2="12.01" y2="8"></line>'
+                '</svg>'
+            )
+
+            with cols[idx_p % 3]:
+                card_html = _compact_html(
+                    f"""
+                    <style>
+                    #cro-modal-toggle-{unique_p_id} {{ display: none; }}
+                    .cro-modal-overlay-{unique_p_id} {{
+                        display: none;
+                        position: fixed;
+                        top: 0; left: 0; right: 0; bottom: 0;
+                        z-index: 999999;
+                        align-items: center;
+                        justify-content: center;
+                        padding: 20px;
+                        box-sizing: border-box;
+                    }}
+                    #cro-modal-toggle-{unique_p_id}:checked ~ .cro-modal-overlay-{unique_p_id} {{
+                        display: flex;
+                    }}
+                    .cro-modal-backdrop-{unique_p_id} {{
+                        position: fixed;
+                        top: 0; left: 0; right: 0; bottom: 0;
+                        background: rgba(10, 14, 20, 0.88);
+                        backdrop-filter: blur(12px);
+                        -webkit-backdrop-filter: blur(12px);
+                        cursor: pointer;
+                        z-index: 1;
+                    }}
+                    .cro-modal-content-{unique_p_id} {{
+                        background: #0f172a;
+                        border: 1px solid rgba(148, 163, 184, 0.28);
+                        border-top: 4px solid {p['badge_color']};
+                        padding: 24px 28px;
+                        border-radius: 16px;
+                        width: 92%;
+                        max-width: 760px;
+                        max-height: 86vh;
+                        overflow-y: auto;
+                        color: #f1f5f9;
+                        position: relative;
+                        z-index: 2;
+                        box-shadow: 0 24px 60px rgba(0,0,0,0.92), 0 0 30px {p['badge_color']}33;
+                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                        text-align: left;
+                        box-sizing: border-box;
+                        animation: croPopIn_{unique_p_id} 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+                    }}
+                    @keyframes croPopIn_{unique_p_id} {{
+                        from {{ opacity: 0; transform: scale(0.95) translateY(10px); }}
+                        to {{ opacity: 1; transform: scale(1) translateY(0); }}
+                    }}
+                    .cro-modal-close-{unique_p_id} {{
+                        position: absolute;
+                        top: 14px; right: 18px;
+                        cursor: pointer;
+                        font-size: 26px;
+                        color: #94a3b8;
+                        line-height: 1;
+                        width: 30px; height: 30px;
+                        display: flex; align-items: center; justify-content: center;
+                        border-radius: 6px;
+                        transition: all 0.2s ease;
+                    }}
+                    .cro-modal-close-{unique_p_id}:hover {{
+                        color: #f8fafc;
+                        background: rgba(255, 255, 255, 0.1);
+                    }}
+                    .cro-info-icon-{unique_p_id} {{
+                        cursor: pointer;
+                        color: {p['badge_color']};
+                        opacity: 0.85;
+                        background: {p['badge_color']}18;
+                        border: 1px solid {p['badge_color']}44;
+                        border-radius: 50%;
+                        width: 16px;
+                        height: 16px;
+                        display: inline-flex;
+                        align-items: center;
+                        justify-content: center;
+                        flex-shrink: 0 !important;
+                        transition: all 0.2s ease;
+                        box-sizing: border-box !important;
+                        padding: 0;
+                    }}
+                    .cro-info-icon-{unique_p_id}:hover {{
+                        opacity: 1;
+                        background: {p['badge_color']}33;
+                        border-color: {p['badge_color']};
+                        box-shadow: 0 0 8px {p['badge_color']}66;
+                        transform: scale(1.15);
+                    }}
+                    </style>
+
+                    <input type="checkbox" id="cro-modal-toggle-{unique_p_id}">
+                    <div class="cro-modal-overlay-{unique_p_id}">
+                        <label for="cro-modal-toggle-{unique_p_id}" class="cro-modal-backdrop-{unique_p_id}"></label>
+                        <div class="cro-modal-content-{unique_p_id}">
+                            <label for="cro-modal-toggle-{unique_p_id}" class="cro-modal-close-{unique_p_id}">×</label>
+                            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; border-bottom:1px solid rgba(148,163,184,0.2); padding-bottom:10px; flex-wrap:wrap; gap:8px;">
+                                <div>
+                                    <span style="font-size:10.5px; font-weight:800; color:{p['badge_color']}; text-transform:uppercase; letter-spacing:0.5px; font-family:'JetBrains Mono',monospace;">
+                                        🏛️ PILASTRO CRO [{p.get('reg_framework', 'BCBS')}] &bull; SCHEDA METODOLOGICA
+                                    </span>
+                                    <h3 style="margin:2px 0 0 0; font-size:18px; font-weight:800; color:#f8fafc;">{p['title']}</h3>
+                                </div>
+                                <div style="text-align:right;">
+                                    <div style="font-size:15px; font-weight:800; color:#f8fafc; font-family:'JetBrains Mono',monospace;">{p['value_label']}</div>
+                                    <div style="font-size:10.5px; color:{p['badge_color']}; font-weight:700;">{icon} {p['status']} ({p.get('delta_label', '')})</div>
+                                </div>
+                            </div>
+                            <div style="font-size:13px; line-height:1.55; color:#cbd5e1;">
+                                {safe_p_content}
+                            </div>
+                            <div style="display:flex; justify-content:flex-end; margin-top:16px;">
+                                <label for="cro-modal-toggle-{unique_p_id}" style="cursor:pointer; background:rgba(255,255,255,0.06); border:1px solid rgba(148,163,184,0.25); color:#cbd5e1; padding:6px 16px; border-radius:8px; font-size:12px; font-weight:600;">
+                                    Chiudi Scheda
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="argus-bento-card" style="background: rgba(15, 23, 42, 0.90); border: 1px solid rgba(148,163,184,0.16);
+                                border-left: 4px solid {p['badge_color']}; border-radius: 10px; padding: 11px 14px; margin-bottom: 10px;
+                                box-shadow: 0 4px 12px rgba(0,0,0,0.25);">
+                        <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
+                            <div style="display:flex; align-items:center; gap:6px;">
+                                <span style="font-size: 11.5px; font-weight: 700; color: #f8fafc; white-space:nowrap;">{p['title']}</span>
+                                <label for="cro-modal-toggle-{unique_p_id}" class="cro-info-icon-{unique_p_id}" title="Clicca per approfondire la metodologia di {p['title']}">
+                                    {p_info_svg}
+                                </label>
+                            </div>
+                            <span style="background:rgba(255,255,255,0.05); border:1px solid {p['badge_color']};
+                                         font-size: 9.5px; font-weight: 800; color: {p['badge_color']}; padding:1px 7px; border-radius:10px; white-space:nowrap;">
+                                {icon} {p['status']}
+                            </span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:7px; gap:8px;">
+                            <div style="min-width:0;">
+                                <div style="font-size: 13.5px; font-weight: 800; color: #f1f5f9; font-family: 'JetBrains Mono', monospace; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                                    {p['value_label']}
+                                </div>
+                                <div style="font-size: 10px; color: #94a3b8; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                                    <span style="color:#818cf8; font-weight:700;">[{p.get('reg_framework', 'BCBS')}]</span> · {p.get('delta_label', '')}
+                                </div>
+                            </div>
+                            <div style="flex-shrink:0;">{spark_svg}</div>
+                        </div>
+                        <div style="margin-top:7px;">
+                            <div style="display:flex; justify-content:space-between; font-size:9.5px; color:#94a3b8; margin-bottom:2px;">
+                                <span>Saturazione Limite Regolamentare</span>
+                                <span style="color:{p['badge_color']}; font-weight:700;">{util_pct:.1f}%</span>
+                            </div>
+                            <div style="width:100%; height:4px; background:rgba(255,255,255,0.08); border-radius:2px; overflow:hidden;">
+                                <div style="width:{min(100.0, util_pct):.1f}%; height:100%; background:{p['badge_color']}; border-radius:2px;"></div>
+                            </div>
+                        </div>
+                    </div>
+                    """
+                )
+                st.markdown(card_html, unsafe_allow_html=True)
+
+        if include_board_pack:
+            from core.executive_board_pack_engine import generate_executive_board_pack
+
+            port_name = str(resolved_port_name or st.session_state.get("portfolio_name") or "Portafoglio Attivo")
+            bp_res = generate_executive_board_pack(
+                portfolio_name=port_name,
+                nav_eur=float(radar.get("nav_eur", 125_000_000.0)),
+                risk_data=eff_risk_data,
+            )
+            bp_c1, bp_c2 = st.columns([2.95, 1.25], vertical_alignment="top")
+            with bp_c1:
+                rx_cards_html = ""
+                for rx in bp_res["cro_prescriptions"]:
+                    b_col = rx.get("badge_color", "#6366f1")
+                    rx_cards_html += (
+                        f'<div style="background:rgba(15,23,42,0.82); border:1px solid rgba(148,163,184,0.14); '
+                        f'border-left:3px solid {b_col}; border-radius:7px; padding:7px 10px; margin-bottom:6px;">'
+                        f'<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; margin-bottom:3px;">'
+                        f'<div style="display:flex; align-items:center; gap:6px;">'
+                        f'<span style="background:rgba(99,102,241,0.22); color:#c7d2fe; font-family:\'JetBrains Mono\',monospace; '
+                        f'font-weight:800; font-size:9.5px; padding:1px 6px; border-radius:4px;">{rx.get("code", "RX")}</span>'
+                        f'<span style="font-size:11px; font-weight:800; color:#f8fafc;">{rx["priority"]}</span>'
+                        f'<span style="font-size:10px; color:#94a3b8;">· {rx["domain"]}</span>'
+                        f'</div>'
+                        f'<div style="display:flex; align-items:center; gap:5px; flex-wrap:wrap;">'
+                        f'<span style="background:rgba(245,158,11,0.14); border:1px solid rgba(245,158,11,0.35); color:#fbbf24; '
+                        f'font-family:\'JetBrains Mono\',monospace; font-size:9.5px; font-weight:700; padding:1px 6px; border-radius:4px;">'
+                        f'{rx.get("notional_label", "")}</span>'
+                        f'<span style="background:rgba(56,189,248,0.12); border:1px solid rgba(56,189,248,0.35); color:#38bdf8; '
+                        f'font-family:\'JetBrains Mono\',monospace; font-size:9.5px; font-weight:700; padding:1px 6px; border-radius:4px;">'
+                        f'{rx.get("target_kpi", "")}</span>'
+                        f'<span style="background:rgba(16,185,129,0.14); border:1px solid rgba(16,185,129,0.35); color:#34d399; '
+                        f'font-size:9.5px; font-weight:800; padding:1px 6px; border-radius:4px;">{rx.get("readiness_lift", "")}</span>'
+                        f'</div>'
+                        f'</div>'
+                        f'<div style="font-size:11px; color:#cbd5e1; line-height:1.38;">'
+                        f'<b style="color:#e2e8f0;">Strumento ({rx.get("instrument", "Overlay")}):</b> {rx["action"]}'
+                        f'</div>'
+                        f'</div>'
+                    )
+
+                lift_pts = max(0, int(bp_res.get("readiness_post_hedge", 95)) - int(bp_res.get("readiness_score", 70)))
+                st.markdown(
+                    _compact_html(
+                        f"""
+                        <div style="background:rgba(22,27,34,0.88); border:1px solid rgba(148,163,184,0.18);
+                                    border-radius:10px; padding:10px 14px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
+                                <div style="font-size:11.5px; font-weight:800; color:#f59e0b; letter-spacing:0.3px;">
+                                    📑 MATRICE PRESCRITTIVA COMITATO RISCHI &amp; TRADE TICKETS ({port_name} — NAV € {radar['nav_eur']:,.2f})
+                                </div>
+                                <span style="background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.4); color:#34d399;
+                                             font-size:10px; font-weight:800; padding:2px 8px; border-radius:12px;">
+                                    🎯 Readiness Post-Copertura: {bp_res.get('readiness_post_hedge', 95)}/100 (+{lift_pts} pts)
+                                </span>
+                            </div>
+                            {rx_cards_html}
+                        </div>
+                        """
+                    ),
+                    unsafe_allow_html=True,
+                )
+            with bp_c2:
+                seal_short = str(bp_res.get("sha256_audit_seal", ""))[:16]
+                st.markdown(
+                    _compact_html(
+                        f"""
+                        <div style="background:rgba(15,23,42,0.92); border:1px solid rgba(99,102,241,0.32);
+                                    border-top:3px solid #6366f1; border-radius:10px; padding:9px 12px; margin-bottom:8px;">
+                            <div style="font-size:11px; font-weight:800; color:#f8fafc; letter-spacing:0.3px;">
+                                🏛️ DOSSIER COMITATO RISCHI (CRO)
+                            </div>
+                            <div style="font-size:10px; color:#94a3b8; margin-top:3px; line-height:1.35;">
+                                Certificazione <b>BCBS-239 / Fed SR 11-7</b><br/>
+                                Include: 6 Pilastri · 3 Trade Tickets · 4 Stress<br/>
+                                <span style="font-family:'JetBrains Mono',monospace; color:#818cf8; font-size:9.5px;">
+                                    SHA-256: {seal_short}...
+                                </span>
+                            </div>
+                        </div>
+                        """
+                    ),
+                    unsafe_allow_html=True,
+                )
+                st.download_button(
+                    label="🏛️ Dossier CRO (HTML5 Print-Ready)",
+                    data=bp_res["board_pack_html"].encode("utf-8"),
+                    file_name=f"ARGUS_CRO_BoardPack_{datetime.now().strftime('%Y%m%d')}.html",
+                    mime="text/html",
+                    use_container_width=True,
+                    type="primary",
+                    key=f"{key_prefix}_dl_bp_btn",
+                )
+                import base64
+
+                st.download_button(
+                    label="📕 Verbale Ufficiale CRO (PDF A4)",
+                    data=base64.b64decode(bp_res.get("board_pack_pdf_base64", "")),
+                    file_name=f"ARGUS_Verbale_CRO_{datetime.now().strftime('%Y%m%d')}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True,
+                    key=f"{key_prefix}_dl_cro_pdf_btn",
+                )
+                st.download_button(
+                    label="🧾 Audit Trail SR 11-7 (JSON)",
+                    data=bp_res["board_pack_audit_json"].encode("utf-8"),
+                    file_name=f"ARGUS_SR117_Audit_{datetime.now().strftime('%Y%m%d')}.json",
+                    mime="application/json",
+                    use_container_width=True,
+                    key=f"{key_prefix}_dl_cro_json_btn",
+                )
+    return radar
+
+
+def render_segmented_workspace_switcher(
+    workspace_key: str,
+    label: str,
+    options: list[str],
+    default_index: int = 0,
+) -> str:
+    """Render Bloomberg-style horizontal workspace selector bar to eliminate infinite scroll fatigue."""
+    if st is None or not options:
+        return options[0] if options else ""
+
+    selected = st.radio(
+        label,
+        options=options,
+        index=min(default_index, len(options) - 1),
+        horizontal=True,
+        key=f"seg_ws_{workspace_key}",
+    )
+    return str(selected)
+
+
+# ============================================================================
+# RELEASE v9.18.0 — BLOOMBERG COMMAND BAR <GO>, MACRO SHOCK BROADCAST,
+# BENTO KPI CARDS (SVG SPARKLINES), SR 11-7 AUDIT DRAWER & DENSITY MODES
+# ============================================================================
+
+MACRO_SHOCK_PRESETS: dict[str, dict[str, Any]] = {
+    "NONE": {
+        "preset_key": "NONE",
+        "label": "🟢 Baseline Normal Market (No Global Shock)",
+        "is_active": False,
+        "rates_bps": 0.0,
+        "credit_bps": 0.0,
+        "equity_pct": 0.0,
+        "vol_pts": 0.0,
+        "vpin_add": 0.0,
+    },
+    "GFC_2008": {
+        "preset_key": "GFC_2008",
+        "label": "🔴 Global Financial Crisis 2008 (-125bps Rates / +350bps Credit / -35% Eq / +22v)",
+        "is_active": True,
+        "rates_bps": -125.0,
+        "credit_bps": 350.0,
+        "equity_pct": -35.0,
+        "vol_pts": 22.0,
+        "vpin_add": 0.35,
+    },
+    "STAGFLATION_SHOCK": {
+        "preset_key": "STAGFLATION_SHOCK",
+        "label": "🟠 Stagflation & Rate Spike (+200bps Rates / +160bps Credit / -18% Eq / +10v)",
+        "is_active": True,
+        "rates_bps": 200.0,
+        "credit_bps": 160.0,
+        "equity_pct": -18.0,
+        "vol_pts": 10.0,
+        "vpin_add": 0.20,
+    },
+    "LIQUIDITY_FREEZE": {
+        "preset_key": "LIQUIDITY_FREEZE",
+        "label": "🟣 Flash Crash & Order-Flow Toxicity (+50bps Rates / +220bps Credit / VPIN +0.45)",
+        "is_active": True,
+        "rates_bps": 50.0,
+        "credit_bps": 220.0,
+        "equity_pct": -15.0,
+        "vol_pts": 16.0,
+        "vpin_add": 0.45,
+    },
+}
+
+GLOBAL_COMMAND_REGISTRY: dict[str, dict[str, str]] = {
+    "SIMM": {
+        "command": "SIMM <GO>",
+        "target_page": "src/pages/7_🌪️_Stress_Testing.py",
+        "workspace": "🛡️ Bilateral XVA, ISDA SIMM & Reg Capital",
+        "description": "ISDA SIMM v2.6 Initial Margin, UMR $50M Threshold & CCP Optimizer",
+    },
+    "SVI": {
+        "command": "SVI <GO>",
+        "target_page": "src/pages/4_🔬_Modelli_Quantitativi.py",
+        "workspace": "📈 Rates, Credit, Commodities & Rough Vol",
+        "description": "Rough Bergomi (H=0.10) & Gatheral SVI Arbitrage-Free Volatility Surface",
+    },
+    "RBERGOMI": {
+        "command": "RBERGOMI <GO>",
+        "target_page": "src/pages/4_🔬_Modelli_Quantitativi.py",
+        "workspace": "📈 Rates, Credit, Commodities & Rough Vol",
+        "description": "Rough Bergomi Fractional Brownian Motion Volatility Surface",
+    },
+    "CDS": {
+        "command": "CDS <GO>",
+        "target_page": "src/pages/4_🔬_Modelli_Quantitativi.py",
+        "workspace": "📈 Rates, Credit, Commodities & Rough Vol",
+        "description": "Single-Name CDS Bootstrapping & iTraxx/CDX Synthetic CDO Tranches",
+    },
+    "ALM": {
+        "command": "ALM <GO>",
+        "target_page": "src/pages/13_🏛️_Patrimonio_e_NetWorth.py",
+        "workspace": "🏛️ ALM, LDI & Microstructure Execution",
+        "description": "Asset-Liability Management, Redington Immunization & Cash-Flow LP",
+    },
+    "VPIN": {
+        "command": "VPIN <GO>",
+        "target_page": "src/pages/13_🏛️_Patrimonio_e_NetWorth.py",
+        "workspace": "🏛️ ALM, LDI & Microstructure Execution",
+        "description": "Avellaneda-Stoikov Market-Making & Hawkes / VPIN Order-Flow Toxicity",
+    },
+    "PACK": {
+        "command": "PACK <GO>",
+        "target_page": "src/0_Control_Room.py",
+        "workspace": "Executive CRO Board-Pack",
+        "description": "1-Click Executive CRO & Investment Committee Printable HTML5 Board-Pack",
+    },
+    "CCAR": {
+        "command": "CCAR <GO>",
+        "target_page": "src/pages/7_🌪️_Stress_Testing.py",
+        "workspace": "🛡️ Bilateral XVA, ISDA SIMM & Reg Capital",
+        "description": "Fed CCAR / EBA 9-Quarter CET1 & Leverage Capital Trajectory",
+    },
+    "SHOCK 2008": {
+        "command": "SHOCK 2008 <GO>",
+        "target_page": "",
+        "macro_shock": "GFC_2008",
+        "description": "Broadcast Global Financial Crisis 2008 Macro Shock across all pages",
+    },
+    "SHOCK STAGFLATION": {
+        "command": "SHOCK STAGFLATION <GO>",
+        "target_page": "",
+        "macro_shock": "STAGFLATION_SHOCK",
+        "description": "Broadcast Stagflation (+200bps Rates / +160bps Credit) Shock across all pages",
+    },
+    "SHOCK LIQUIDITY": {
+        "command": "SHOCK LIQUIDITY <GO>",
+        "target_page": "",
+        "macro_shock": "LIQUIDITY_FREEZE",
+        "description": "Broadcast Liquidity Freeze & High VPIN Toxicity across all pages",
+    },
+    "SHOCK RESET": {
+        "command": "SHOCK RESET <GO>",
+        "target_page": "",
+        "macro_shock": "NONE",
+        "description": "Clear Global Macro Shock and return to Baseline Normal Market",
+    },
+    "PORT": {
+        "command": "PORT <GO>",
+        "target_page": "src/pages/1_📈_Dashboard_Generale.py",
+        "workspace": "📈 Dashboard Generale & CRO Radar",
+        "description": "General Dashboard, Portfolio Performance, Asset Allocation & CRO Radar",
+    },
+    "DASH": {
+        "command": "DASH <GO>",
+        "target_page": "src/pages/1_📈_Dashboard_Generale.py",
+        "workspace": "📈 Dashboard Generale & CRO Radar",
+        "description": "General Dashboard, Portfolio Performance, Asset Allocation & CRO Radar",
+    },
+    "CRO": {
+        "command": "CRO <GO>",
+        "target_page": "src/pages/1_📈_Dashboard_Generale.py",
+        "workspace": "📈 Dashboard Generale & CRO Radar",
+        "description": "Chief Risk Officer Multi-Pillar Executive Traffic Light Radar",
+    },
+    "TERM": {
+        "command": "TERM <GO>",
+        "target_page": "src/pages/2_🖥️_Live_Terminal.py",
+        "workspace": "🖥️ Live Terminal & Real-Time Market Desk",
+        "description": "Interactive Bloomberg CLI, Level 2 Depth Book, Streaming Tape & OMS Blotter",
+    },
+    "LIVE": {
+        "command": "LIVE <GO>",
+        "target_page": "src/pages/2_🖥️_Live_Terminal.py",
+        "workspace": "🖥️ Live Terminal & Real-Time Market Desk",
+        "description": "Real-Time Streaming Market Feed, L2 Depth & Order Management Blotter",
+    },
+    "RISK": {
+        "command": "RISK <GO>",
+        "target_page": "src/pages/3_🔴_Analisi_Rischio.py",
+        "workspace": "🔴 Analisi Rischio & Stress Engine",
+        "description": "Parametric / Historical VaR, Expected Shortfall CVaR & Kupiec Backtest",
+    },
+    "VAR": {
+        "command": "VAR <GO>",
+        "target_page": "src/pages/3_🔴_Analisi_Rischio.py",
+        "workspace": "🔴 Analisi Rischio & Stress Engine",
+        "description": "Value-at-Risk Engine (95% / 99% Cornish-Fisher & Historical Horizons)",
+    },
+    "QUANT": {
+        "command": "QUANT <GO>",
+        "target_page": "src/pages/4_🔬_Modelli_Quantitativi.py",
+        "workspace": "🔬 Modelli Quantitativi Avanzati",
+        "description": "16 Quantitative Institutional Engines (Heston, SVI, Swaptions, CDS, Black-Litterman)",
+    },
+    "MODELS": {
+        "command": "MODELS <GO>",
+        "target_page": "src/pages/4_🔬_Modelli_Quantitativi.py",
+        "workspace": "🔬 Modelli Quantitativi Avanzati",
+        "description": "Full Suite of Derivative Pricing & Stochastic Volatility Models",
+    },
+    "POS": {
+        "command": "POS <GO>",
+        "target_page": "src/pages/5_📋_Posizioni_e_Dettagli.py",
+        "workspace": "📋 Posizioni, Concentrazione & Algorithmic Execution",
+        "description": "Holdings Detail, FIFO Tax Lots, Almgren-Chriss Liquidation & Implementation Shortfall",
+    },
+    "TCA": {
+        "command": "TCA <GO>",
+        "target_page": "src/pages/5_📋_Posizioni_e_Dettagli.py",
+        "workspace": "📋 Posizioni, Concentrazione & Algorithmic Execution",
+        "description": "Transaction Cost Analysis (Perold 1988 Implementation Shortfall & Broker Ratings)",
+    },
+    "VAL": {
+        "command": "VAL <GO>",
+        "target_page": "src/pages/6_🏛️_Valutazione_Aziendale.py",
+        "workspace": "🏛️ Valutazione Intrinseca & Fair Value",
+        "description": "DCF Monte Carlo, WACC, Altman Z-Score, Beneish M-Score & PE Waterfall",
+    },
+    "DCF": {
+        "command": "DCF <GO>",
+        "target_page": "src/pages/6_🏛️_Valutazione_Aziendale.py",
+        "workspace": "🏛️ Valutazione Intrinseca & Fair Value",
+        "description": "Stochastic Monte Carlo DCF, WACC Simulation & Gordon Growth Sensitivity",
+    },
+    "STRESS": {
+        "command": "STRESS <GO>",
+        "target_page": "src/pages/7_🌪️_Stress_Testing.py",
+        "workspace": "🌪️ Stress Testing & Reg Capital",
+        "description": "Solvency II SCR, FRTB Standardized Approach, CCAR 9-Quarter & CreditMetrics",
+    },
+    "TIME": {
+        "command": "TIME <GO>",
+        "target_page": "src/pages/8_📊_Analisi_Temporale.py",
+        "workspace": "📊 Analisi Temporale & Dinamiche di Ritorno",
+        "description": "Rolling Beta, EWMA Volatility Clustering, Regime Switching & Underwater Drawdowns",
+    },
+    "TECH": {
+        "command": "TECH <GO>",
+        "target_page": "src/pages/9_📈_Analisi_Tecnica.py",
+        "workspace": "📈 Analisi Tecnica & Indicatori Algoritmici",
+        "description": "ATR Chandelier Exits, Bollinger Bands Squeeze, RSI & Momentum Signals",
+    },
+    "SCREEN": {
+        "command": "SCREEN <GO>",
+        "target_page": "src/pages/10_🎯_Screener_Opportunita.py",
+        "workspace": "🎯 Screener Opportunità & Factor Model",
+        "description": "Multi-Factor Screening (Value, Quality, Momentum, Low Volatility) & Universe Scanner",
+    },
+    "BQ": {
+        "command": "BQ <GO>",
+        "target_page": "src/pages/11_💻_BQuant_e_Launchpad.py",
+        "workspace": "💻 ARGUS BQuant Python Workspace & Excel Connector",
+        "description": "Interactive In-App Python Notebook, Bloomberg BDP/BDH Emulation & DuckDB OLAP",
+    },
+    "WEALTH": {
+        "command": "WEALTH <GO>",
+        "target_page": "src/pages/12_🎛️_Wealth_Control_Room.py",
+        "workspace": "🎛️ Wealth Management Control Room & Ingestion",
+        "description": "Family Office Ingestion Hub, Multi-Profile Switching & Wealth Reporting",
+    },
+    "NET": {
+        "command": "NET <GO>",
+        "target_page": "src/pages/13_🏛️_Patrimonio_e_NetWorth.py",
+        "workspace": "🏛️ Patrimonio Netto, ALM & Wealth Strategy",
+        "description": "Consolidated Net Worth, Structured Products, PRIIPs KID & Schwartz-Smith Commodities",
+    },
+    "CASH": {
+        "command": "CASH <GO>",
+        "target_page": "src/pages/14_💳_Cash_Flow_e_Spese.py",
+        "workspace": "💳 Flussi di Cassa, Spese & Runway",
+        "description": "Budgeting, Burn Rate, Savings Rate, Emergency Runway & Recurring Outflows",
+    },
+    "ILLIQ": {
+        "command": "ILLIQ <GO>",
+        "target_page": "src/pages/15_📦_Asset_Illiquidi_e_Orologi.py",
+        "workspace": "📦 Asset Illiquidi, Orologi & Caveau",
+        "description": "Luxury Watches, Art, Collectibles, Real Estate Appraisals & Illiquidity Haircut",
+    },
+    "PENS": {
+        "command": "PENS <GO>",
+        "target_page": "src/pages/16_👵_Previdenza_e_Pension_Planning.py",
+        "workspace": "👵 Previdenza & Pension Planning Attuariale",
+        "description": "INPS Pension Gap Calculator, Supplementary Pension Fund Tax Shield & Annuities",
+    },
+    "FIRE": {
+        "command": "FIRE <GO>",
+        "target_page": "src/pages/17_🏖️_Indipendenza_Finanziaria_e_FIRE.py",
+        "workspace": "🏖️ Indipendenza Finanziaria & Movimento FIRE",
+        "description": "Safe Withdrawal Rate (SWR), Trinity Study, Sequence of Returns & Coast/Lean FIRE",
+    },
+    "TAX": {
+        "command": "TAX <GO>",
+        "target_page": "src/pages/18_⚖️_Fiscalita_e_Quadro_RW.py",
+        "workspace": "⚖️ Fiscalità, Minusvalenze & Monitoraggio Fiscale",
+        "description": "Tax-Loss Harvesting, Quadro RW / RT, IVAFE, Bollo & TUIR Art. 67-68",
+    },
+    "RE": {
+        "command": "RE <GO>",
+        "target_page": "src/pages/19_🏠_Immobili_e_Mutui.py",
+        "workspace": "🏠 Immobili, Mutui & Buy vs Rent",
+        "description": "French Amortization Schedules, Weighted LTV Stress & Real Estate Net Worth",
+    },
+    "ESTATE": {
+        "command": "ESTATE <GO>",
+        "target_page": "src/pages/20_📜_Pianificazione_Successoria.py",
+        "workspace": "📜 Pianificazione Successoria & Trust",
+        "description": "Italian Civil Code Forced Heirship, Legittima vs Disponibile & Estate Tax TUS",
+    },
+    "AI": {
+        "command": "AI <GO>",
+        "target_page": "src/pages/21_🤖_AI_Copilot_e_Advisor.py",
+        "workspace": "🤖 ARGUS AI Copilot & Private Wealth Advisor",
+        "description": "RAG Multi-Asset Assistant, Portfolio Risk Explainer & SEC 10-K Document Search",
+    },
+}
+
+
+def resolve_terminal_command(query: str) -> dict[str, Any]:
+    """Resolve a user command string (e.g. 'SIMM <GO>', 'svi', 'shock 2008') into an executable action."""
+    clean = str(query or "").upper().replace("<GO>", "").strip()
+    if not clean:
+        return {
+            "matched": False,
+            "command_key": "NONE",
+            "command": "HELP <GO>",
+            "target_page": "",
+            "workspace": "",
+            "macro_shock": "",
+            "description": "Type SIMM, SVI, CDS, ALM, VPIN, PACK, CCAR, or SHOCK 2008",
+        }
+
+    # Exact or prefix match first
+    for key, spec in GLOBAL_COMMAND_REGISTRY.items():
+        if clean == key or clean.startswith(key) or key in clean:
+            return {
+                "matched": True,
+                "command_key": key,
+                "command": spec["command"],
+                "target_page": spec.get("target_page", ""),
+                "workspace": spec.get("workspace", ""),
+                "macro_shock": spec.get("macro_shock", ""),
+                "description": spec["description"],
+            }
+
+    # Fuzzy keyword match on description
+    for key, spec in GLOBAL_COMMAND_REGISTRY.items():
+        if any(tok in spec["description"].upper() for tok in clean.split() if len(tok) >= 3):
+            return {
+                "matched": True,
+                "command_key": key,
+                "command": spec["command"],
+                "target_page": spec.get("target_page", ""),
+                "workspace": spec.get("workspace", ""),
+                "macro_shock": spec.get("macro_shock", ""),
+                "description": spec["description"],
+            }
+
+    return {
+        "matched": False,
+        "command_key": "UNKNOWN",
+        "command": f"{clean} <GO>",
+        "target_page": "",
+        "workspace": "",
+        "macro_shock": "",
+        "description": f"No exact match for '{clean}'. Available: " + ", ".join(GLOBAL_COMMAND_REGISTRY.keys()),
+    }
+
+
+def get_active_macro_shock(
+    session_state_dict: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Return active global macro shock preset from session state."""
+    state = session_state_dict if session_state_dict is not None else (
+        dict(st.session_state) if st is not None and hasattr(st, "session_state") else {}
+    )
+    preset_key = str(state.get("global_macro_shock", "NONE")).upper()
+    if preset_key not in MACRO_SHOCK_PRESETS:
+        preset_key = "NONE"
+    return dict(MACRO_SHOCK_PRESETS[preset_key])
+
+
+def apply_macro_shock_to_inputs(
+    base_inputs: dict[str, float],
+    session_state_dict: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Apply active global macro shock deltas to engine inputs deterministically."""
+    shock = get_active_macro_shock(session_state_dict=session_state_dict)
+    out = dict(base_inputs)
+    if not shock["is_active"]:
+        out["macro_shock_active"] = False
+        out["macro_shock_label"] = shock["label"]
+        return out
+
+    rates_delta_dec = float(shock["rates_bps"]) / 10000.0
+    credit_mult = 1.0 + float(shock["credit_bps"]) / 200.0
+    eq_mult = max(0.25, 1.0 + float(shock["equity_pct"]) / 100.0)
+    vol_add_dec = float(shock["vol_pts"]) / 100.0
+
+    if "discount_rate" in out:
+        out["discount_rate"] = max(0.005, float(out["discount_rate"]) + rates_delta_dec)
+    if "index_spread_bps" in out:
+        out["index_spread_bps"] = max(10.0, float(out["index_spread_bps"]) + float(shock["credit_bps"]))
+    if "ir_dv01" in out:
+        out["ir_dv01"] = float(out["ir_dv01"]) * (1.0 + abs(float(shock["rates_bps"])) / 250.0)
+    if "credit_q_cs01" in out:
+        out["credit_q_cs01"] = float(out["credit_q_cs01"]) * credit_mult
+    if "equity_delta" in out:
+        out["equity_delta"] = float(out["equity_delta"]) * (2.0 - eq_mult)
+    if "annual_vol" in out:
+        out["annual_vol"] = min(1.50, float(out["annual_vol"]) + vol_add_dec)
+    if "asset_value" in out:
+        out["asset_value"] = float(out["asset_value"]) * eq_mult
+
+    out["macro_shock_active"] = True
+    out["macro_shock_label"] = shock["label"]
+    out["macro_shock_preset"] = shock["preset_key"]
+    return out
+
+
+def build_svg_sparkline(
+    values: list[float],
+    color: str = "#10b981",
+    width: int = 120,
+    height: int = 30,
+) -> str:
+    """Build an inline SVG polyline micro-sparkline for Bento KPI cards."""
+    pts = [float(v) for v in (values or [1.0, 1.05, 1.02, 1.08, 1.12]) if np.isfinite(v)]
+    if len(pts) < 2:
+        pts = [1.0, 1.0]
+    vmin, vmax = min(pts), max(pts)
+    span = max(vmax - vmin, 1e-9)
+    coords: list[str] = []
+    for idx, val in enumerate(pts):
+        x = (idx / (len(pts) - 1)) * (width - 6) + 3
+        y = height - 4 - ((val - vmin) / span) * (height - 8)
+        coords.append(f"{x:.1f},{y:.1f}")
+    poly_points = " ".join(coords)
+    return (
+        f'<svg width="{width}" height="{height}" viewBox="0 0 {width} {height}" '
+        f'xmlns="http://www.w3.org/2000/svg" style="overflow:visible;">'
+        f'<polyline fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" '
+        f'stroke-linejoin="round" points="{poly_points}" />'
+        f"</svg>"
+    )
+
+
+def build_bento_kpi_card_html(
+    title: str,
+    value: str,
+    delta_label: str = "",
+    provenance: str = "LIVE PORTFOLIO",
+    limit_utilization_pct: float | None = None,
+    sparkline_values: list[float] | None = None,
+    accent_color: str = "#10b981",
+    help_text: str | None = None,
+    modal_content: str | None = None,
+) -> str:
+    """Build HTML for an Institutional Bento KPI Card with inline SVG sparkline, limit bar & interactive methodology modal."""
+    prov_upper = provenance.upper()
+    if "SHOCK" in prov_upper:
+        prov_bg, prov_col, prov_icon = "rgba(168,85,247,0.18)", "#d8b4fe", "🟣"
+    elif "LIVE" in prov_upper:
+        prov_bg, prov_col, prov_icon = "rgba(16,185,129,0.16)", "#6ee7b7", "🟢"
+    else:
+        prov_bg, prov_col, prov_icon = "rgba(59,130,246,0.16)", "#93c5fd", "🔵"
+
+    spark_html = ""
+    if sparkline_values:
+        spark_html = build_svg_sparkline(sparkline_values, color=accent_color, width=105, height=26)
+
+    limit_html = ""
+    if limit_utilization_pct is not None:
+        pct_clamped = float(np.clip(limit_utilization_pct, 0.0, 100.0))
+        bar_col = "#10b981" if pct_clamped < 70.0 else ("#f59e0b" if pct_clamped < 90.0 else "#ef4444")
+        limit_html = (
+            f'<div style="margin-top:8px;">'
+            f'<div style="display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;margin-bottom:2px;">'
+            f'<span>Limit Utilization</span><span style="color:{bar_col};font-weight:700;">{limit_utilization_pct:.1f}%</span></div>'
+            f'<div style="width:100%;height:5px;background:rgba(255,255,255,0.08);border-radius:3px;overflow:hidden;">'
+            f'<div style="width:{pct_clamped:.1f}%;height:100%;background:{bar_col};border-radius:3px;"></div>'
+            f"</div></div>"
+        )
+
+    unique_id = hashlib.md5(f"bento_{title}_{provenance}_{value}_{delta_label}".encode("utf-8")).hexdigest()[:8]
+
+    if modal_content:
+        raw_modal_content = modal_content
+    else:
+        try:
+            from components.ui_core.ui_utils import resolve_metric_knowledge
+
+            raw_modal_content = resolve_metric_knowledge(title, help_text)
+        except Exception:
+            raw_modal_content = f"<p><b>{title}</b>: Metrica di controllo quantitativo e prudenziale del portafoglio.</p>"
+
+    cleaned = re.sub(r"<!--.*?-->", "", raw_modal_content, flags=re.DOTALL)
+    safe_modal_content = _compact_html(cleaned)
+
+    info_svg = (
+        '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+        'stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" style="display:block;">'
+        '<circle cx="12" cy="12" r="10"></circle>'
+        '<line x1="12" y1="16" x2="12" y2="12"></line>'
+        '<line x1="12" y1="8" x2="12.01" y2="8"></line>'
+        '</svg>'
+    )
+
+    card_markup = f"""
+    <style>
+    #bento-modal-toggle-{unique_id} {{ display: none; }}
+    .bento-modal-overlay-{unique_id} {{
+        display: none;
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        z-index: 999999;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        box-sizing: border-box;
+    }}
+    #bento-modal-toggle-{unique_id}:checked ~ .bento-modal-overlay-{unique_id} {{
+        display: flex;
+    }}
+    .bento-modal-backdrop-{unique_id} {{
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(10, 14, 20, 0.88);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        cursor: pointer;
+        z-index: 1;
+    }}
+    .bento-modal-content-{unique_id} {{
+        background: #0f172a;
+        border: 1px solid rgba(148, 163, 184, 0.28);
+        border-top: 4px solid {accent_color};
+        padding: 24px 28px;
+        border-radius: 16px;
+        width: 92%;
+        max-width: 760px;
+        max-height: 86vh;
+        overflow-y: auto;
+        color: #f1f5f9;
+        position: relative;
+        z-index: 2;
+        box-shadow: 0 24px 60px rgba(0,0,0,0.92), 0 0 30px {accent_color}33;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        text-align: left;
+        box-sizing: border-box;
+        animation: bentoPopIn_{unique_id} 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+    }}
+    @keyframes bentoPopIn_{unique_id} {{
+        from {{ opacity: 0; transform: scale(0.95) translateY(10px); }}
+        to {{ opacity: 1; transform: scale(1) translateY(0); }}
+    }}
+    .bento-modal-close-{unique_id} {{
+        position: absolute;
+        top: 14px; right: 18px;
+        cursor: pointer;
+        font-size: 26px;
+        color: #94a3b8;
+        line-height: 1;
+        width: 30px; height: 30px;
+        display: flex; align-items: center; justify-content: center;
+        border-radius: 6px;
+        transition: all 0.2s ease;
+    }}
+    .bento-modal-close-{unique_id}:hover {{
+        color: #f8fafc;
+        background: rgba(255, 255, 255, 0.1);
+    }}
+    .bento-info-icon-{unique_id} {{
+        cursor: pointer;
+        color: {accent_color};
+        opacity: 0.85;
+        background: {accent_color}18;
+        border: 1px solid {accent_color}44;
+        border-radius: 50%;
+        width: 17px;
+        height: 17px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0 !important;
+        transition: all 0.2s ease;
+        box-sizing: border-box !important;
+        padding: 0;
+    }}
+    .bento-info-icon-{unique_id}:hover {{
+        opacity: 1;
+        background: {accent_color}33;
+        border-color: {accent_color};
+        box-shadow: 0 0 8px {accent_color}66;
+        transform: scale(1.15);
+    }}
+    </style>
+
+    <input type="checkbox" id="bento-modal-toggle-{unique_id}">
+    <div class="bento-modal-overlay-{unique_id}">
+        <label for="bento-modal-toggle-{unique_id}" class="bento-modal-backdrop-{unique_id}"></label>
+        <div class="bento-modal-content-{unique_id}">
+            <label for="bento-modal-toggle-{unique_id}" class="bento-modal-close-{unique_id}">×</label>
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; border-bottom:1px solid rgba(148,163,184,0.2); padding-bottom:10px; flex-wrap:wrap; gap:8px;">
+                <div>
+                    <span style="font-size:10.5px; font-weight:800; color:{accent_color}; text-transform:uppercase; letter-spacing:0.5px; font-family:'JetBrains Mono',monospace;">
+                        {prov_icon} {provenance} &bull; SCHEDA METODOLOGICA ISTITUZIONALE
+                    </span>
+                    <h3 style="margin:2px 0 0 0; font-size:18px; font-weight:800; color:#f8fafc;">{title}</h3>
+                </div>
+                <div style="text-align:right;">
+                    <div style="font-size:17px; font-weight:800; color:#f8fafc; font-family:'JetBrains Mono',monospace;">{value}</div>
+                    <div style="font-size:10.5px; color:{accent_color}; font-weight:700;">{delta_label}</div>
+                </div>
+            </div>
+            <div style="font-size:13px; line-height:1.55; color:#cbd5e1;">
+                {safe_modal_content}
+            </div>
+            <div style="display:flex; justify-content:flex-end; margin-top:16px;">
+                <label for="bento-modal-toggle-{unique_id}" style="cursor:pointer; background:rgba(255,255,255,0.06); border:1px solid rgba(148,163,184,0.25); color:#cbd5e1; padding:6px 16px; border-radius:8px; font-size:12px; font-weight:600;">
+                    Chiudi Scheda
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <div class="argus-bento-card" style="background:rgba(15,23,42,0.86);border:1px solid rgba(148,163,184,0.18);
+                border-top:3px solid {accent_color};border-radius:10px;padding:12px 14px;margin-bottom:8px;
+                box-shadow:0 4px 14px rgba(0,0,0,0.28);">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">
+            <div style="display:flex;align-items:center;gap:6px;">
+                <span style="font-size:11.5px;font-weight:700;color:#cbd5e1;">{title}</span>
+                <label for="bento-modal-toggle-{unique_id}" class="bento-info-icon-{unique_id}" title="Clicca per approfondire la metodologia di {title}">
+                    {info_svg}
+                </label>
+            </div>
+            <span style="background:{prov_bg};color:{prov_col};font-size:9.5px;font-weight:800;
+                         padding:2px 6px;border-radius:8px;font-family:'JetBrains Mono',monospace;">{prov_icon} {provenance}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:6px;">
+            <div>
+                <div style="font-size:20px;font-weight:800;color:#f8fafc;font-family:'JetBrains Mono',monospace;">{value}</div>
+                <div style="font-size:11px;color:{accent_color};font-weight:600;margin-top:2px;">{delta_label}</div>
+            </div>
+            <div>{spark_html}</div>
+        </div>
+        {limit_html}
+    </div>
+    """
+    return _compact_html(card_markup)
+
+
+def render_bento_kpi_card(
+    title: str,
+    value: str,
+    delta_label: str = "",
+    provenance: str = "LIVE PORTFOLIO",
+    limit_utilization_pct: float | None = None,
+    sparkline_values: list[float] | None = None,
+    accent_color: str = "#10b981",
+    help_text: str | None = None,
+    modal_content: str | None = None,
+) -> str:
+    """Render an Institutional Bento KPI Card in Streamlit and return its HTML."""
+    html = build_bento_kpi_card_html(
+        title=title,
+        value=value,
+        delta_label=delta_label,
+        provenance=provenance,
+        limit_utilization_pct=limit_utilization_pct,
+        sparkline_values=sparkline_values,
+        accent_color=accent_color,
+        help_text=help_text,
+        modal_content=modal_content,
+    )
+    if st is not None:
+        st.markdown(html, unsafe_allow_html=True)
+    return html
+
+
+def build_sr117_audit_record(
+    engine_name: str,
+    model_version: str,
+    latex_formulas: list[str],
+    inputs_dict: dict[str, Any] | None = None,
+    outputs_dict: dict[str, Any] | None = None,
+    compute_ms: float = 4.2,
+    regulatory_refs: list[str] | None = None,
+    assumptions: list[str] | None = None,
+    risk_limits: list[str] | None = None,
+    benchmark_supervisory: str | None = None,
+    **kwargs: Any,
+) -> dict[str, Any]:
+    """Build a deterministic Fed SR 11-7 / ECB TRIM Model Risk Management audit trail record."""
+    if regulatory_refs is not None:
+        resolved_regulatory_refs = list(regulatory_refs)
+    elif benchmark_supervisory:
+        resolved_regulatory_refs = (
+            [benchmark_supervisory] if isinstance(benchmark_supervisory, str) else list(benchmark_supervisory)
+        )
+    else:
+        resolved_regulatory_refs = ["Fed SR 11-7", "ECB TRIM", "BCBS-352"]
+
+    payload: dict[str, Any] = {
+        "engine": engine_name,
+        "version": model_version,
+        "inputs": inputs_dict or {},
+        "outputs": outputs_dict or {},
+    }
+
+    canonical_payload = json.dumps(
+        payload,
+        sort_keys=True,
+        default=str,
+    )
+    sha256_hash = hashlib.sha256(canonical_payload.encode("utf-8")).hexdigest()
+    return {
+        "engine_name": engine_name,
+        "model_version": model_version,
+        "sha256_audit_hash": sha256_hash,
+        "compute_ms": round(float(compute_ms), 2),
+        "timestamp_utc": datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "regulatory_references": resolved_regulatory_refs,
+        "latex_formulas": latex_formulas,
+        "assumptions": assumptions or [],
+        "risk_limits": risk_limits or [],
+        "benchmark_supervisory": benchmark_supervisory,
+        "canonical_json": canonical_payload,
+    }
+
+
+def render_sr117_audit_drawer(
+    engine_name: str,
+    latex_formulas: list[str],
+    inputs_dict: dict[str, Any] | None = None,
+    outputs_dict: dict[str, Any] | None = None,
+    compute_ms: float = 4.2,
+    regulatory_refs: list[str] | None = None,
+    assumptions: list[str] | None = None,
+    risk_limits: list[str] | None = None,
+    benchmark_supervisory: str | None = None,
+    **kwargs: Any,
+) -> dict[str, Any]:
+    """Render collapsible Explain-the-Math & SR 11-7 Audit Trail drawer for a quantitative engine."""
+    record = build_sr117_audit_record(
+        engine_name=engine_name,
+        model_version=APP_VERSION,
+        latex_formulas=latex_formulas,
+        inputs_dict=inputs_dict,
+        outputs_dict=outputs_dict,
+        compute_ms=compute_ms,
+        regulatory_refs=regulatory_refs,
+        assumptions=assumptions,
+        risk_limits=risk_limits,
+        benchmark_supervisory=benchmark_supervisory,
+        **kwargs,
+    )
+    if st is None:
+        return record
+
+    with st.expander(
+        f"📐 Explain-the-Math & SR 11-7 Audit Trail — {engine_name} [SHA-256: {record['sha256_audit_hash'][:12]}...]"
+    ):
+        st.caption(
+            f"**Regulatory Standards**: {', '.join(record['regulatory_references'])} | "
+            f"**Compute Latency**: `{record['compute_ms']:.2f} ms` | "
+            f"**Audit Hash**: `{record['sha256_audit_hash']}`"
+        )
+        for formula in latex_formulas:
+            st.latex(formula)
+
+        if assumptions:
+            st.markdown("**Ipotesi di Calcolo (Model Assumptions):**")
+            for asm in assumptions:
+                st.markdown(f"- {asm}")
+
+        if risk_limits:
+            st.markdown("**Limiti di Rischio e Limiti Operativi (Risk Boundaries & Limits):**")
+            for rl in risk_limits:
+                st.markdown(f"- ⚠️ {rl}")
+
+        has_telemetry = bool(inputs_dict) or bool(outputs_dict)
+        if has_telemetry:
+            telemetry_payload = {
+                "engine": engine_name,
+                "version": APP_VERSION,
+                "inputs": inputs_dict or {},
+                "outputs": outputs_dict or {},
+            }
+            formatted_json = json.dumps(telemetry_payload, indent=2, ensure_ascii=False, default=str)
+            st.markdown("**Parametri di Esecuzione & Telemetria Modello (Execution Payload):**")
+            st.code(formatted_json, language="json")
+    return record
+
+
+def get_density_mode_css(mode: str = "COMPACT_DESK") -> str:
+    """Return CSS rules for Compact Quant Desk vs Boardroom Presentation mode."""
+    mode_norm = str(mode or "COMPACT_DESK").upper()
+    if mode_norm == "BOARDROOM":
+        return _compact_html(
+            """
+            <style>
+            .argus-bento-card { padding: 18px 22px !important; }
+            div[data-testid="stMetricValue"] { font-size: 1.85rem !important; }
+            </style>
+            """
+        )
+    return _compact_html(
+        """
+        <style>
+        .argus-bento-card { padding: 10px 12px !important; }
+        div[data-testid="stMetricValue"] { font-size: 1.35rem !important; font-family: 'JetBrains Mono', monospace !important; }
+        </style>
+        """
+    )
+
+
+def inject_density_mode_css(mode: str = "COMPACT_DESK") -> str:
+    """Inject adaptive density CSS into Streamlit view."""
+    css = get_density_mode_css(mode)
+    if st is not None:
+        st.markdown(css, unsafe_allow_html=True)
+    return css
+
+
+def render_command_bar_and_shock_ribbon(key_prefix: str = "global_cmd") -> dict[str, Any]:
+    """Render Bloomberg <GO> Command Launcher, Global Macro Shock Selector & Adaptive Density Toggle."""
+    if st is None:
+        return get_active_macro_shock()
+
+    with st.expander("⌨️ Bloomberg Command Bar `<GO>` · Global Macro Shock Broadcast · Adaptive Density", expanded=False):
+        c1, c2, c3 = st.columns([2.2, 2.0, 1.3])
+        with c1:
+            cmd_input = st.text_input(
+                "Terminal Command (`SIMM <GO>`, `SVI <GO>`, `ALM <GO>`, `CDS <GO>`, `VPIN <GO>`, `PACK <GO>`, `SHOCK 2008`)",
+                value="",
+                placeholder="Type e.g. SIMM <GO> or SHOCK STAGFLATION and press Enter...",
+                key=f"{key_prefix}_input",
+            )
+            if cmd_input.strip():
+                res = resolve_terminal_command(cmd_input)
+                if res.get("macro_shock"):
+                    st.session_state["global_macro_shock"] = res["macro_shock"]
+                st.info(f"**{res['command']}** → {res['description']}")
+                if res.get("target_page"):
+                    _safe_page_link(res["target_page"], f"🚀 Open {res['command']} ({res['workspace']})")
+        with c2:
+            preset_keys = list(MACRO_SHOCK_PRESETS.keys())
+            cur_shock = str(st.session_state.get("global_macro_shock", "NONE"))
+            idx = preset_keys.index(cur_shock) if cur_shock in preset_keys else 0
+            chosen_shock = st.selectbox(
+                "⚡ Global Macro Shock Broadcast (Cross-Page Synchronizer)",
+                options=preset_keys,
+                format_func=lambda k: MACRO_SHOCK_PRESETS[k]["label"],
+                index=idx,
+                key=f"{key_prefix}_shock_sel",
+            )
+            st.session_state["global_macro_shock"] = chosen_shock
+        with c3:
+            cur_density = str(st.session_state.get("ux_density_mode", "COMPACT_DESK"))
+            chosen_density = st.radio(
+                "🖥️ View Density",
+                options=["COMPACT_DESK", "BOARDROOM"],
+                format_func=lambda m: "Compact Desk" if m == "COMPACT_DESK" else "Boardroom HD",
+                index=0 if cur_density == "COMPACT_DESK" else 1,
+                horizontal=True,
+                key=f"{key_prefix}_density_sel",
+            )
+            st.session_state["ux_density_mode"] = chosen_density
+
+    return get_active_macro_shock()
+
+
+def render_institutional_info_box(
+    title: str = "",
+    badge: str = "",
+    summary: str = "",
+    math_foundation: str = "",
+    kpi_guide: str = "",
+    operational_impact: str = "",
+    accent_color: str = "#6366f1",
+    default_expanded: bool = False,
+    summary_html: str | None = None,
+    math_html: str | None = None,
+    chart_guide_html: str | None = None,
+    regulatory_html: str | None = None,
+    **kwargs: Any,
+) -> None:
+    """Render an institutional methodology & interpretation info box with compact banner and expandable 3-column guide."""
+    if st is None:
+        return
+
+    eff_summary = summary_html if summary_html is not None else summary
+    eff_math = math_html if math_html is not None else math_foundation
+    eff_kpi = chart_guide_html if chart_guide_html is not None else kpi_guide
+    eff_reg = regulatory_html if regulatory_html is not None else operational_impact
+
+    unique_id = hashlib.md5(f"{title}_{badge}".encode("utf-8")).hexdigest()[:8]
+
+    banner_html = _compact_html(
+        f"""
+        <style>
+        #inst-modal-{unique_id} {{ display: none; }}
+        .inst-modal-overlay-{unique_id} {{
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            z-index: 999999;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }}
+        #inst-modal-{unique_id}:checked ~ .inst-modal-overlay-{unique_id} {{
+            display: flex;
+        }}
+        .inst-modal-backdrop-{unique_id} {{
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(10, 14, 20, 0.88);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            cursor: pointer;
+            z-index: 1;
+        }}
+        .inst-modal-content-{unique_id} {{
+            background: #0f172a;
+            border: 1px solid rgba(148, 163, 184, 0.28);
+            border-top: 4px solid {accent_color};
+            padding: 26px 30px;
+            border-radius: 16px;
+            width: 94%;
+            max-width: 900px;
+            max-height: 88vh;
+            overflow-y: auto;
+            color: #f1f5f9;
+            position: relative;
+            z-index: 2;
+            box-shadow: 0 24px 60px rgba(0,0,0,0.92), 0 0 35px {accent_color}33;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            text-align: left;
+            box-sizing: border-box;
+            animation: modalPopIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+        }}
+        @keyframes modalPopIn {{
+            from {{ opacity: 0; transform: scale(0.95) translateY(10px); }}
+            to {{ opacity: 1; transform: scale(1) translateY(0); }}
+        }}
+        .inst-modal-close-{unique_id} {{
+            position: absolute;
+            top: 16px; right: 20px;
+            cursor: pointer;
+            font-size: 26px;
+            color: #94a3b8;
+            line-height: 1;
+            width: 32px; height: 32px;
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+        }}
+        .inst-modal-close-{unique_id}:hover {{
+            color: #f8fafc;
+            background: rgba(255, 255, 255, 0.1);
+        }}
+        .btn-inst-modal-{unique_id} {{
+            cursor: pointer;
+            background: {accent_color}22;
+            color: #f8fafc;
+            border: 1px solid {accent_color}77;
+            padding: 5px 12px;
+            border-radius: 7px;
+            font-size: 11.5px;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+            transition: all 0.2s ease;
+            user-select: none;
+        }}
+        .btn-inst-modal-{unique_id}:hover {{
+            background: {accent_color}44;
+            border-color: {accent_color};
+            box-shadow: 0 0 12px {accent_color}55;
+            transform: translateY(-1px);
+        }}
+        </style>
+
+        <div style="background: linear-gradient(90deg, rgba(15, 23, 42, 0.94) 0%, rgba(30, 41, 59, 0.88) 100%);
+                    border: 1px solid rgba(148, 163, 184, 0.22); border-left: 4px solid {accent_color};
+                    border-radius: 9px; padding: 10px 14px; margin-bottom: 10px;
+                    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+            <div style="display: flex; align-items: center; gap: 9px; flex-wrap: wrap;">
+                <span style="background: {accent_color}24; color: #e2e8f0; border: 1px solid {accent_color}66;
+                             font-family: 'JetBrains Mono', monospace; font-size: 10.5px; font-weight: 800;
+                             padding: 2px 8px; border-radius: 5px;">
+                    {badge}
+                </span>
+                <span style="font-size: 13px; font-weight: 800; color: #f8fafc;">{title}</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                <div style="font-size: 11.5px; color: #cbd5e1; line-height: 1.4; max-width: 600px;">
+                    {eff_summary}
+                </div>
+                <label for="inst-modal-{unique_id}" class="btn-inst-modal-{unique_id}" title="Apri scheda metodologica e interpretazione in modale a schermo intero">
+                    🔍 Modale Informativo
+                </label>
+            </div>
+        </div>
+
+        <input type="checkbox" id="inst-modal-{unique_id}">
+        <div class="inst-modal-overlay-{unique_id}">
+            <label for="inst-modal-{unique_id}" class="inst-modal-backdrop-{unique_id}"></label>
+            <div class="inst-modal-content-{unique_id}">
+                <label for="inst-modal-{unique_id}" class="inst-modal-close-{unique_id}">×</label>
+                <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px; flex-wrap:wrap;">
+                    <span style="background: {accent_color}25; color: #e2e8f0; border: 1px solid {accent_color}66;
+                                 font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 800;
+                                 padding: 3px 9px; border-radius: 6px;">
+                        {badge}
+                    </span>
+                    <h3 style="margin:0; font-size:18px; font-weight:800; color:#f8fafc;">{title}</h3>
+                </div>
+                <div style="background:rgba(30,41,59,0.7); border-left:3px solid {accent_color}; border-radius:8px; padding:12px 16px; margin-bottom:18px; font-size:13px; color:#cbd5e1; line-height:1.55;">
+                    {eff_summary}
+                </div>
+                <div style="display:grid; grid-template-columns: 1fr; gap:14px;">
+                    <div style="background:rgba(15,23,42,0.9); border:1px solid rgba(148,163,184,0.18); border-top:3px solid {accent_color}; border-radius:8px; padding:14px 16px;">
+                        <div style="font-size:13px; font-weight:800; color:#93c5fd; margin-bottom:8px;">
+                            🔬 1. Fondamento Matematico & Modello
+                        </div>
+                        <div style="font-size:12.5px; color:#cbd5e1; line-height:1.55;">
+                            {eff_math}
+                        </div>
+                    </div>
+                    <div style="background:rgba(15,23,42,0.9); border:1px solid rgba(148,163,184,0.18); border-top:3px solid #10b981; border-radius:8px; padding:14px 16px;">
+                        <div style="font-size:13px; font-weight:800; color:#6ee7b7; margin-bottom:8px;">
+                            📊 2. Come Leggere i KPI & i Grafici
+                        </div>
+                        <div style="font-size:12.5px; color:#cbd5e1; line-height:1.55;">
+                            {eff_kpi}
+                        </div>
+                    </div>
+                    <div style="background:rgba(15,23,42,0.9); border:1px solid rgba(148,163,184,0.18); border-top:3px solid #f59e0b; border-radius:8px; padding:14px 16px;">
+                        <div style="font-size:13px; font-weight:800; color:#fcd34d; margin-bottom:8px;">
+                            🛡️ 3. Implicazioni Regolamentari & Operative
+                        </div>
+                        <div style="font-size:12.5px; color:#cbd5e1; line-height:1.55;">
+                            {eff_reg}
+                        </div>
+                    </div>
+                </div>
+                <div style="display:flex; justify-content:flex-end; margin-top:16px;">
+                    <label for="inst-modal-{unique_id}" style="cursor:pointer; background:rgba(255,255,255,0.06); border:1px solid rgba(148,163,184,0.25); color:#cbd5e1; padding:6px 16px; border-radius:8px; font-size:12px; font-weight:600;">
+                        Chiudi Scheda
+                    </label>
+                </div>
+            </div>
+        </div>
+        """
+    )
+    st.markdown(banner_html, unsafe_allow_html=True)
+
+    with st.expander(f"📘 Guida Metodologica & Interpretazione Istituzionale — {title}", expanded=default_expanded):
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            st.markdown(
+                _compact_html(
+                    f"""
+                    <div style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(148, 163, 184, 0.16);
+                                border-top: 3px solid {accent_color}; border-radius: 8px; padding: 10px 12px; height: 100%;">
+                        <div style="font-size: 11.5px; font-weight: 800; color: #93c5fd; margin-bottom: 5px;">
+                            🔬 1. Fondamento Matematico & Modello
+                        </div>
+                        <div style="font-size: 11.5px; color: #cbd5e1; line-height: 1.48;">
+                            {eff_math}
+                        </div>
+                    </div>
+                    """
+                ),
+                unsafe_allow_html=True,
+            )
+        with c2:
+            st.markdown(
+                _compact_html(
+                    """
+                    <div style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(148, 163, 184, 0.16);
+                                border-top: 3px solid #10b981; border-radius: 8px; padding: 10px 12px; height: 100%;">
+                        <div style="font-size: 11.5px; font-weight: 800; color: #6ee7b7; margin-bottom: 5px;">
+                            📊 2. Come Leggere i KPI & i Grafici
+                        </div>
+                        <div style="font-size: 11.5px; color: #cbd5e1; line-height: 1.48;">
+                    """
+                    + eff_kpi
+                    + """
+                        </div>
+                    </div>
+                    """
+                ),
+                unsafe_allow_html=True,
+            )
+        with c3:
+            st.markdown(
+                _compact_html(
+                    """
+                    <div style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(148, 163, 184, 0.16);
+                                border-top: 3px solid #f59e0b; border-radius: 8px; padding: 10px 12px; height: 100%;">
+                        <div style="font-size: 11.5px; font-weight: 800; color: #fcd34d; margin-bottom: 5px;">
+                            🛡️ 3. Implicazioni Regolamentari & Operative
+                        </div>
+                        <div style="font-size: 11.5px; color: #cbd5e1; line-height: 1.48;">
+                    """
+                    + eff_reg
+                    + """
+                        </div>
+                    </div>
+                    """
+                ),
+                unsafe_allow_html=True,
+            )
+
+

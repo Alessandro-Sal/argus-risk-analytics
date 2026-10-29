@@ -13,8 +13,8 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
+from core.institutional_telemetry import style_institutional_chart
 from core.ui_utils import fmt_eur, metric_card
-from core.ux_institutional_hub import style_institutional_chart
 
 
 @dataclass

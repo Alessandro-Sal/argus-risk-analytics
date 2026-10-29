@@ -168,3 +168,80 @@ def test_wealth_networth_endpoint_success(client):
     assert "liquid_cash" in data
     assert "financial_investments" in data
     assert "solvency_ratio" in data
+
+
+def test_unified_cross_asset_stress_endpoint(client):
+    res = client.post(
+        "/api/v1/stress/unified-cross-asset",
+        json={
+            "preset_key": "stagflation_2026",
+            "wealth_snapshot": {"liquid_investments": 500000.0, "real_estate": 300000.0, "net_worth": 800000.0},
+        },
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "success"
+    assert "evaluation" in data
+
+
+def test_crypto_tax_report_endpoint(client):
+    res = client.post(
+        "/api/v1/tax/crypto-report",
+        json={
+            "tax_year": 2024,
+            "positions": [
+                {"ticker": "BTC-USD", "asset_class": "crypto", "current_value": 15000.0, "cost_basis": 10000.0}
+            ],
+        },
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "success"
+    assert data["tax_year"] == 2024
+
+
+def test_cross_border_tax_comparison_endpoint(client):
+    res = client.post(
+        "/api/v1/tax/cross-border-comparison",
+        json={
+            "total_wealth_eur": 2000000.0,
+            "annual_capital_gain_eur": 100000.0,
+            "annual_foreign_income_eur": 50000.0,
+            "estate_succession_eur": 2000000.0,
+        },
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "success"
+    assert "comparison" in data
+    assert "lowest_tax_jurisdiction" in data["comparison"]
+
+
+def test_pension_deduction_optimizer_endpoint(client):
+    res = client.post(
+        "/api/v1/tax/pension-deduction-optimizer",
+        json={
+            "tax_year": 2025,
+            "taxable_income_eur": 65000.0,
+            "current_contributions_eur": 2000.0,
+            "additional_voluntary_eur": 3164.57,
+        },
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "success"
+    assert data["tax_savings_irpef_eur"] > 0
+
+
+def test_fiscal_reform_2026_endpoint(client):
+    res = client.post(
+        "/api/v1/tax/fiscal-reform-2026",
+        json={
+            "portfolio_value_eur": 500000.0,
+            "unrealized_gains_eur": 50000.0,
+        },
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "success"
+    assert "simulation" in data

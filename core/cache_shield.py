@@ -482,3 +482,26 @@ def clear_cache(data_type: Optional[str] = None) -> int:
         return deleted
     finally:
         conn.close()
+
+
+def memoize_computation(
+    cache_key: str,
+    compute_fn,
+    ttl_seconds: float = 3600.0,
+    force_refresh: bool = False,
+):
+    """
+    Tier-1 In-Memory Memoization Shield per calcoli quantitativi intensivi
+    (GARCH, Regime Switching HMM, EVT, Nelson-Siegel, Covered Calls).
+    Evita il ricalcolo ad ogni re-render della UI o chiamata API identica.
+    """
+    global _L1_CACHE
+    now = time.time()
+    if not force_refresh and cache_key in _L1_CACHE:
+        cached_at, val = _L1_CACHE[cache_key]
+        if (now - cached_at) < ttl_seconds:
+            return val
+
+    res = compute_fn()
+    _L1_CACHE[cache_key] = (now, res)
+    return res

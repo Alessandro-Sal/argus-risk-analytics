@@ -206,6 +206,7 @@ class QualityGateReport(BaseModel):
     unique_tickers: List[str] = Field(default_factory=list)
     unique_currencies: List[str] = Field(default_factory=list)
     date_interval: Optional[Tuple[str, str]] = None
+    dividend_events_count: int = 0
 
 
 # ── DATA QUALITY GATE MIDDLEWARE ─────────────────────────────────────────────
@@ -218,9 +219,17 @@ class DataQualityGate:
     la congruità dei prezzi e l'inventario posizioni ed elimina i duplicati.
     """
 
-    def __init__(self, reject_on_short_sell: bool = False, max_price_deviation_pct: float = 0.50):
+    def __init__(
+        self,
+        reject_on_short_sell: bool = False,
+        max_price_deviation_pct: float = 0.50,
+        auto_resolve_isin: bool = True,
+        auto_reconcile_splits: bool = False,
+    ):
         self.reject_on_short_sell = reject_on_short_sell
         self.max_price_deviation_pct = max_price_deviation_pct
+        self.auto_resolve_isin = auto_resolve_isin
+        self.auto_reconcile_splits = auto_reconcile_splits
 
     def process(
         self,
@@ -261,8 +270,24 @@ class DataQualityGate:
                         pass
 
             try:
+                # Risoluzione automatica ISIN -> Ticker prima di validazione e hashing deterministico
+                raw_t = str(row_dict.get("ticker", "")).strip().upper()
+                if self.auto_resolve_isin and re.match(r"^[A-Z]{2}[A-Z0-9]{9}[0-9]$", raw_t):
+                    try:
+                        from core.adapters.isin_resolver import resolve_isin_to_ticker
+
+                        res_t = resolve_isin_to_ticker(raw_t)
+                        if res_t and res_t != raw_t:
+                            row_dict["ticker"] = res_t
+                            report.fixes_applied.append(f"Risolto ISIN {raw_t} -> {res_t}")
+                    except Exception:
+                        pass
+
                 rec = CanonicalTradeRecord.model_validate(row_dict)
                 tx_hash = rec.canonical_hash
+
+                if rec.tx_type == TransactionType.DIVIDEND:
+                    report.dividend_events_count += 1
 
                 # Controllo Idempotenza
                 if tx_hash in known_hashes:
@@ -296,6 +321,16 @@ class DataQualityGate:
         df_validated = pd.DataFrame(clean_records)
         df_validated["tx_date"] = pd.to_datetime(df_validated["tx_date"]).dt.date
         df_validated = df_validated.sort_values(["tx_date", "tx_type"]).reset_index(drop=True)
+
+        # Riconciliazione automatica corporate actions (frazionamenti/split azionari)
+        if self.auto_reconcile_splits and not df_validated.empty:
+            try:
+                from core.corporate_actions import adjust_transactions_for_splits
+
+                df_validated = adjust_transactions_for_splits(df_validated)
+                report.fixes_applied.append("Riconciliazione split azionari (corporate actions) applicata con successo.")
+            except Exception as e_ca:
+                report.semantic_warnings.append(f"Riconciliazione corporate actions non riuscita: {e_ca}")
 
         # ── 2. AUDIT SEMANTICO: INVENTARIO E NO-SHORT CHECK ──
         position_inventory: Dict[str, float] = {}

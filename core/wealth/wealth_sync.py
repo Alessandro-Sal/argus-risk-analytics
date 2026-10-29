@@ -1407,3 +1407,57 @@ def sync_expenses_tracker_2026_from_gsheets(
 def sync_wealth_from_payload(engine: Engine, payload: Dict[str, Any]) -> None:
     """Wrapper legacy compatibile per payload generici."""
     pass
+
+
+# ── SINCRONIZZAZIONE ASINCRONA & BACKGROUND THREADS ──────────────
+from concurrent.futures import Future, ThreadPoolExecutor
+from typing import Callable
+
+_WEALTH_SYNC_EXECUTOR: Optional[ThreadPoolExecutor] = None
+
+
+def get_wealth_sync_executor() -> ThreadPoolExecutor:
+    global _WEALTH_SYNC_EXECUTOR
+    if _WEALTH_SYNC_EXECUTOR is None:
+        _WEALTH_SYNC_EXECUTOR = ThreadPoolExecutor(max_workers=2, thread_name_prefix="argus_wealth_sync")
+    return _WEALTH_SYNC_EXECUTOR
+
+
+def sync_expenses_tracker_async(
+    engine: Engine,
+    spreadsheet_name: str = "My All financial Statements",
+    years: Optional[List[int]] = None,
+    portfolio_id: int = 1,
+    callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+    **kwargs,
+) -> Future:
+    """
+    Esegue la sincronizzazione Google Sheets in background thread senza bloccare
+    il thread principale della UI Streamlit o delle REST API, con fallback offline.
+    """
+    executor = get_wealth_sync_executor()
+
+    def _worker() -> Dict[str, Any]:
+        try:
+            res = sync_all_historical_expenses_from_gsheets(
+                engine,
+                spreadsheet_name=spreadsheet_name,
+                years=years or [2026],
+                portfolio_id=portfolio_id,
+                **kwargs,
+            )
+            if callback:
+                callback(res)
+            return res
+        except Exception as exc:
+            err_res = {
+                "status": "error",
+                "error": str(exc),
+                "offline_fallback": True,
+                "message": "Sincronizzazione non riuscita: mantenuti i dati locali offline.",
+            }
+            if callback:
+                callback(err_res)
+            return err_res
+
+    return executor.submit(_worker)

@@ -3090,3 +3090,61 @@ def render_supabase_cloud_panel(engine: Optional[Engine] = None) -> None:
         key="sb_dl_supabase_schema",
         help="Script DDL pronto da incollare nel SQL Editor di Supabase (include 20 tabelle, indici B-Tree, Storage Bucket e RLS).",
     )
+
+
+# ── SUPABASE BACKGROUND ASYNC POOL & OFFLINE RESILIENCE ──────────
+from concurrent.futures import Future, ThreadPoolExecutor
+from typing import Callable
+
+_SUPABASE_SYNC_EXECUTOR: Optional[ThreadPoolExecutor] = None
+
+
+def get_supabase_sync_executor() -> ThreadPoolExecutor:
+    global _SUPABASE_SYNC_EXECUTOR
+    if _SUPABASE_SYNC_EXECUTOR is None:
+        _SUPABASE_SYNC_EXECUTOR = ThreadPoolExecutor(max_workers=2, thread_name_prefix="argus_supabase_sync")
+    return _SUPABASE_SYNC_EXECUTOR
+
+
+def migrate_local_to_supabase_async(
+    sqlite_path: Optional[str] = "data/argus_local.db",
+    target_db_url: Optional[str] = None,
+    target_engine: Optional[Engine] = None,
+    include_market_prices: bool = False,
+    user_id: Optional[str] = None,
+    owner: Optional[str] = None,
+    callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+    **kwargs,
+) -> Future:
+    """
+    Esegue il processo di migrazione verso Supabase PostgreSQL in background
+    senza bloccare la UI Streamlit o il server FastAPI, con gestione sicura dei conflitti.
+    """
+    executor = get_supabase_sync_executor()
+
+    def _task() -> Dict[str, Any]:
+        try:
+            res = migrate_local_to_supabase(
+                sqlite_path=sqlite_path,
+                target_db_url=target_db_url,
+                target_engine=target_engine,
+                include_market_prices=include_market_prices,
+                user_id=user_id,
+                owner=owner,
+                **kwargs,
+            )
+            if callback:
+                callback(res)
+            return res
+        except Exception as exc:
+            err_res = {
+                "success": False,
+                "error": str(exc),
+                "offline_fallback": True,
+                "message": f"Errore durante la migrazione a Supabase: {exc}. I dati locali sono rimasti integri.",
+            }
+            if callback:
+                callback(err_res)
+            return err_res
+
+    return executor.submit(_task)

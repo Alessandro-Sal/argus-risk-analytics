@@ -58,7 +58,10 @@ logger = logging.getLogger("wealth_engine")
 
 
 def compute_consolidated_net_worth(
-    engine: Engine, portfolio_id: Optional[int] = None, risk_portfolio_ids: Optional[List[int]] = None
+    engine: Engine,
+    portfolio_id: Optional[int] = None,
+    risk_portfolio_ids: Optional[List[int]] = None,
+    active_portfolio_data: Optional[Union[Dict[str, Any], pd.DataFrame]] = None,
 ) -> NetWorthSummary:
     """
     Calcola il Patrimonio Netto Totale Consolidato aggregando:
@@ -75,13 +78,30 @@ def compute_consolidated_net_worth(
     if not df_acc.empty:
         from core.terminal_engine import get_fx_rate_to_eur
 
-        # Calcolo saldi normalizzati in EUR al cambio spot
+        # Calcolo saldi normalizzati in EUR al cambio spot (vettorializzato)
+
+
         if "currency" in df_acc.columns:
-            df_acc["balance_eur"] = df_acc.apply(
-                lambda r: float(r.get("balance", 0.0) or 0.0) * get_fx_rate_to_eur(str(r.get("currency", "EUR"))),
-                axis=1,
-            )
+
+
+            currs = df_acc["currency"].dropna().astype(str).unique()
+
+
+            rates = {c: get_fx_rate_to_eur(c) for c in currs}
+
+
+            rates["EUR"] = 1.0
+
+
+            mult = df_acc["currency"].astype(str).map(rates).fillna(1.0)
+
+
+            df_acc["balance_eur"] = df_acc["balance"].fillna(0.0).astype(float) * mult
+
+
         else:
+
+
             df_acc["balance_eur"] = df_acc["balance"].astype(float)
 
         # Liquidità attiva (conti correnti, depositi, contanti) con saldo positivo
@@ -110,44 +130,42 @@ def compute_consolidated_net_worth(
     risk_val = 0.0
     active_data_found = False
 
-    # Controllo priorità 1: st.session_state["active_portfolio_data"] e sessione Risk attiva
-    try:
-        import streamlit as st
-        ss = getattr(st, "session_state", None)
-        if ss is not None:
-            act_data = ss.get("active_portfolio_data")
-            if isinstance(act_data, dict):
-                eq = act_data.get("equity")
-                if eq is not None and float(eq) > 0:
-                    risk_val = float(eq)
-                    active_data_found = True
-                elif "positions" in act_data and isinstance(act_data["positions"], pd.DataFrame) and not act_data["positions"].empty:
-                    df_p = act_data["positions"]
-                    for col in ["market_value", "value", "controvalore", "total_value"]:
-                        if col in df_p.columns:
-                            val_sum = float(pd.to_numeric(df_p[col], errors="coerce").fillna(0).sum())
-                            if val_sum > 0:
-                                risk_val = val_sum
-                                active_data_found = True
-                                break
-            elif isinstance(act_data, pd.DataFrame) and not act_data.empty:
+    # Controllo priorità 1: active_portfolio_data esplicito, WorkspaceContext o sessione attiva
+    act_data = active_portfolio_data
+    if act_data is None:
+        try:
+            import sys
+            if "streamlit" in sys.modules:
+                st = sys.modules["streamlit"]
+                ss = getattr(st, "session_state", None)
+                if ss is not None:
+                    act_data = ss.get("active_portfolio_data") or ss.get("results")
+        except Exception:
+            act_data = None
+
+    if act_data is not None:
+        if isinstance(act_data, dict):
+            eq = act_data.get("equity") or act_data.get("total_equity")
+            if eq is not None and float(eq) > 0:
+                risk_val = float(eq)
+                active_data_found = True
+            elif "positions" in act_data and isinstance(act_data["positions"], pd.DataFrame) and not act_data["positions"].empty:
+                df_p = act_data["positions"]
                 for col in ["market_value", "value", "controvalore", "total_value"]:
-                    if col in act_data.columns:
-                        val_sum = float(pd.to_numeric(act_data[col], errors="coerce").fillna(0).sum())
+                    if col in df_p.columns:
+                        val_sum = float(pd.to_numeric(df_p[col], errors="coerce").fillna(0).sum())
                         if val_sum > 0:
                             risk_val = val_sum
                             active_data_found = True
                             break
-
-            if not active_data_found:
-                res = ss.get("results")
-                if isinstance(res, dict):
-                    eq = res.get("total_equity") or res.get("equity")
-                    if eq is not None and float(eq) > 0:
-                        risk_val = float(eq)
+        elif isinstance(act_data, pd.DataFrame) and not act_data.empty:
+            for col in ["market_value", "value", "controvalore", "total_value"]:
+                if col in act_data.columns:
+                    val_sum = float(pd.to_numeric(act_data[col], errors="coerce").fillna(0).sum())
+                    if val_sum > 0:
+                        risk_val = val_sum
                         active_data_found = True
-    except Exception:
-        pass
+                        break
 
     if not active_data_found:
         try:
@@ -236,13 +254,26 @@ def compute_consolidated_net_worth(
         from core.terminal_engine import get_fx_rate_to_eur
 
         if "currency" in df_phys.columns:
-            df_phys["market_val_eur"] = df_phys.apply(
-                lambda r: (
-                    float(r.get("current_market_value", 0.0) or 0.0) * get_fx_rate_to_eur(str(r.get("currency", "EUR")))
-                ),
-                axis=1,
-            )
+
+
+            currs = df_phys["currency"].dropna().astype(str).unique()
+
+
+            rates = {c: get_fx_rate_to_eur(c) for c in currs}
+
+
+            rates["EUR"] = 1.0
+
+
+            mult = df_phys["currency"].astype(str).map(rates).fillna(1.0)
+
+
+            df_phys["market_val_eur"] = df_phys["current_market_value"].fillna(0.0).astype(float) * mult
+
+
         else:
+
+
             df_phys["market_val_eur"] = df_phys["current_market_value"].astype(float)
 
         summary.physical_assets = float(df_phys["market_val_eur"].sum())
@@ -262,13 +293,26 @@ def compute_consolidated_net_worth(
         from core.terminal_engine import get_fx_rate_to_eur
 
         if "currency" in df_pens.columns:
-            df_pens["accum_eur"] = df_pens.apply(
-                lambda r: (
-                    float(r.get("accumulated_value", 0.0) or 0.0) * get_fx_rate_to_eur(str(r.get("currency", "EUR")))
-                ),
-                axis=1,
-            )
+
+
+            currs = df_pens["currency"].dropna().astype(str).unique()
+
+
+            rates = {c: get_fx_rate_to_eur(c) for c in currs}
+
+
+            rates["EUR"] = 1.0
+
+
+            mult = df_pens["currency"].astype(str).map(rates).fillna(1.0)
+
+
+            df_pens["accum_eur"] = df_pens["accumulated_value"].fillna(0.0).astype(float) * mult
+
+
         else:
+
+
             df_pens["accum_eur"] = df_pens["accumulated_value"].astype(float)
         summary.pension_total = float(df_pens["accum_eur"].sum())
 

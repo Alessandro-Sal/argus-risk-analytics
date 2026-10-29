@@ -6,6 +6,7 @@ ARGUS — Unified Portfolio Rebalancing Package.
 from core.rebalancing.engine import (
     AutonomousStrategyAdapter,
     HeuristicStrategyAdapter,
+    MIPStrategyAdapter,
     PrescriptiveStrategyAdapter,
     RebalancingEngine,
     TaxAwareStrategyAdapter,
@@ -33,4 +34,5 @@ __all__ = [
     "TaxAwareStrategyAdapter",
     "PrescriptiveStrategyAdapter",
     "HeuristicStrategyAdapter",
+    "MIPStrategyAdapter",
 ]

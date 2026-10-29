@@ -34,6 +34,7 @@ class RebalancingMode(str, Enum):
     PRESCRIPTIVE = "prescriptive"
     AUTONOMOUS = "autonomous"
     HEURISTIC = "heuristic"
+    MIP = "mip"
 
 
 @dataclass

@@ -47,7 +47,23 @@ _LAZY_EXPORTS: dict[str, str] = {
 }
 
 
+_SUBPACKAGES: set[str] = {
+    "rebalancing",
+    "volatility",
+    "regime",
+    "quant",
+    "execution",
+    "temporal",
+    "reporting",
+}
+
+
 def __getattr__(name: str) -> Any:
+    if name in _SUBPACKAGES:
+        mod = importlib.import_module(f"core.{name}")
+        globals()[name] = mod
+        return mod
+
     target_mod = _LAZY_EXPORTS.get(name)
     if target_mod:
         mod = importlib.import_module(target_mod)
@@ -58,7 +74,7 @@ def __getattr__(name: str) -> Any:
 
 
 def __dir__() -> list[str]:
-    return sorted(list(globals().keys()) + list(_LAZY_EXPORTS.keys()))
+    return sorted(list(globals().keys()) + list(_LAZY_EXPORTS.keys()) + list(_SUBPACKAGES))
 
 
-__all__ = ["__version__"] + list(_LAZY_EXPORTS.keys())
+__all__ = ["__version__"] + list(_LAZY_EXPORTS.keys()) + list(_SUBPACKAGES)

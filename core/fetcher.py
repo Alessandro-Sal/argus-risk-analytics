@@ -433,18 +433,21 @@ def fetch_and_store(df_clean: pd.DataFrame, engine, portfolio_id: int = None, be
         report["success"].append(f"Forzato download di {benchmark_ticker} come benchmark")
 
     # ── Forzatura Tassi di Cambio (FX Risk) ──────────────────
-    common_currencies = ["USD", "DKK", "GBP", "CHF", "SEK", "CAD", "JPY", "MXN"]
+    # Ottimizzazione: scarica solo i cambi realmente presenti nel portafoglio per evitare roundtrip inutili
     cur_list = df_clean["currency"].dropna().unique().tolist() if "currency" in df_clean.columns else []
-    unique_currencies = list(set(cur_list + common_currencies))
-    for c in unique_currencies:
-        c_upper = str(c).upper()
-        if c_upper not in ["EUR", "XXX", "CRYPTO", "NAN", "NONE", "NULL"] and len(c_upper) == 3:
-            fx_ticker = f"{c_upper}EUR=X"
-            fx_ticker_inv = f"EUR{c_upper}=X"
-            if fx_ticker not in tickers:
-                tickers.append(fx_ticker)
-            if fx_ticker_inv not in tickers:
-                tickers.append(fx_ticker_inv)
+    unique_currencies = [
+        str(c).upper().strip()
+        for c in cur_list
+        if str(c).upper().strip() not in ["EUR", "XXX", "CRYPTO", "NAN", "NONE", "NULL", ""]
+        and len(str(c).upper().strip()) == 3
+    ]
+    for c_upper in unique_currencies:
+        fx_ticker = f"{c_upper}EUR=X"
+        fx_ticker_inv = f"EUR{c_upper}=X"
+        if fx_ticker not in tickers:
+            tickers.append(fx_ticker)
+        if fx_ticker_inv not in tickers:
+            tickers.append(fx_ticker_inv)
 
     # ── Determinazione date di inizio incrementali per DB ───
     max_dates = {}
@@ -824,39 +827,64 @@ def _upsert_asset(ticker: str, yf_ticker, df_clean: pd.DataFrame, engine, info: 
 
 def _store_prices(hist: pd.DataFrame, asset_id: int, engine, ticker: str = None):
     """
-    Scrive i prezzi storici su market_prices.
+    Scrive i prezzi storici su market_prices con estrazione vettorializzata ad alte prestazioni.
     Usa INSERT IGNORE (MySQL), INSERT OR IGNORE (SQLite) o ON CONFLICT DO NOTHING (PostgreSQL)
     per non duplicare righe già presenti (grazie a UNIQUE KEY uq_asset_date).
     """
-    records = []
-    for date, row in hist.iterrows():
-        close = row.get("Close") if row.get("Close") is not None else row.get("close")
-        volume = row.get("Volume") if row.get("Volume") is not None else row.get("volume")
-
-        if close is None or pd.isna(close):
-            continue
-
-        price_date_str = date.strftime("%Y-%m-%d") if hasattr(date, "strftime") else str(date)[:10]
-
-        records.append(
-            {
-                "asset_id": asset_id,
-                "price_date": price_date_str,
-                "close": round(float(close), 6),
-                "volume": int(volume) if volume and not pd.isna(volume) else None,
-                "source": "yfinance",
-            }
-        )
-
-    if not records:
+    if hist is None or hist.empty:
         if engine is None:
             return pd.DataFrame(columns=["ticker", "price_date", "close", "volume"])
         return 0
 
+    close_col = "Close" if "Close" in hist.columns else ("close" if "close" in hist.columns else None)
+    volume_col = "Volume" if "Volume" in hist.columns else ("volume" if "volume" in hist.columns else None)
+
+    if close_col is None:
+        if engine is None:
+            return pd.DataFrame(columns=["ticker", "price_date", "close", "volume"])
+        return 0
+
+    valid_mask = hist[close_col].notna()
+    if not valid_mask.any():
+        if engine is None:
+            return pd.DataFrame(columns=["ticker", "price_date", "close", "volume"])
+        return 0
+
+    sub = hist.loc[valid_mask]
+    idx = sub.index
+    if hasattr(idx, "strftime"):
+        date_strs = idx.strftime("%Y-%m-%d").tolist()
+    else:
+        date_strs = [str(d)[:10] for d in idx]
+
+    closes = [round(float(c), 6) for c in sub[close_col].values]
+
+    if volume_col is not None and volume_col in sub.columns:
+        vols_raw = sub[volume_col].values
+        vols = [int(v) if pd.notna(v) and v is not None else None for v in vols_raw]
+    else:
+        vols = [None] * len(date_strs)
+
     if engine is None:
-        df_p = pd.DataFrame(records)
-        df_p["ticker"] = ticker
-        return df_p[["ticker", "price_date", "close", "volume"]]
+        return pd.DataFrame(
+            {
+                "ticker": [ticker] * len(date_strs),
+                "price_date": date_strs,
+                "close": closes,
+                "volume": vols,
+            }
+        )[["ticker", "price_date", "close", "volume"]]
+
+    records = [
+        {
+            "asset_id": asset_id,
+            "price_date": d,
+            "close": c,
+            "volume": v,
+            "source": "yfinance",
+        }
+        for d, c, v in zip(date_strs, closes, vols)
+    ]
 
     dialect_name = getattr(getattr(engine, "dialect", None), "name", "")
     if dialect_name == "postgresql":

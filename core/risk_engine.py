@@ -141,9 +141,18 @@ def compute_risk(
     div_ratio_val = metrics["concentration"].get("diversification_ratio", 1.0)
     metrics["market_risk"]["diversification_ratio"] = div_ratio_val
 
-    # EVT POT-GPD Tail Risk & Basel IV Backtesting
+    # Signature deterministica di sr_portfolio per memoizzazione in-memory
+    _s_sig = ""
+    if sr_portfolio is not None and not sr_portfolio.empty:
+        _s_sig = f"{len(sr_portfolio)}_{sr_portfolio.index[-1]}_{round(float(sr_portfolio.iloc[-1]), 5)}"
+
+    from core.cache_shield import memoize_computation
+
+    # EVT POT-GPD Tail Risk & Basel IV Backtesting (con cache shield)
     try:
-        metrics["market_risk"]["evt_tail_risk"] = compute_evt_pot_var_cvar(sr_portfolio)
+        metrics["market_risk"]["evt_tail_risk"] = memoize_computation(
+            f"evt_{_s_sig}", lambda: compute_evt_pot_var_cvar(sr_portfolio)
+        )
         metrics["market_risk"]["basel_backtest"] = compute_basel_traffic_light_backtest(
             sr_portfolio,
             var_99=metrics["market_risk"].get("var_cf_99", metrics["market_risk"].get("var_99")),
@@ -158,7 +167,10 @@ def compute_risk(
     from core.garch_engine import compute_garch_fhs_bundle
 
     tot_val = float(df_positions["current_value"].sum()) if "current_value" in df_positions.columns else 100000.0
-    garch_bundle = compute_garch_fhs_bundle(sr_portfolio, total_value=tot_val)
+    garch_bundle = memoize_computation(
+        f"garch_{_s_sig}_{round(tot_val, 2)}",
+        lambda: compute_garch_fhs_bundle(sr_portfolio, total_value=tot_val),
+    )
 
     # Parametri Curva Istituzionale Nelson-Siegel
     yield_params = {}
@@ -191,12 +203,15 @@ def compute_risk(
     except Exception:
         options_hedging = {}
 
-    # Regime Switching Markoviano
+    # Regime Switching Markoviano (con cache shield)
     regime_summary = {}
     try:
         from core.regime_switching import compute_market_regime_states
 
-        regime_res = compute_market_regime_states(sr_portfolio)
+        regime_res = memoize_computation(
+            f"regime_{_s_sig}",
+            lambda: compute_market_regime_states(sr_portfolio),
+        )
         if regime_res and isinstance(regime_res, dict):
             probs = regime_res.get("regime_probabilities", {})
             crisis_p = probs.get("Crisis High-Vol", probs.get("Bear High-Vol", 0.0))

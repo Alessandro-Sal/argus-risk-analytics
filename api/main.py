@@ -42,6 +42,12 @@ from core.fixed_income import compute_bond_analytics
 from core.frtb_engine import compute_frtb_capital_charges
 from core.heston_fft_engine import compute_heston_surface_and_calibration
 from core.hull_white_engine import compute_hull_white_swaptions
+from core.institutional_telemetry import (
+    apply_macro_shock_to_inputs,
+    compute_executive_traffic_light_radar,
+    compute_scenario_delta_comparison,
+    resolve_terminal_command,
+)
 from core.isda_simm_engine import compute_isda_simm_margin
 from core.macro_stress_engine import (
     compute_reverse_stress_test,
@@ -72,12 +78,6 @@ from core.smart_order_router import compute_smart_order_routing
 from core.solvency2_engine import compute_solvency2_standard_formula
 from core.structured_products_engine import compute_structured_product_pricing
 from core.tax_engine import compute_tax_and_harvesting
-from core.ux_institutional_hub import (
-    apply_macro_shock_to_inputs,
-    compute_executive_traffic_light_radar,
-    compute_scenario_delta_comparison,
-    resolve_terminal_command,
-)
 from core.walk_forward_engine import run_walk_forward_backtest
 from core.watchdog.risk_watchdog import RiskWatchdogService, evaluate_risk_appetite_framework
 from core.wealth.private_markets_engine import compute_private_markets_analytics
@@ -952,6 +952,51 @@ class MichaudResampledRequest(BaseModel):
     n_samples: int = Field(default=100, ge=10, le=500)
     n_frontier_points: int = Field(default=20, ge=5, le=50)
     risk_free_rate: float = Field(default=0.03)
+
+
+
+
+class UnifiedCrossAssetStressRequest(BaseModel):
+    """Payload for holistic multi-asset factor stress propagation."""
+    preset_key: Optional[str] = Field("stagflation_2026", description="Preset key: stagflation_2026, global_rate_spike, liquidity_squeeze")
+    equity_shock_pct: Optional[float] = Field(None, description="Override for equity shock, e.g. -0.20")
+    yield_curve_shift_bps: Optional[float] = Field(None, description="Override for yield curve shift in bps, e.g. 150.0")
+    inflation_rate_pct: Optional[float] = Field(None, description="Override for inflation shock, e.g. 0.04")
+    fx_eur_usd_pct: Optional[float] = Field(None, description="Override for EUR/USD shock, e.g. -0.05")
+    credit_spread_bps: Optional[float] = Field(None, description="Override for credit spread in bps, e.g. 50.0")
+    wealth_snapshot: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Consolidated balance sheet quantities")
+    positions: Optional[List[Dict[str, Any]]] = Field(default_factory=list, description="Portfolio positions with asset_class, weight, duration")
+
+
+class CryptoTaxReportRequest(BaseModel):
+    """Payload for Italian Crypto Tax Report (L. 197/2022 Quadro RT & RW)."""
+    tax_year: int = Field(2024, description="Tax year (e.g. 2024, 2025)")
+    positions: Optional[List[Dict[str, Any]]] = Field(default_factory=list, description="Crypto positions")
+    transactions: Optional[List[Dict[str, Any]]] = Field(default_factory=list, description="Crypto transactions")
+
+
+class CrossBorderTaxRequest(BaseModel):
+    """Payload for HNWI cross-border wealth tax comparison."""
+    total_wealth_eur: float = Field(5000000.0, ge=0.0, description="Total wealth in EUR")
+    annual_capital_gain_eur: float = Field(250000.0, ge=0.0, description="Annual realized capital gains")
+    annual_foreign_income_eur: float = Field(150000.0, ge=0.0, description="Annual foreign income (dividends/coupons)")
+    estate_succession_eur: float = Field(5000000.0, ge=0.0, description="Estimated estate succession value")
+
+
+class PensionDeductionRequest(BaseModel):
+    """Payload for Italian pension contribution tax deduction optimization (Art. 10 TUIR)."""
+    tax_year: int = Field(2025, description="Tax year")
+    taxable_income_eur: float = Field(65000.0, ge=0.0, description="Gross taxable income IRPEF")
+    current_contributions_eur: float = Field(2000.0, ge=0.0, description="Already contributed amount")
+    additional_voluntary_eur: Optional[float] = Field(3164.57, ge=0.0, description="Simulated additional voluntary contribution")
+
+
+class FiscalReform2026Request(BaseModel):
+    """Payload for 2026 Italian Fiscal Reform ETF capital gain/loss offset simulation."""
+    portfolio_value_eur: float = Field(500000.0, ge=0.0, description="Total portfolio value")
+    etf_share_pct: float = Field(0.60, ge=0.0, le=1.0, description="Fraction invested in UCITS ETFs")
+    unrealized_gains_eur: float = Field(75000.0, ge=0.0, description="Unrealized gains in ETFs")
+    accumulated_losses_eur: float = Field(20000.0, ge=0.0, description="Prior tax losses in zainetto fiscale")
 
 
 # ============================================================
@@ -2291,6 +2336,170 @@ def create_app() -> FastAPI:
             }
         except Exception as exc:
             logger.error("Michaud resampling failed: %s", exc, exc_info=True)
+            raise HTTPException(status_code=500, detail=str(exc))
+
+
+    @app.post("/api/v1/stress/unified-cross-asset", tags=["Stress Testing & Regulatory"])
+    def run_unified_cross_asset_stress(req: UnifiedCrossAssetStressRequest) -> Dict[str, Any]:
+        """Holistic Multi-Asset Factor Stress-Testing Engine (propagating shocks to Total Balance Sheet)."""
+        try:
+            from core.wealth.unified_stress_bridge import (
+                MacroFactorShock,
+                UnifiedCrossAssetStressEngine,
+                map_global_macro_preset_to_factor_shock,
+            )
+
+            if req.preset_key:
+                shock = map_global_macro_preset_to_factor_shock(req.preset_key)
+            else:
+                shock = MacroFactorShock()
+
+            if req.equity_shock_pct is not None:
+                shock.equity_mkt_pct = req.equity_shock_pct
+            if req.yield_curve_shift_bps is not None:
+                shock.yield_curve_shift_bps = req.yield_curve_shift_bps
+            if req.inflation_rate_pct is not None:
+                shock.inflation_rate_pct = req.inflation_rate_pct
+            if req.fx_eur_usd_pct is not None:
+                shock.fx_eur_usd_pct = req.fx_eur_usd_pct
+            if req.credit_spread_bps is not None:
+                shock.credit_spread_bps = req.credit_spread_bps
+
+            df_pos = pd.DataFrame(req.positions) if req.positions else pd.DataFrame()
+            engine = UnifiedCrossAssetStressEngine(portfolio_positions=df_pos)
+            snapshot = req.wealth_snapshot or {
+                "liquid_investments": 500000.0,
+                "real_estate": 400000.0,
+                "variable_debt": 150000.0,
+                "annual_spending": 40000.0,
+                "net_worth": 750000.0,
+            }
+            res = engine.evaluate_integrated_shock(shock, snapshot)
+            return {
+                "version": "10.0.0",
+                "status": "success",
+                "scenario_name": shock.scenario_name,
+                "evaluation": res,
+            }
+        except Exception as exc:
+            logger.error("Unified cross-asset stress failed: %s", exc, exc_info=True)
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.post("/api/v1/tax/crypto-report", tags=["Tax Optimization & Regulatory"])
+    def run_crypto_tax_report(req: CryptoTaxReportRequest) -> Dict[str, Any]:
+        """Italian Law 197/2022 Crypto Tax Report (Quadro RT, Quadro RW, Zainetto Fiscale Cripto)."""
+        try:
+            from core.crypto_tax_engine import compute_crypto_tax_report
+
+            df_pos = pd.DataFrame(req.positions) if req.positions else pd.DataFrame()
+            df_tx = pd.DataFrame(req.transactions) if req.transactions else pd.DataFrame()
+            results = {"positions": df_pos, "df_tx": df_tx}
+            res = compute_crypto_tax_report(results, db_engine=None, tax_year=req.tax_year)
+            clean_res = {}
+            for k, v in res.items():
+                if isinstance(v, pd.DataFrame):
+                    clean_res[k] = v.to_dict(orient="records")
+                else:
+                    clean_res[k] = v
+            return {
+                "version": "10.0.0",
+                "status": "success",
+                "tax_year": req.tax_year,
+                "crypto_tax_report": clean_res,
+            }
+        except Exception as exc:
+            logger.error("Crypto tax report failed: %s", exc, exc_info=True)
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.post("/api/v1/tax/cross-border-comparison", tags=["Tax Optimization & Regulatory"])
+    def run_cross_border_comparison(req: CrossBorderTaxRequest) -> Dict[str, Any]:
+        """HNWI Cross-Border Wealth Tax & Structuring Comparison (Italy, Switzerland, Luxembourg, UAE)."""
+        try:
+            from core.cross_border_tax_engine import (
+                compute_cross_border_wealth_tax_comparison,
+                get_international_tax_jurisdictions,
+            )
+
+            res = compute_cross_border_wealth_tax_comparison(
+                total_wealth_eur=req.total_wealth_eur,
+                annual_capital_gain_eur=req.annual_capital_gain_eur,
+                annual_foreign_income_eur=req.annual_foreign_income_eur,
+                estate_succession_eur=req.estate_succession_eur,
+            )
+            if "comparison_df" in res and hasattr(res["comparison_df"], "to_dict"):
+                res["comparison_df"] = res["comparison_df"].to_dict(orient="records")
+            return {
+                "version": "10.0.0",
+                "status": "success",
+                "jurisdictions_metadata": get_international_tax_jurisdictions(),
+                "comparison": res,
+            }
+        except Exception as exc:
+            logger.error("Cross border comparison failed: %s", exc, exc_info=True)
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.post("/api/v1/tax/pension-deduction-optimizer", tags=["Tax Optimization & Regulatory"])
+    def run_pension_deduction_optimizer(req: PensionDeductionRequest) -> Dict[str, Any]:
+        """Optimize voluntary pension contributions under Italian Art. 10 TUIR cap (EUR 5,164.57)."""
+        try:
+            gross_income = req.taxable_income_eur
+            current_contributions = req.current_contributions_eur
+            MAX_ANNUAL_CAP = 5164.57
+            remaining_cap = max(0.0, round(MAX_ANNUAL_CAP - current_contributions, 2))
+
+            if gross_income <= 28000:
+                marginal_irpef_pct = 0.23
+            elif gross_income <= 50000:
+                marginal_irpef_pct = 0.35
+            else:
+                marginal_irpef_pct = 0.43
+            surcharges_pct = 0.025
+            total_marginal_rate = marginal_irpef_pct + surcharges_pct
+
+            sim_voluntary = req.additional_voluntary_eur if req.additional_voluntary_eur is not None else remaining_cap
+            actual_deductible = min(sim_voluntary, remaining_cap)
+            tax_savings_eur = round(actual_deductible * total_marginal_rate, 2)
+            net_effective_cost_eur = round(actual_deductible - tax_savings_eur, 2)
+
+            return {
+                "version": "10.0.0",
+                "status": "success",
+                "tax_year": req.tax_year,
+                "gross_income_eur": gross_income,
+                "marginal_irpef_rate_pct": round(marginal_irpef_pct * 100, 2),
+                "total_marginal_benefit_pct": round(total_marginal_rate * 100, 2),
+                "max_annual_cap_eur": MAX_ANNUAL_CAP,
+                "current_contributions_eur": current_contributions,
+                "remaining_deductible_cap_eur": remaining_cap,
+                "simulated_voluntary_eur": sim_voluntary,
+                "effective_deductible_eur": actual_deductible,
+                "tax_savings_irpef_eur": tax_savings_eur,
+                "net_effective_cost_eur": net_effective_cost_eur,
+                "roi_immediate_pct": round((tax_savings_eur / net_effective_cost_eur) * 100, 2) if net_effective_cost_eur > 0 else 0.0,
+            }
+        except Exception as exc:
+            logger.error("Pension deduction optimization failed: %s", exc, exc_info=True)
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.post("/api/v1/tax/fiscal-reform-2026", tags=["Tax Optimization & Regulatory"])
+    def run_fiscal_reform_2026_simulation(req: FiscalReform2026Request) -> Dict[str, Any]:
+        """Simulate 2026 Italian Fiscal Reform (ETF capital gains offsetting tax loss carryforwards)."""
+        try:
+            from core.fetcher import get_engine
+            from core.wealth.tax_history_engine import compute_fiscal_reform_2026_etf_harmonization
+
+            engine = get_engine()
+            res = compute_fiscal_reform_2026_etf_harmonization(
+                engine,
+                simulated_etf_gain=req.unrealized_gains_eur,
+            )
+            return {
+                "version": "10.0.0",
+                "status": "success",
+                "simulation": res,
+            }
+        except Exception as exc:
+            logger.error("Fiscal reform 2026 simulation failed: %s", exc, exc_info=True)
             raise HTTPException(status_code=500, detail=str(exc))
 
     @app.get("/api/v1/reporting/cro-institutional-dossier", tags=["Institutional UX & Telemetry"])

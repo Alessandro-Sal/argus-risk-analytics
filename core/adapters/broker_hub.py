@@ -189,10 +189,13 @@ def parse_broker_csv(
     apply_quality_gate: bool = False,
     portfolio_id: int = 1,
     existing_hashes: Optional[Any] = None,
+    auto_resolve_isin: bool = True,
+    auto_reconcile_splits: bool = False,
 ) -> Tuple[pd.DataFrame, str, Dict[str, Any]]:
     """
     Esegue il parsing e la normalizzazione del DataFrame grezzo utilizzando il parser appropriato.
-    Se apply_quality_gate=True, esegue il middleware DataQualityGate con Pydantic per validazione sintattica/semantica e deduplicazione.
+    Se apply_quality_gate=True, esegue il middleware DataQualityGate con Pydantic per validazione sintattica/semantica,
+    risoluzione automatica ISIN, riconciliazione corporate actions e deduplicazione idempotente.
     """
     if df_raw is None or df_raw.empty:
         return pd.DataFrame(), "standard", {"status": "empty", "rows_parsed": 0}
@@ -217,7 +220,7 @@ def parse_broker_csv(
         if apply_quality_gate and not df_parsed.empty:
             from core.data_quality_gate import DataQualityGate
 
-            gate = DataQualityGate()
+            gate = DataQualityGate(auto_resolve_isin=auto_resolve_isin, auto_reconcile_splits=auto_reconcile_splits)
             df_gated, q_report = gate.process(
                 df_parsed, broker_name=detected_key, portfolio_id=portfolio_id, existing_hashes=existing_hashes
             )
@@ -229,4 +232,9 @@ def parse_broker_csv(
     except Exception as e:
         logger.error(f"Errore durante il parsing del broker {detected_key}: {e}", exc_info=True)
         b_name = SUPPORTED_BROKERS.get(detected_key, {}).get("name", detected_key)
-        raise ValueError(f"Errore durante l'elaborazione del file con il parser {b_name}: {e}") from e
+        raw_cols = list(df_raw.columns) if df_raw is not None else []
+        err_msg = (
+            f"Errore durante l'elaborazione del file con il parser {b_name}: {e}. "
+            f"Colonne rilevate: {raw_cols[:8]} (Totale righe: {len(df_raw) if df_raw is not None else 0})"
+        )
+        raise ValueError(err_msg) from e

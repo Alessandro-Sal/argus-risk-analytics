@@ -382,6 +382,105 @@ class HeuristicStrategyAdapter:
         )
 
 
+
+
+class MIPStrategyAdapter:
+    """
+    Adapter per core.rebalancing.mip.solve_mip_rebalance.
+    Ottimizzazione discreta a numeri interi con vincoli di cardinalita, lotti minimi e budget CGT.
+    """
+    name = "mip"
+
+    def generate_plan(self, context: RebalancingContext) -> RebalanceResult:
+        from core.rebalancing.mip import solve_mip_rebalance
+
+        df_pos = context.get_holdings_df()
+        targets = context.get_normalized_target_weights()
+        tot_val = context.get_total_value()
+
+        current_holdings: Dict[str, float] = {}
+        current_prices: Dict[str, float] = {}
+        pmc_dict: Dict[str, float] = {}
+
+        if isinstance(df_pos, pd.DataFrame) and not df_pos.empty:
+            for _, row in df_pos.iterrows():
+                tk = str(row.get("ticker", "")).strip().upper()
+                sh = float(row.get("shares", row.get("qty_net", row.get("quantity", 0.0))))
+                px = float(row.get("current_price", row.get("last_price", row.get("prezzo_corrente", 100.0))))
+                pmc = float(row.get("pmc", row.get("prezzo_medio_carico", px)))
+                if tk:
+                    current_holdings[tk] = sh
+                    current_prices[tk] = px
+                    pmc_dict[tk] = pmc
+
+        for tk in targets.keys():
+            if tk not in current_prices:
+                current_prices[tk] = 100.0
+            if tk not in current_holdings:
+                current_holdings[tk] = 0.0
+            if tk not in pmc_dict:
+                pmc_dict[tk] = current_prices[tk]
+
+        meta = context.metadata or {}
+        raw = solve_mip_rebalance(
+            current_holdings=current_holdings,
+            current_prices=current_prices,
+            target_weights=targets,
+            total_capital=tot_val,
+            cash_available=context.cash_available,
+            max_cardinality=meta.get("max_cardinality"),
+            lot_sizes=meta.get("lot_sizes"),
+            min_trade_eur=context.min_trade_eur,
+            max_turnover_pct=context.max_turnover_pct,
+            capital_gains_tax_budget_eur=meta.get("capital_gains_tax_budget_eur"),
+            pmc_dict=pmc_dict,
+            tax_rate=meta.get("tax_rate", 0.26),
+        )
+
+        raw_orders = raw.get("orders", [])
+        orders: List[PlannedOrder] = []
+        for o in raw_orders:
+            orders.append(
+                PlannedOrder(
+                    ticker=o.get("ticker", ""),
+                    action=o.get("action", "HOLD"),
+                    shares=float(o.get("shares_to_trade", 0.0)),
+                    price=float(o.get("price", 0.0)),
+                    order_value=float(o.get("trade_value_eur", 0.0)),
+                    realized_gain=float(o.get("estimated_gain_eur", 0.0)),
+                    estimated_tax=float(o.get("estimated_tax_eur", 0.0)),
+                    current_weight_pct=float(o.get("current_weight_pct", 0.0)),
+                    target_weight_pct=float(o.get("target_weight_pct", 0.0)),
+                    delta_weight_pct=round(float(o.get("target_weight_pct", 0.0)) - float(o.get("current_weight_pct", 0.0)), 2),
+                    notes=f"Post shares: {o.get('new_shares', 0)}",
+                )
+            )
+
+        summary = {
+            "portfolio_total_value_eur": raw.get("summary", {}).get("total_portfolio_value_eur", tot_val),
+            "total_trades_count": len(orders),
+            "turnover_pct": raw.get("summary", {}).get("turnover_pct", 0.0),
+            "is_turnover_compliant": True,
+            "cardinality": raw.get("summary", {}).get("final_cardinality", len(current_holdings)),
+            "cash_remaining_eur": raw.get("summary", {}).get("cash_remaining_eur", 0.0),
+        }
+
+        tax_report = {
+            "estimated_tax_liability_eur": raw.get("summary", {}).get("total_tax_liability_eur", 0.0),
+            "capital_gains_realized_eur": raw.get("summary", {}).get("total_capital_gains_eur", 0.0),
+        }
+
+        return RebalanceResult(
+            strategy_name=self.name,
+            orders=orders,
+            df_orders=pd.DataFrame(raw_orders) if raw_orders else pd.DataFrame(),
+            summary=summary,
+            tax_report=tax_report,
+            compliance=raw.get("milp_diagnostics", {}),
+            raw_result=raw,
+        )
+
+
 class RebalancingEngine:
     """
     Dispatcher e orchestratore centrale di ribilanciamento per ARGUS.
