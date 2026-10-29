@@ -1643,6 +1643,32 @@ def migrate_local_to_supabase(
 
     from core.wealth.wealth_db import sync_wealth_tables_between_engines
 
+    # ── GUARDIA HARD-BLOCK: DISABILITA CLOUD SYNC PER DEMO E ARCHETIPI ──
+    try:
+        import streamlit as st
+
+        ss = getattr(st, "session_state", None)
+        if ss is not None:
+            is_demo = bool(
+                ss.get("is_sandbox")
+                or ss.get("is_demo")
+                or ss.get("active_archetype_code")
+                or str(ss.get("portfolio_name", "")).startswith("DEMO_")
+                or str(ss.get("portfolio_name", "")).startswith("Archetipo:")
+                or ss.get("wealth_active_portfolio_id") == 999001
+            )
+            if is_demo:
+                logger.warning("Cloud sync verso Supabase bloccato: profilo demo/archetipo attivo.")
+                return {
+                    "ok": False,
+                    "blocked": True,
+                    "error": "Operazione bloccata: La sincronizzazione cloud su Supabase è disabilitata per i profili Demo e gli Archetipi didattici per prevenire la contaminazione del database di produzione.",
+                    "total_rows_migrated": 0,
+                    "tables": {},
+                }
+    except Exception:
+        pass
+
     # Risoluzione automatica di user_id e owner se non specificati
     if not user_id or not owner:
         try:

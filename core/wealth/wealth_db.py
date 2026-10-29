@@ -1864,6 +1864,13 @@ def delete_wealth_account(engine: Engine, account_id: int) -> bool:
     """Elimina un conto dall'anagrafica e riassegna eventuali movimenti al primo conto disponibile."""
     init_wealth_db(engine)
     with engine.begin() as conn:
+        try:
+            conn.execute(
+                sqlt("INSERT INTO tombstone_deletions (entity_type, entity_id, user_id, workspace_id) VALUES ('wealth_accounts', :eid, 'default_user', 'default')"),
+                {"eid": str(account_id)},
+            )
+        except Exception:
+            pass
         fallback_id = conn.execute(
             sqlt("""
             SELECT account_id FROM wealth_accounts 
@@ -2446,9 +2453,16 @@ def get_wealth_snapshots_history(engine: Engine, portfolio_id: Optional[int] = N
 
 
 def delete_wealth_snapshot(engine: Engine, snapshot_id: int) -> bool:
-    """Elimina uno snapshot patrimoniale dal database."""
+    """Elimina uno snapshot patrimoniale dal database registrando il tombstone."""
     init_wealth_db(engine)
     with engine.begin() as conn:
+        try:
+            conn.execute(
+                sqlt("INSERT INTO tombstone_deletions (entity_type, entity_id, user_id, workspace_id) VALUES ('wealth_networth_snapshots', :eid, 'default_user', 'default')"),
+                {"eid": str(snapshot_id)},
+            )
+        except Exception:
+            pass
         res = conn.execute(sqlt("DELETE FROM wealth_networth_snapshots WHERE snapshot_id = :sid"), {"sid": snapshot_id})
         return res.rowcount > 0
 
@@ -2721,21 +2735,28 @@ def sync_wealth_tables_between_engines(
         except Exception:
             pass
 
-    # Svuotamento atomico sicuro delle tabelle target rispettando i vincoli di foreign key
+    # Svuotamento mirato e tenant-safe delle tabelle target
     if is_tgt_postgres:
-        tables_to_clear = [tbl for tbl in reversed(tables_to_sync) if tbl in tgt_tables]
-        if tables_to_clear:
+        if resolved_uuid:
             try:
                 with target_engine.begin() as conn:
-                    conn.execute(sqlt(f"TRUNCATE TABLE {', '.join(tables_to_clear)} CASCADE;"))
+                    conn.execute(sqlt("SET session_replication_role = 'replica';"))
+                    for tbl in reversed(tables_to_sync):
+                        if tbl in tgt_tables:
+                            tgt_c = [c["name"] for c in tgt_insp.get_columns(tbl)]
+                            if "user_id" in tgt_c:
+                                conn.execute(sqlt(f"DELETE FROM {tbl} WHERE user_id = :uid"), {"uid": resolved_uuid})
+                            else:
+                                conn.execute(sqlt(f"DELETE FROM {tbl}"))
+                    conn.execute(sqlt("SET session_replication_role = 'origin';"))
             except Exception:
+                pass
+        else:
+            tables_to_clear = [tbl for tbl in reversed(tables_to_sync) if tbl in tgt_tables]
+            if tables_to_clear:
                 try:
                     with target_engine.begin() as conn:
-                        conn.execute(sqlt("SET session_replication_role = 'replica';"))
-                        for tbl in reversed(tables_to_sync):
-                            if tbl in tgt_tables:
-                                conn.execute(sqlt(f"DELETE FROM {tbl}"))
-                        conn.execute(sqlt("SET session_replication_role = 'origin';"))
+                        conn.execute(sqlt(f"TRUNCATE TABLE {', '.join(tables_to_clear)} CASCADE;"))
                 except Exception:
                     pass
     elif is_tgt_sqlite:
@@ -2759,8 +2780,24 @@ def sync_wealth_tables_between_engines(
             continue
         try:
             df = pd.read_sql_table(tbl, source_engine)
-            if df is None:
+            if df is None or df.empty:
                 continue
+
+            # Esclusione automatica dei record demo/archetipo dal sync cloud
+            if tbl in ("wealth_profiles", "portfolios"):
+                name_col = "name" if "name" in df.columns else None
+                if name_col:
+                    mask = (
+                        ~df[name_col].astype(str).str.startswith("DEMO_")
+                        & ~df[name_col].astype(str).str.startswith("Archetipo:")
+                        & ~df[name_col].astype(str).str.contains("Demo", case=False, na=False)
+                    )
+                    df = df[mask]
+            elif "portfolio_id" in df.columns:
+                df = df[df["portfolio_id"] != 999001]
+
+            if "is_deleted" in df.columns:
+                df = df[df["is_deleted"] != 1]
 
             tgt_col_meta = {col["name"]: str(col.get("type", "")).upper() for col in tgt_insp.get_columns(tbl)}
             tgt_cols = set(tgt_col_meta.keys())

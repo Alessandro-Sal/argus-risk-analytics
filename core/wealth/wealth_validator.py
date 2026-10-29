@@ -241,10 +241,14 @@ def validate_cashflow_df(df_raw: pd.DataFrame) -> Tuple[bool, List[str], pd.Data
     return is_valid, errors, df_clean
 
 
-def validate_physical_assets_df(df_raw: pd.DataFrame) -> Tuple[bool, List[str], pd.DataFrame]:
+def validate_physical_assets_df(df_raw: pd.DataFrame, allow_empty: bool = True) -> Tuple[bool, List[str], pd.DataFrame]:
     """Valida e normalizza il DataFrame degli Asset Fisici (Orologi, Immobili, Metalli)."""
     errors: List[str] = []
-    if df_raw is None or df_raw.empty:
+    if df_raw is None:
+        return False, ["Il file è vuoto."], pd.DataFrame()
+    if df_raw.empty:
+        if allow_empty and len(df_raw.columns) > 0:
+            return True, [], pd.DataFrame()
         return False, ["Il file è vuoto."], pd.DataFrame()
 
     matched = _match_column_aliases(df_raw, PHYSICAL_ASSETS_ALIASES)
@@ -388,10 +392,14 @@ def validate_accounts_df(df_raw: pd.DataFrame) -> Tuple[bool, List[str], pd.Data
     return (len(errors) == 0), errors, df_clean
 
 
-def validate_pension_df(df_raw: pd.DataFrame) -> Tuple[bool, List[str], pd.DataFrame]:
+def validate_pension_df(df_raw: pd.DataFrame, allow_empty: bool = True) -> Tuple[bool, List[str], pd.DataFrame]:
     """Valida e normalizza il DataFrame dei Piani Pensionistici e Previdenza."""
     errors: List[str] = []
-    if df_raw is None or df_raw.empty:
+    if df_raw is None:
+        return False, ["Il file è vuoto."], pd.DataFrame()
+    if df_raw.empty:
+        if allow_empty and len(df_raw.columns) > 0:
+            return True, [], pd.DataFrame()
         return False, ["Il file è vuoto."], pd.DataFrame()
 
     matched = _match_column_aliases(df_raw, PENSION_ALIASES)

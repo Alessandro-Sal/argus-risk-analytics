@@ -255,34 +255,29 @@ def seed_unified_demo_scenario(target_portfolio_name: str = "DEMO_FAMILY_OFFICE"
             save_wealth_account,
         )
 
-        active_offline = bool(st.session_state.get("offline_mode", False))
-        engine = st.session_state.get("engine") or st.session_state.get("db_engine")
-        if engine is None:
-            engine = get_engine(database="wealth", offline=active_offline)
+        # Isolamento Air-Gapped: il seeding avviene esclusivamente sul database sandbox demo_sandbox.db
+        demo_db_path = "data/demo_sandbox.db"
+        engine = get_engine(offline=True, sqlite_path=demo_db_path)
         init_wealth_db(engine)
 
         pid = create_wealth_portfolio(
             engine,
             name=target_portfolio_name,
             description="Demo Family Office Multi-Asset (5 Pilastri)",
-            owner=curr_user,
+            owner="demo_sandbox_user",
             base_currency="EUR",
         )
 
-        # Se disponibile user_id, lo colleghiamo sul record del profilo / portafoglio
-        if user_id:
-            try:
-                with engine.begin() as conn:
-                    from sqlalchemy import text as sqlt
-                    try:
-                        conn.execute(
-                            sqlt("UPDATE wealth_profiles SET user_id = :uid WHERE profile_id = :pid"),
-                            {"uid": str(user_id), "pid": pid},
-                        )
-                    except Exception:
-                        pass
-            except Exception:
-                pass
+        try:
+            import streamlit as st
+
+            ss = getattr(st, "session_state", None)
+            if ss is not None:
+                ss["is_sandbox"] = True
+                ss["is_demo"] = True
+                ss["demo_sqlite_path"] = demo_db_path
+        except Exception:
+            pass
 
         try:
             import streamlit as st

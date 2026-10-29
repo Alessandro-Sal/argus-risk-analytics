@@ -18,7 +18,7 @@ import sqlite3
 import sys
 import time
 import zipfile
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Union
@@ -1215,4 +1215,455 @@ def run_system_health_check(
             "numpy_version": np.__version__,
             "pandas_version": pd.__version__,
         },
+    }
+
+
+# ── 5. SUITE DI RICONCILIAZIONE, DATA HEALTH AUDIT & PULIZIA AUTOMATICA ──────────
+
+
+def run_deep_data_health_audit(db_path: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Esegue un audit approfondito di integrita dei dati, SSOT e isolamento tenant su SQLite.
+    Verifica:
+    1. Demo residui nel database reale (profili DEMO_%, Archetipo:%, portfolio_id == 999001, owner == 'demo_sandbox_user').
+    2. Record orfani / violazioni FK concettuali (transazioni senza portfolio o asset, cashflow/conti/snapshot orfani).
+    3. Soft-deleted records (is_deleted = 1) e consistenza dei tombstone (tombstone_deletions).
+    4. Incoerenze numeriche / contabili (saldi negativi o cashflow nulli / anomalie date).
+
+    Ritorna uno score di salute (0-100), stato e report dettagliato delle anomalie.
+    """
+    target_path = db_path or "data/argus_local.db"
+    if not os.path.exists(target_path):
+        return {
+            "health_score": 100.0,
+            "status": "HEALTHY",
+            "db_path": target_path,
+            "anomalies": [],
+            "orphan_records_count": 0,
+            "demo_residuals_count": 0,
+            "tombstones_count": 0,
+            "soft_deleted_count": 0,
+            "inconsistencies_count": 0,
+            "details": {"info": "Database file does not exist yet; treated as empty and healthy."},
+        }
+
+    conn = sqlite3.connect(target_path)
+    cur = conn.cursor()
+    cur.execute("SELECT name FROM sqlite_master WHERE type='table';")
+    tables = {r[0] for r in cur.fetchall()}
+
+    anomalies: List[Dict[str, Any]] = []
+    demo_residuals_count = 0
+    orphan_records_count = 0
+    soft_deleted_count = 0
+    tombstones_count = 0
+    inconsistencies_count = 0
+
+    # 1. Audit Demo Residuals in Non-Sandbox DB
+    is_sandbox_file = "demo_sandbox" in os.path.basename(target_path).lower()
+
+    if not is_sandbox_file:
+        if "wealth_profiles" in tables:
+            cur.execute("""
+                SELECT profile_id, name, owner FROM wealth_profiles
+                WHERE name LIKE 'DEMO_%' OR name LIKE 'TEST_DEMO_%' OR name LIKE 'Archetipo:%'
+                   OR owner = 'demo_sandbox_user' OR owner = 'Demo User' OR profile_id = 999001
+            """)
+            rows = cur.fetchall()
+            if rows:
+                cnt = len(rows)
+                demo_residuals_count += cnt
+                anomalies.append({
+                    "category": "DEMO_RESIDUAL",
+                    "table": "wealth_profiles",
+                    "count": cnt,
+                    "description": f"Found {cnt} demo profiles in primary database",
+                    "sample_ids": [r[0] for r in rows[:5]],
+                })
+
+        if "portfolios" in tables:
+            cur.execute("""
+                SELECT portfolio_id, name, owner FROM portfolios
+                WHERE portfolio_id = 999001 OR name LIKE 'DEMO_%' OR name LIKE 'TEST_DEMO_%'
+                   OR name LIKE 'Archetipo:%' OR owner = 'demo_sandbox_user' OR owner = 'Demo User'
+            """)
+            rows = cur.fetchall()
+            if rows:
+                cnt = len(rows)
+                demo_residuals_count += cnt
+                anomalies.append({
+                    "category": "DEMO_RESIDUAL",
+                    "table": "portfolios",
+                    "count": cnt,
+                    "description": f"Found {cnt} demo portfolios in primary database",
+                    "sample_ids": [r[0] for r in rows[:5]],
+                })
+
+        for child_tbl in ["wealth_accounts", "wealth_cashflow", "wealth_physical_assets", "wealth_pension_plans", "transactions"]:
+            if child_tbl in tables:
+                cur.execute(f"PRAGMA table_info({child_tbl});")
+                cols = {c[1] for c in cur.fetchall()}
+                if "portfolio_id" in cols:
+                    cur.execute(f"SELECT COUNT(*) FROM {child_tbl} WHERE portfolio_id = 999001;")
+                    cnt = cur.fetchone()[0]
+                    if cnt > 0:
+                        demo_residuals_count += cnt
+                        anomalies.append({
+                            "category": "DEMO_RESIDUAL",
+                            "table": child_tbl,
+                            "count": cnt,
+                            "description": f"Found {cnt} demo child records linked to portfolio_id=999001",
+                        })
+
+    # 2. Audit Orphan Records (FK inconsistencies)
+    if "wealth_accounts" in tables and ("portfolios" in tables or "wealth_profiles" in tables):
+        cur.execute("PRAGMA table_info(wealth_accounts);")
+        cols = {c[1] for c in cur.fetchall()}
+        if "portfolio_id" in cols:
+            p_clause = "SELECT portfolio_id FROM portfolios" if "portfolios" in tables else "SELECT 0 WHERE 1=0"
+            wp_clause = "SELECT profile_id FROM wealth_profiles" if "wealth_profiles" in tables else "SELECT 0 WHERE 1=0"
+            cur.execute(f"""
+                SELECT account_id FROM wealth_accounts
+                WHERE portfolio_id IS NOT NULL
+                  AND portfolio_id NOT IN ({p_clause})
+                  AND portfolio_id NOT IN ({wp_clause})
+            """)
+            rows = cur.fetchall()
+            if rows:
+                cnt = len(rows)
+                orphan_records_count += cnt
+                anomalies.append({
+                    "category": "ORPHAN_RECORD",
+                    "table": "wealth_accounts",
+                    "count": cnt,
+                    "description": f"Found {cnt} wealth_accounts with non-existent portfolio_id",
+                    "sample_ids": [r[0] for r in rows[:5]],
+                })
+
+    if "wealth_cashflow" in tables and "wealth_accounts" in tables:
+        cur.execute("""
+            SELECT tx_id FROM wealth_cashflow
+            WHERE account_id IS NOT NULL
+              AND account_id NOT IN (SELECT account_id FROM wealth_accounts)
+        """)
+        rows = cur.fetchall()
+        if rows:
+            cnt = len(rows)
+            orphan_records_count += cnt
+            anomalies.append({
+                "category": "ORPHAN_RECORD",
+                "table": "wealth_cashflow",
+                "count": cnt,
+                "description": f"Found {cnt} cashflow records referencing deleted account_id",
+                "sample_ids": [r[0] for r in rows[:5]],
+            })
+
+    if "transactions" in tables and "portfolios" in tables:
+        cur.execute("""
+            SELECT tx_id FROM transactions
+            WHERE portfolio_id IS NOT NULL
+              AND portfolio_id NOT IN (SELECT portfolio_id FROM portfolios)
+        """)
+        rows = cur.fetchall()
+        if rows:
+            cnt = len(rows)
+            orphan_records_count += cnt
+            anomalies.append({
+                "category": "ORPHAN_RECORD",
+                "table": "transactions",
+                "count": cnt,
+                "description": f"Found {cnt} transactions referencing non-existent portfolio_id",
+                "sample_ids": [r[0] for r in rows[:5]],
+            })
+
+    # 3. Soft-deleted and Tombstones
+    for tbl in sorted(list(tables)):
+        cur.execute(f"PRAGMA table_info({tbl});")
+        cols = {c[1] for c in cur.fetchall()}
+        if "is_deleted" in cols:
+            cur.execute(f"SELECT COUNT(*) FROM {tbl} WHERE is_deleted = 1;")
+            cnt = cur.fetchone()[0]
+            if cnt > 0:
+                soft_deleted_count += cnt
+
+    if "tombstone_deletions" in tables:
+        cur.execute("SELECT COUNT(*) FROM tombstone_deletions;")
+        tombstones_count = cur.fetchone()[0]
+
+    # 4. Numerical Inconsistencies
+    if "wealth_cashflow" in tables:
+        cur.execute("""
+            SELECT COUNT(*) FROM wealth_cashflow
+            WHERE amount IS NULL OR tx_date IS NULL OR direction NOT IN ('inflow', 'outflow')
+        """)
+        bad_cf = cur.fetchone()[0]
+        if bad_cf > 0:
+            inconsistencies_count += bad_cf
+            anomalies.append({
+                "category": "DATA_INCONSISTENCY",
+                "table": "wealth_cashflow",
+                "count": bad_cf,
+                "description": f"Found {bad_cf} cashflow entries with invalid amount, date or direction",
+            })
+
+    if "wealth_accounts" in tables:
+        cur.execute("SELECT COUNT(*) FROM wealth_accounts WHERE balance IS NULL;")
+        null_bal = cur.fetchone()[0]
+        if null_bal > 0:
+            inconsistencies_count += null_bal
+            anomalies.append({
+                "category": "DATA_INCONSISTENCY",
+                "table": "wealth_accounts",
+                "count": null_bal,
+                "description": f"Found {null_bal} accounts with NULL balance",
+            })
+
+    conn.close()
+
+    # Calculate Health Score (0-100)
+    score = 100.0
+    if demo_residuals_count > 0:
+        score -= min(35.0, demo_residuals_count * 5.0)
+    if orphan_records_count > 0:
+        score -= min(30.0, orphan_records_count * 5.0)
+    if inconsistencies_count > 0:
+        score -= min(20.0, inconsistencies_count * 2.0)
+    if tombstones_count > 500:
+        score -= min(10.0, (tombstones_count - 500) * 0.02)
+    if soft_deleted_count > 1000:
+        score -= min(10.0, (soft_deleted_count - 1000) * 0.01)
+
+    score = max(0.0, min(100.0, round(score, 1)))
+    status = "HEALTHY" if score >= 90.0 else ("WARNING" if score >= 70.0 else "CRITICAL")
+
+    return {
+        "health_score": score,
+        "status": status,
+        "db_path": target_path,
+        "anomalies": anomalies,
+        "orphan_records_count": orphan_records_count,
+        "demo_residuals_count": demo_residuals_count,
+        "tombstones_count": tombstones_count,
+        "soft_deleted_count": soft_deleted_count,
+        "inconsistencies_count": inconsistencies_count,
+        "details": {
+            "tables_audited": len(tables),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        },
+    }
+
+
+def reconcile_and_clean_database(
+    db_path: Optional[str] = None,
+    dry_run: bool = True,
+    purge_tombstones_older_than_days: int = 90,
+) -> Dict[str, Any]:
+    """
+    Riconcilia e pulisce in modo sicuro e transazionale il database da dati sporchi,
+    contaminazioni demo, record orfani e tombstone obsoleti, deframmentando lo storage con VACUUM.
+    """
+    target_path = db_path or "data/argus_local.db"
+    if not os.path.exists(target_path):
+        return {
+            "success": True,
+            "dry_run": dry_run,
+            "db_path": target_path,
+            "cleaned_demo_records": 0,
+            "cleaned_orphan_records": 0,
+            "reconciled_inconsistencies": 0,
+            "purged_tombstones": 0,
+            "vacuum_executed": False,
+            "pre_health_score": 100.0,
+            "post_health_score": 100.0,
+            "anomalies_detected": [],
+        }
+
+    pre_audit = run_deep_data_health_audit(target_path)
+
+    if dry_run:
+        return {
+            "success": True,
+            "dry_run": True,
+            "db_path": target_path,
+            "cleaned_demo_records": pre_audit["demo_residuals_count"],
+            "cleaned_orphan_records": pre_audit["orphan_records_count"],
+            "reconciled_inconsistencies": pre_audit["inconsistencies_count"],
+            "purged_tombstones": 0,
+            "vacuum_executed": False,
+            "pre_health_score": pre_audit["health_score"],
+            "post_health_score": pre_audit["health_score"],
+            "anomalies_detected": pre_audit["anomalies"],
+        }
+
+    # Execute transactional clean
+    conn = sqlite3.connect(target_path)
+    cur = conn.cursor()
+    cur.execute("SELECT name FROM sqlite_master WHERE type='table';")
+    tables = {r[0] for r in cur.fetchall()}
+
+    cleaned_demo = 0
+    cleaned_orphan = 0
+    reconciled_inconsistencies = 0
+    purged_tombstones = 0
+
+    try:
+        cur.execute("BEGIN TRANSACTION;")
+
+        # 1. Clean Demo Residuals if not sandbox
+        is_sandbox_file = "demo_sandbox" in os.path.basename(target_path).lower()
+        if not is_sandbox_file:
+            demo_pids = set()
+            demo_profile_ids = set()
+
+            if "portfolios" in tables:
+                cur.execute("""
+                    SELECT portfolio_id FROM portfolios
+                    WHERE portfolio_id = 999001 OR name LIKE 'DEMO_%' OR name LIKE 'TEST_DEMO_%'
+                       OR name LIKE 'Archetipo:%' OR owner = 'demo_sandbox_user' OR owner = 'Demo User'
+                """)
+                demo_pids.update(r[0] for r in cur.fetchall())
+
+            if "wealth_profiles" in tables:
+                cur.execute("""
+                    SELECT profile_id FROM wealth_profiles
+                    WHERE name LIKE 'DEMO_%' OR name LIKE 'TEST_DEMO_%' OR name LIKE 'Archetipo:%'
+                       OR owner = 'demo_sandbox_user' OR owner = 'Demo User' OR profile_id = 999001
+                """)
+                demo_profile_ids.update(r[0] for r in cur.fetchall())
+
+            all_demo_ids = demo_pids.union(demo_profile_ids)
+
+            if all_demo_ids:
+                id_list_str = ",".join(str(i) for i in all_demo_ids)
+
+                if "wealth_cashflow" in tables:
+                    cur.execute("PRAGMA table_info(wealth_cashflow);")
+                    cf_cols = {c[1] for c in cur.fetchall()}
+                    if "portfolio_id" in cf_cols:
+                        cur.execute(f"DELETE FROM wealth_cashflow WHERE portfolio_id IN ({id_list_str});")
+                        cleaned_demo += cur.rowcount
+                    if "wealth_accounts" in tables:
+                        cur.execute("PRAGMA table_info(wealth_accounts);")
+                        acc_cols = {c[1] for c in cur.fetchall()}
+                        if "portfolio_id" in acc_cols:
+                            cur.execute(f"""
+                                DELETE FROM wealth_cashflow
+                                WHERE account_id IN (SELECT account_id FROM wealth_accounts WHERE portfolio_id IN ({id_list_str}))
+                            """)
+                            cleaned_demo += cur.rowcount
+
+                for tbl in [
+                    "wealth_networth_snapshots",
+                    "portfolio_snapshots",
+                    "wealth_physical_assets",
+                    "wealth_pension_plans",
+                    "wealth_fixed_expenses",
+                    "transactions",
+                    "wealth_accounts",
+                ]:
+                    if tbl in tables:
+                        cur.execute(f"PRAGMA table_info({tbl});")
+                        t_cols = {c[1] for c in cur.fetchall()}
+                        if "portfolio_id" in t_cols:
+                            cur.execute(f"DELETE FROM {tbl} WHERE portfolio_id IN ({id_list_str});")
+                            cleaned_demo += cur.rowcount
+
+                if "snapshot_positions" in tables and "portfolio_snapshots" in tables:
+                    cur.execute(
+                        "DELETE FROM snapshot_positions WHERE snapshot_id NOT IN (SELECT snapshot_id FROM portfolio_snapshots);"
+                    )
+                    cleaned_demo += cur.rowcount
+
+                if "portfolios" in tables and demo_pids:
+                    p_str = ",".join(str(i) for i in demo_pids)
+                    cur.execute(f"DELETE FROM portfolios WHERE portfolio_id IN ({p_str});")
+                    cleaned_demo += cur.rowcount
+
+                if "wealth_profiles" in tables and demo_profile_ids:
+                    wp_str = ",".join(str(i) for i in demo_profile_ids)
+                    cur.execute(f"DELETE FROM wealth_profiles WHERE profile_id IN ({wp_str});")
+                    cleaned_demo += cur.rowcount
+
+        # 2. Clean Orphan Records
+        if "wealth_cashflow" in tables and "wealth_accounts" in tables:
+            cur.execute("""
+                DELETE FROM wealth_cashflow
+                WHERE account_id IS NOT NULL
+                  AND account_id NOT IN (SELECT account_id FROM wealth_accounts);
+            """)
+            cleaned_orphan += cur.rowcount
+
+        if "transactions" in tables and "portfolios" in tables:
+            cur.execute("""
+                DELETE FROM transactions
+                WHERE portfolio_id IS NOT NULL
+                  AND portfolio_id NOT IN (SELECT portfolio_id FROM portfolios);
+            """)
+            cleaned_orphan += cur.rowcount
+
+        if "snapshot_positions" in tables and "portfolio_snapshots" in tables:
+            cur.execute("""
+                DELETE FROM snapshot_positions
+                WHERE snapshot_id NOT IN (SELECT snapshot_id FROM portfolio_snapshots);
+            """)
+            cleaned_orphan += cur.rowcount
+
+        # 3. Reconcile Inconsistencies
+        if "wealth_cashflow" in tables:
+            cur.execute("DELETE FROM wealth_cashflow WHERE amount IS NULL OR tx_date IS NULL;")
+            reconciled_inconsistencies += cur.rowcount
+
+            cur.execute("""
+                UPDATE wealth_cashflow
+                SET direction = CASE WHEN amount < 0 THEN 'outflow' ELSE 'inflow' END,
+                    amount = ABS(amount)
+                WHERE direction NOT IN ('inflow', 'outflow');
+            """)
+            reconciled_inconsistencies += cur.rowcount
+
+        if "wealth_accounts" in tables:
+            cur.execute("UPDATE wealth_accounts SET balance = 0.0 WHERE balance IS NULL;")
+            reconciled_inconsistencies += cur.rowcount
+
+        # 4. Purge old tombstones
+        if "tombstone_deletions" in tables:
+            cutoff = (datetime.now(timezone.utc) - timedelta(days=purge_tombstones_older_than_days)).strftime(
+                "%Y-%m-%d %H:%M:%S"
+            )
+            cur.execute("DELETE FROM tombstone_deletions WHERE deleted_at < ?;", (cutoff,))
+            purged_tombstones += cur.rowcount
+
+        conn.commit()
+    except Exception as ex:
+        conn.rollback()
+        conn.close()
+        raise ex
+    finally:
+        conn.close()
+
+    # 5. Outside transaction: VACUUM & Optimize
+    vacuum_ok = False
+    try:
+        conn = sqlite3.connect(target_path, isolation_level=None)
+        conn.execute("VACUUM;")
+        conn.execute("PRAGMA optimize;")
+        conn.close()
+        vacuum_ok = True
+    except Exception:
+        vacuum_ok = False
+
+    post_audit = run_deep_data_health_audit(target_path)
+
+    return {
+        "success": True,
+        "dry_run": False,
+        "db_path": target_path,
+        "cleaned_demo_records": cleaned_demo,
+        "cleaned_orphan_records": cleaned_orphan,
+        "reconciled_inconsistencies": reconciled_inconsistencies,
+        "purged_tombstones": purged_tombstones,
+        "vacuum_executed": vacuum_ok,
+        "pre_health_score": pre_audit["health_score"],
+        "post_health_score": post_audit["health_score"],
+        "anomalies_detected": post_audit["anomalies"],
     }

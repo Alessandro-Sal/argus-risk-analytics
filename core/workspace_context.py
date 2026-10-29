@@ -326,6 +326,8 @@ class WorkspaceContext:
 
     def __init__(self, session_id: Optional[str] = None):
         self.session_id: str = session_id or str(uuid.uuid4())
+        self.user_id: str = "default_user"
+        self.workspace_id: str = "default"
         self.risk: RiskSubContext = RiskSubContext()
         self.wealth: WealthSubContext = WealthSubContext()
         self.ui: UIViewState = UIViewState()
@@ -491,6 +493,21 @@ class WorkspaceContext:
                     "pipeline_done",
                     "fetch_report",
                     "sandbox_preset_name",
+                    "df_positions",
+                    "df_raw_injected",
+                    "active_archetype_code",
+                    "active_archetype_name",
+                    "active_archetype_tx_count",
+                    "active_archetype_db_ids",
+                    "archetype_just_injected",
+                    "keep_archetype_expander_open",
+                    "selected_portfolio",
+                    "current_portfolio_id",
+                    "selected_bitemp_port",
+                    "last_rebalance_result",
+                    "active_quant_tab",
+                    "is_sandbox",
+                    "is_demo",
                 ]:
                     if key in st_state:
                         del st_state[key]
@@ -716,6 +733,75 @@ class WorkspaceContext:
                     "force": force,
                 },
             )
+
+    @classmethod
+    def switch_profile_context(
+        cls,
+        user_id: Optional[str] = None,
+        workspace_id: Optional[str] = None,
+        target_portfolio_id: Optional[Union[str, int]] = None,
+        is_demo: bool = False,
+    ) -> "WorkspaceContext":
+        """
+        Commuta atomicamente il contesto tenant/profilo (SSOT).
+        - Invalida tutte le chiavi orfane di portafoglio, analisi e demo sia lato Risk che Wealth.
+        - Purga la cache L1/L2 in cache_shield.py e le viste singleton in duckdb_engine.py.
+        - Invalida la cache di processo Streamlit (st.cache_data).
+        - Riconfigura WorkspaceContext con i nuovi metadati tenant isolati.
+        """
+        with cls._LOCK:
+            ctx = cls.get_current()
+            ctx.flush_risk_domain()
+            ctx.flush_wealth_domain()
+
+            # Pulisci cache di calcolo C++ e OLAP
+            try:
+                from core.cache_shield import clear_cache
+
+                clear_cache()
+            except Exception:
+                pass
+
+            try:
+                from core.duckdb_engine import reset_shared_duckdb_views
+
+                reset_shared_duckdb_views()
+            except Exception:
+                pass
+
+            try:
+                import streamlit as st
+
+                if hasattr(st, "cache_data"):
+                    st.cache_data.clear()
+            except Exception:
+                pass
+
+            # Riassegna identificativi tenant
+            if user_id is not None:
+                ctx.user_id = str(user_id)
+            if workspace_id is not None:
+                ctx.workspace_id = str(workspace_id)
+            ctx.risk.is_sandbox = is_demo
+            if target_portfolio_id is not None:
+                ctx.risk.portfolio_id = target_portfolio_id
+
+            ctx.is_dirty = True
+            ctx.version += 1
+            ctx.sync_to_legacy_session_state()
+
+            _safe_log_audit(
+                action="PROFILE_CONTEXT_SWITCH",
+                entity_type="workspace_context",
+                entity_id=str(target_portfolio_id) if target_portfolio_id is not None else "NONE",
+                details={
+                    "user_id": ctx.user_id,
+                    "workspace_id": ctx.workspace_id,
+                    "target_portfolio_id": target_portfolio_id,
+                    "is_demo": is_demo,
+                },
+            )
+            return ctx
 
     @classmethod
     def execute_database_switch(cls, new_db: str, offline_mode: Optional[bool] = None) -> None:
@@ -1525,6 +1611,21 @@ def render_portfolio_selector(
 
 
 # ── EXPORTS DI STATE MANAGEMENT & UI LIFECYCLE ───────────────────────
+def switch_profile_context(
+    user_id: Optional[str] = None,
+    workspace_id: Optional[str] = None,
+    target_portfolio_id: Optional[Union[str, int]] = None,
+    is_demo: bool = False,
+) -> WorkspaceContext:
+    """Helper module-level per commutare deterministicamente il contesto di profilo/workspace."""
+    return WorkspaceContext.switch_profile_context(
+        user_id=user_id,
+        workspace_id=workspace_id,
+        target_portfolio_id=target_portfolio_id,
+        is_demo=is_demo,
+    )
+
+
 try:
     from core.ui_lifecycle import (  # noqa: F401
         get_active_context_salt,

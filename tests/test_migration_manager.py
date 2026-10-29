@@ -24,6 +24,7 @@ from core.database_migration_manager import (
     V002_AnalyticalCompositeIndexes,
     V003_AssetFundamentalsAndForensicColumns,
     V004_WealthEcosystemAudit,
+    V005_SSOTMultiTenantAndTombstones,
     bootstrap_and_migrate_db,
 )
 
@@ -39,27 +40,27 @@ def temp_db_env():
 
 
 def test_fresh_database_full_migration(temp_db_env):
-    """Verifica la migrazione completa da zero fino alla target_version (v4)."""
+    """Verifica la migrazione completa da zero fino alla target_version (v5)."""
     db_path = temp_db_env["db_path"]
     backup_dir = temp_db_env["backup_dir"]
 
     mgr = DatabaseMigrationManager(db_path=db_path, backup_dir=backup_dir)
-    assert mgr.target_version == 4
+    assert mgr.target_version == 5
 
     # Stato iniziale su DB non esistente
     status_pre = mgr.get_migration_status()
     assert status_pre.current_version == 0
     assert status_pre.is_up_to_date is False
-    assert status_pre.pending_count == 4
+    assert status_pre.pending_count == 5
 
     # Esecuzione forward migration
     applied = mgr.migrate()
-    assert len(applied) == 4
-    assert [m.version for m in applied] == [1, 2, 3, 4]
+    assert len(applied) == 5
+    assert [m.version for m in applied] == [1, 2, 3, 4, 5]
 
     # Verifica stato post-migrazione
     status_post = mgr.get_migration_status()
-    assert status_post.current_version == 4
+    assert status_post.current_version == 5
     assert status_post.is_up_to_date is True
     assert status_post.pending_count == 0
 
@@ -68,16 +69,17 @@ def test_fresh_database_full_migration(temp_db_env):
     try:
         cur = conn.cursor()
         cur.execute("PRAGMA user_version;")
-        assert cur.fetchone()[0] == 4
+        assert cur.fetchone()[0] == 5
 
         # Verifica tabella schema_migrations
         cur.execute("SELECT version, name FROM schema_migrations ORDER BY version ASC;")
         rows = cur.fetchall()
-        assert len(rows) == 4
+        assert len(rows) == 5
         assert rows[0] == (1, "baseline_schema")
         assert rows[1] == (2, "analytical_composite_indexes")
         assert rows[2] == (3, "asset_fundamentals_and_forensics")
         assert rows[3] == (4, "wealth_ecosystem_audit")
+        assert rows[4] == (5, "ssot_multi_tenant_and_tombstones")
     finally:
         conn.close()
 
@@ -89,7 +91,7 @@ def test_migration_idempotency(temp_db_env):
 
     mgr = DatabaseMigrationManager(db_path=db_path, backup_dir=backup_dir)
     applied_first = mgr.migrate()
-    assert len(applied_first) == 4
+    assert len(applied_first) == 5
 
     # Seconda esecuzione immediata
     applied_second = mgr.migrate()
@@ -97,7 +99,7 @@ def test_migration_idempotency(temp_db_env):
 
     status = mgr.get_migration_status()
     assert status.is_up_to_date is True
-    assert status.current_version == 4
+    assert status.current_version == 5
 
 
 def test_incremental_step_migrations_and_rollback(temp_db_env):
@@ -268,7 +270,7 @@ def test_bootstrap_helper(temp_db_env):
     db_path = temp_db_env["db_path"]
     mgr = bootstrap_and_migrate_db(db_path)
     assert mgr.get_migration_status().is_up_to_date is True
-    assert mgr.get_migration_status().current_version == 4
+    assert mgr.get_migration_status().current_version == 5
 
 
 def test_missing_column_and_index_drift(temp_db_env):

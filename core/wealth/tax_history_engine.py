@@ -2849,6 +2849,7 @@ def _gather_portfolio_tax_metrics(
                 SELECT SUM(amount) FROM wealth_cashflow
                 WHERE direction = 'inflow'
                   AND strftime('%Y', tx_date) = :yr
+                  AND COALESCE(is_deleted, 0) = 0
             """)
             r = conn.execute(q_in, {"yr": str(tax_year)}).fetchone()
             if r and r[0] is not None:
@@ -3924,7 +3925,7 @@ def compute_pension_tax_deduction_optimizer(
     current_contributions = 0.0
     with engine.connect() as conn:
         try:
-            r = conn.execute(sqlt("SELECT SUM(tax_deductible_annual) FROM wealth_pension_plans")).fetchone()
+            r = conn.execute(sqlt("SELECT SUM(tax_deductible_annual) FROM wealth_pension_plans WHERE COALESCE(is_deleted, 0) = 0")).fetchone()
             if r and r[0] is not None:
                 current_contributions = float(r[0])
         except Exception:

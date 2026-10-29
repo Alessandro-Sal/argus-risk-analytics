@@ -1945,7 +1945,9 @@ with tab_diagnostics:
         get_hardware_and_environment_specs,
         get_recent_logs,
         optimize_database_storage,
+        reconcile_and_clean_database,
         reindex_databases,
+        run_deep_data_health_audit,
         run_system_health_check,
     )
 
@@ -2056,6 +2058,15 @@ with tab_diagnostics:
                     st.rerun()
                 else:
                     st.error("Errore durante la reindicizzazione.")
+
+            if st.button("🔍 Audit Integrità SSOT & Riconciliazione Dati", use_container_width=True, help="Scansiona il database per residui demo, record orfani e consistenza multi-tenant, riparando le anomalie", key="diag_btn_reconcile"):
+                with st.spinner("Esecuzione Audit e Riconciliazione Transazionale..."):
+                    rec_res = reconcile_and_clean_database(dry_run=False)
+                    if rec_res["success"]:
+                        st.success(f"Riconciliazione completata! Rimossi {rec_res['cleaned_demo_records']} residui demo, {rec_res['cleaned_orphan_records']} orfani. Score di salute: {rec_res['post_health_score']:.0f}%")
+                        st.rerun()
+                    else:
+                        st.error("Errore durante la riconciliazione del database.")
                     
             st.markdown(f"""
             <div style="font-size:11.5px; color:#8b949e; margin-top:8px;">

@@ -179,6 +179,16 @@ def get_engine(
             return _FETCHER_ENGINE_CACHE[engine_lookup_key]
 
     if offline:
+        try:
+            import streamlit as st
+
+            ss = getattr(st, "session_state", None)
+            if ss and (ss.get("is_sandbox") or ss.get("is_demo")):
+                if sqlite_path in ("data/argus_local.db", "data/wealth.db", "wealth"):
+                    sqlite_path = str(ss.get("demo_sqlite_path") or "data/demo_sandbox.db")
+        except Exception:
+            pass
+
         os.makedirs(os.path.dirname(sqlite_path) or ".", exist_ok=True)
         sqlite_url = f"sqlite:///{sqlite_path.replace(chr(92), '/')}"
         engine = create_engine(sqlite_url, echo=False, connect_args={"timeout": 15})

@@ -10,6 +10,10 @@ from typing import TYPE_CHECKING, Any
 __version__ = "10.0.0"
 
 if TYPE_CHECKING:
+    from core.diagnostics import (
+        reconcile_and_clean_database,
+        run_deep_data_health_audit,
+    )
     from core.duckdb_engine import (
         compute_duckdb_asset_sector_currency_cube,
         compute_duckdb_sector_rankings,
@@ -44,6 +48,8 @@ _LAZY_EXPORTS: dict[str, str] = {
     "compute_side_by_side_comparison": "core.temporal_engine",
     "compute_underwater_drawdowns": "core.temporal_engine",
     "reconstruct_point_in_time_portfolio": "core.temporal_engine",
+    "run_deep_data_health_audit": "core.diagnostics",
+    "reconcile_and_clean_database": "core.diagnostics",
 }
 
 

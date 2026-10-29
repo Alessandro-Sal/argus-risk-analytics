@@ -772,6 +772,79 @@ class V004_WealthEcosystemAudit(BaseMigration):
         return True
 
 
+
+
+class V005_SSOTMultiTenantAndTombstones(BaseMigration):
+    version = 5
+    name = "ssot_multi_tenant_and_tombstones"
+    description = "Aggiunge client_uuid, user_id, workspace_id, updated_at, is_deleted e la tabella tombstone_deletions su tutte le tabelle per isolamento multi-tenant e sync deterministico."
+
+    def up(self, conn: sqlite3.Connection) -> None:
+        cur = conn.cursor()
+        cur.execute("SELECT name FROM sqlite_master WHERE type='table';")
+        tables = {row[0] for row in cur.fetchall()}
+
+        # 1. Creazione tabella tombstone_deletions per tracciare record eliminati
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS tombstone_deletions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                entity_type TEXT NOT NULL,
+                entity_id TEXT NOT NULL,
+                client_uuid TEXT,
+                user_id TEXT NOT NULL DEFAULT 'default_user',
+                workspace_id TEXT NOT NULL DEFAULT 'default',
+                deleted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_tombstones_lookup ON tombstone_deletions(user_id, entity_type);")
+
+        # 2. Aggiunta colonne SSOT su tutte le tabelle chiave
+        target_tables = [
+            "portfolios",
+            "transactions",
+            "portfolio_snapshots",
+            "wealth_profiles",
+            "wealth_accounts",
+            "wealth_cashflow",
+            "wealth_physical_assets",
+            "wealth_pension_plans",
+            "wealth_networth_snapshots",
+            "wealth_fixed_expenses",
+            "wealth_goals",
+            "tax_declarations",
+            "tax_loss_carryforward",
+        ]
+
+        for tbl in target_tables:
+            if tbl in tables:
+                cur.execute(f"PRAGMA table_info({tbl});")
+                cols = {row[1] for row in cur.fetchall()}
+
+                if "client_uuid" not in cols:
+                    conn.execute(f"ALTER TABLE {tbl} ADD COLUMN client_uuid TEXT;")
+                if "user_id" not in cols:
+                    conn.execute(f"ALTER TABLE {tbl} ADD COLUMN user_id TEXT DEFAULT 'default_user';")
+                if "workspace_id" not in cols:
+                    conn.execute(f"ALTER TABLE {tbl} ADD COLUMN workspace_id TEXT DEFAULT 'default';")
+                if "updated_at" not in cols:
+                    conn.execute(f"ALTER TABLE {tbl} ADD COLUMN updated_at TIMESTAMP;")
+                    conn.execute(f"UPDATE {tbl} SET updated_at = CURRENT_TIMESTAMP WHERE updated_at IS NULL;")
+                if "is_deleted" not in cols:
+                    conn.execute(f"ALTER TABLE {tbl} ADD COLUMN is_deleted INTEGER DEFAULT 0;")
+
+                # Popola client_uuid dove nullo con un UUID casuale
+                try:
+                    conn.execute(f"UPDATE {tbl} SET client_uuid = lower(hex(randomblob(16))) WHERE client_uuid IS NULL;")
+                except Exception:
+                    pass
+
+    def verify(self, conn: sqlite3.Connection) -> bool:
+        cur = conn.cursor()
+        cur.execute("SELECT name FROM sqlite_master WHERE type='table';")
+        tables = {row[0] for row in cur.fetchall()}
+        return "tombstone_deletions" in tables
+
+
 # ── Database Migration Manager Engine ──────────────────────
 
 
@@ -791,6 +864,7 @@ class DatabaseMigrationManager:
         V002_AnalyticalCompositeIndexes,
         V003_AssetFundamentalsAndForensicColumns,
         V004_WealthEcosystemAudit,
+        V005_SSOTMultiTenantAndTombstones,
     ]
 
     _instance: Optional["DatabaseMigrationManager"] = None

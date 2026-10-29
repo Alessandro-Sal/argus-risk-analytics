@@ -69,6 +69,25 @@ def get_shared_duckdb_connection():
     return _SHARED_CON
 
 
+def reset_shared_duckdb_views() -> None:
+    """Azzera e ricrea la connessione DuckDB singleton in-process per prevenire data leakage tra profili/utenti."""
+    global _SHARED_CON
+    with _SHARED_LOCK:
+        if _SHARED_CON is not None:
+            try:
+                _SHARED_CON.close()
+            except Exception:
+                pass
+            _SHARED_CON = None
+        if HAS_DUCKDB:
+            try:
+                _SHARED_CON = duckdb.connect(database=":memory:")
+                _SHARED_CON.execute("PRAGMA threads=4;")
+                _SHARED_CON.execute("PRAGMA enable_object_cache=true;")
+            except Exception:
+                pass
+
+
 def _register_dfs_optimized(con, context_dfs: Optional[Dict[str, pd.DataFrame]] = None) -> None:
     """Registra i DataFrame nel catalogo DuckDB in modo sicuro ed efficiente."""
     if not con or not context_dfs:

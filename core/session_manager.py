@@ -212,10 +212,47 @@ class ArgusSessionManager:
         state.clear()
         cls.ensure_initialized()
 
+    @classmethod
+    def switch_profile_context(
+        cls,
+        user_id: Optional[str] = None,
+        workspace_id: Optional[str] = None,
+        target_portfolio_id: Optional[Union[str, int]] = None,
+        is_demo: bool = False,
+    ) -> Any:
+        """Commuta atomicamente il contesto tenant/profilo (SSOT)."""
+        from core.workspace_context import switch_profile_context
+
+        return switch_profile_context(
+            user_id=user_id,
+            workspace_id=workspace_id,
+            target_portfolio_id=target_portfolio_id,
+            is_demo=is_demo,
+        )
+
+
+
+def switch_profile_context(
+    user_id: str = "default_user",
+    workspace_id: str = "default",
+    target_portfolio_id: Optional[Union[str, int]] = None,
+    is_demo: bool = False,
+) -> Any:
+    """Commuta atomicamente il contesto tenant/profilo (SSOT)."""
+    from core.workspace_context import switch_profile_context as _sw
+
+    return _sw(
+        user_id=user_id,
+        workspace_id=workspace_id,
+        target_portfolio_id=target_portfolio_id,
+        is_demo=is_demo,
+    )
+
 
 __all__ = [
     "ArgusSessionKeys",
     "ArgusSessionManager",
     "set_active_portfolio",
     "render_portfolio_selector",
+    "switch_profile_context",
 ]

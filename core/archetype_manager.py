@@ -28,30 +28,16 @@ def execute_unified_archetype_load(
     sim_eng = PortfolioSimulationEngine(offline=True, seed=42)
     res_arch = sim_eng.simulate(arch_code, years=3)
 
-    # 1. Popolamento database SQLite locale
-    db_res = populate_argus_database(res_arch, sqlite_path="data/argus_local.db")
+    # 1. Popolamento database SQLite isolato in sandbox (Air-Gapped: non inquina argus_local.db)
+    demo_db_path = "data/demo_sandbox.db"
+    db_res = populate_argus_database(res_arch, sqlite_path=demo_db_path)
     risk_pid = db_res["risk_portfolio_id"]
     wealth_pid = db_res["wealth_profile_id"]
 
-    # 2. Se MySQL è attivo e non siamo in offline_mode, sincronizza anche su MySQL
-    is_offline = bool(st.session_state.get("offline_mode", False))
-    if not is_offline:
-        try:
-            active_db = st.session_state.get("db_name") or st.session_state.get("wealth_db_name") or "wealth"
-            db_u = st.session_state.get("db_user", "root")
-            db_p = st.session_state.get("db_pass", "root")
-            db_h = st.session_state.get("db_host", "localhost")
-            db_port = int(st.session_state.get("db_port", 3306))
-
-            eng_mysql = get_engine(db_u, db_p, db_h, db_port, active_db, database=active_db, offline=False)
-            eng_sqlite = get_engine(offline=True, sqlite_path="data/argus_local.db")
-
-            Base.metadata.create_all(eng_mysql)
-            init_wealth_db(eng_mysql)
-            sync_wealth_tables_between_engines(eng_sqlite, eng_mysql)
-        except Exception:
-            # Continua in ogni caso con SQLite locale se MySQL ha generato un errore
-            pass
+    # 2. Flag di isolamento sandbox per prevenire sync cloud
+    st.session_state["is_sandbox"] = True
+    st.session_state["is_demo"] = True
+    st.session_state["demo_sqlite_path"] = demo_db_path
 
     # 3. Aggiorna Session State per Risk Analytics
     st.session_state["df_raw_injected"] = res_arch.trading_transactions_df
