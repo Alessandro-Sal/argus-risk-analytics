@@ -15,3 +15,10 @@ warnings.warn(
 )
 
 from components.ui_core.sidebar import *  # noqa: F401, F403
+
+
+def __getattr__(name: str):
+    import importlib
+
+    mod = importlib.import_module("components.ui_core.sidebar")
+    return getattr(mod, name)

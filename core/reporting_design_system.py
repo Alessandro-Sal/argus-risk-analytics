@@ -15,3 +15,10 @@ warnings.warn(
 )
 
 from core.reporting.design_system import *  # noqa: F401, F403
+
+
+def __getattr__(name: str):
+    import importlib
+
+    mod = importlib.import_module("core.reporting.design_system")
+    return getattr(mod, name)

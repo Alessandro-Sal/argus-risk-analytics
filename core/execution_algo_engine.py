@@ -15,3 +15,10 @@ warnings.warn(
 )
 
 from core.execution.tca import *  # noqa: F401, F403
+
+
+def __getattr__(name: str):
+    import importlib
+
+    mod = importlib.import_module("core.execution.tca")
+    return getattr(mod, name)

@@ -15,3 +15,10 @@ warnings.warn(
 )
 
 from core.rebalancing.autonomous import *  # noqa: F401, F403
+
+
+def __getattr__(name: str):
+    import importlib
+
+    mod = importlib.import_module("core.rebalancing.autonomous")
+    return getattr(mod, name)

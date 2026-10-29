@@ -17,3 +17,9 @@ warnings.warn(
 
 from core.institutional_telemetry import *  # noqa: F401, F403, I001
 from components.ui_core.ux_institutional_hub import *  # noqa: F401, F403, I001
+
+def __getattr__(name: str):
+    import importlib
+
+    mod = importlib.import_module("core.institutional_telemetry")
+    return getattr(mod, name)

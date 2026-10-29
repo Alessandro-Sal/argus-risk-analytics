@@ -15,3 +15,10 @@ warnings.warn(
 )
 
 from core.quant.msci_barra import *  # noqa: F401, F403
+
+
+def __getattr__(name: str):
+    import importlib
+
+    mod = importlib.import_module("core.quant.msci_barra")
+    return getattr(mod, name)

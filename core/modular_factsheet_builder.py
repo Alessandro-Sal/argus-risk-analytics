@@ -15,3 +15,10 @@ warnings.warn(
 )
 
 from core.reporting.factsheet import *  # noqa: F401, F403
+
+
+def __getattr__(name: str):
+    import importlib
+
+    mod = importlib.import_module("core.reporting.factsheet")
+    return getattr(mod, name)

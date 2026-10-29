@@ -16,3 +16,10 @@ warnings.warn(
 
 from core.reporting.pdf import *  # noqa: F401, F403
 from core.reporting.pdf import _generate_legacy_pure_pdf  # noqa: F401
+
+
+def __getattr__(name: str):
+    import importlib
+
+    mod = importlib.import_module("core.reporting.pdf")
+    return getattr(mod, name)

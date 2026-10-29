@@ -14,4 +14,9 @@ warnings.warn(
     stacklevel=2,
 )
 
+from core.reporting import db_exporter as _target_module
 from core.reporting.db_exporter import *  # noqa: F401, F403
+
+
+def __getattr__(name: str):
+    return getattr(_target_module, name)

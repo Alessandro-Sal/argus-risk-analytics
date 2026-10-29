@@ -15,3 +15,10 @@ warnings.warn(
 )
 
 from core.volatility.garch import *  # noqa: F401, F403
+
+
+def __getattr__(name: str):
+    import importlib
+
+    mod = importlib.import_module("core.volatility.garch")
+    return getattr(mod, name)

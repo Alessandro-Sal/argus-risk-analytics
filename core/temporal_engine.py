@@ -15,3 +15,10 @@ warnings.warn(
 )
 
 from core.temporal.temporal_engine import *  # noqa: F401, F403
+
+
+def __getattr__(name: str):
+    import importlib
+
+    mod = importlib.import_module("core.temporal.temporal_engine")
+    return getattr(mod, name)
