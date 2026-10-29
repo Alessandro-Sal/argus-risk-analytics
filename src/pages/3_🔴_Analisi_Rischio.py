@@ -110,7 +110,14 @@ active_risk_tab = render_segmented_tabs(
 # Risoluzione robusta del Beta aggregato a livello di pagina
 b_val_display = mk.get('beta')
 if b_val_display is None or (abs(float(b_val_display) - 1.0) < 1e-4 and not pos.empty):
-    valid_p = pos[pos.get("current_value", 0) > 0]
+    if "current_value" in pos.columns:
+        valid_p = pos[pd.to_numeric(pos["current_value"], errors="coerce").fillna(0.0) > 0]
+    elif "market_value" in pos.columns:
+        valid_p = pos[pd.to_numeric(pos["market_value"], errors="coerce").fillna(0.0) > 0]
+    elif "qty_net" in pos.columns:
+        valid_p = pos[pd.to_numeric(pos["qty_net"], errors="coerce").fillna(0.0) > 0]
+    else:
+        valid_p = pos
     if "beta" in valid_p.columns and "weight_pct" in valid_p.columns:
         w_sum = valid_p["weight_pct"].sum()
         if w_sum > 0:

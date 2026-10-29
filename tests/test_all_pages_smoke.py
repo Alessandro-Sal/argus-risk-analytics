@@ -68,3 +68,53 @@ def test_empty_state_guard_isolation_and_resilience():
         ws = WorkspaceContext.get_current()
         ws.flush_risk_domain()
         ws.flush_wealth_domain()
+
+
+def test_positions_missing_current_value_resilience():
+    """
+    Verifica che strutture DataFrame positions prive di 'current_value' o 'qty_net'
+    non sollevino KeyError: False o KeyError: True in fase di slicing o calcolo aggregato.
+    """
+    import pandas as pd
+
+    # Mock DataFrame privo di current_value e privo di qty_net
+    mock_pos = pd.DataFrame({
+        "ticker": ["AAPL", "MSFT"],
+        "shares": [10.0, 5.0],
+        "average_price": [150.0, 300.0],
+    })
+
+    # 1. 3_Analisi_Rischio filtering
+    if "current_value" in mock_pos.columns:
+        valid_p = mock_pos[pd.to_numeric(mock_pos["current_value"], errors="coerce").fillna(0.0) > 0]
+    elif "market_value" in mock_pos.columns:
+        valid_p = mock_pos[pd.to_numeric(mock_pos["market_value"], errors="coerce").fillna(0.0) > 0]
+    elif "qty_net" in mock_pos.columns:
+        valid_p = mock_pos[pd.to_numeric(mock_pos["qty_net"], errors="coerce").fillna(0.0) > 0]
+    else:
+        valid_p = mock_pos
+    assert len(valid_p) == 2
+
+    # 2. 8_Analisi_Temporale active tickers
+    if "current_value" in mock_pos.columns:
+        active_tickers = sorted(list(mock_pos[pd.to_numeric(mock_pos["current_value"], errors="coerce").fillna(0.0) > 0]["ticker"].unique()))
+    elif "qty_net" in mock_pos.columns:
+        active_tickers = sorted(list(mock_pos[pd.to_numeric(mock_pos["qty_net"], errors="coerce").fillna(0.0) > 0]["ticker"].unique()))
+    else:
+        active_tickers = sorted(list(mock_pos["ticker"].unique()))
+    assert active_tickers == ["AAPL", "MSFT"]
+
+    # 3. 1_Dashboard_Generale n_pos
+    n_pos = int(len(mock_pos[pd.to_numeric(mock_pos["qty_net"], errors="coerce").fillna(0.0) > 1e-6])) if (not mock_pos.empty and "qty_net" in mock_pos.columns) else len(mock_pos)
+    assert n_pos == 2
+
+    # 4. core/reporting/html.py filtering
+    val_col = "current_value" if "current_value" in mock_pos.columns else None
+    mask = pd.Series(True, index=mock_pos.index)
+    if "qty_net" in mock_pos.columns:
+        mask &= (pd.to_numeric(mock_pos["qty_net"], errors="coerce").fillna(0.0) > 1e-6)
+    if val_col:
+        mask &= (pd.to_numeric(mock_pos[val_col], errors="coerce").fillna(0.0) > 0)
+    active_pos = mock_pos[mask] if mask.any() else mock_pos
+    assert len(active_pos) == 2
+

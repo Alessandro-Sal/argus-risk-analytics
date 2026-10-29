@@ -236,7 +236,7 @@ if active_bquant_tab == "🐍 ARGUS BQuant Python Sandbox":
     # ── Pipeline Binding Status Strip (Bloomberg BQuant Data Bus) ──
     port_label, has_port = ui_utils.get_display_portfolio_name()
     port_name = st.session_state.get("portfolio_name", port_label)
-    n_pos = len(pos[pos.get("qty_net", 1) > 1e-6]) if (pos is not None and isinstance(pos, pd.DataFrame)) else 0
+    n_pos = len(pos[pd.to_numeric(pos["qty_net"], errors="coerce").fillna(0.0) > 1e-6]) if (pos is not None and isinstance(pos, pd.DataFrame) and "qty_net" in pos.columns) else (len(pos) if (pos is not None and isinstance(pos, pd.DataFrame)) else 0)
     tot_val = float(pos["current_value"].sum()) if (pos is not None and isinstance(pos, pd.DataFrame) and not pos.empty and "current_value" in pos.columns) else 0.0
     tot_val_str = f"€ {tot_val:,.2f}".replace(",", ".")
     

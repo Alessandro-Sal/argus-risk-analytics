@@ -122,9 +122,12 @@ def generate_interactive_html_report(results: Dict[str, Any], output_path: str =
             if "current_value" in pos.columns
             else ("market_value" if "market_value" in pos.columns else None)
         )
-        active_pos = (
-            pos[(pos.get("qty_net", 1) > 1e-6) & (pos[val_col] > 0)] if val_col else pos[pos.get("qty_net", 1) > 1e-6]
-        )
+        mask = pd.Series(True, index=pos.index)
+        if "qty_net" in pos.columns:
+            mask &= (pd.to_numeric(pos["qty_net"], errors="coerce").fillna(0.0) > 1e-6)
+        if val_col:
+            mask &= (pd.to_numeric(pos[val_col], errors="coerce").fillna(0.0) > 0)
+        active_pos = pos[mask] if mask.any() else pos
         for idx, row in active_pos.iterrows():
             ticker = str(row.get("ticker", "N/A"))
             ac = str(row.get("asset_class", "N/A"))

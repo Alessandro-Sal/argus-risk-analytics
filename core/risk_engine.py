@@ -4527,7 +4527,7 @@ def compute_fx_risk_decomposition(
 
     pivot = df_prices.pivot(index="price_date", columns="ticker", values="close")
     pos_open = (
-        df_positions[df_positions.get("qty_net", 1) > 0].copy()
+        df_positions[pd.to_numeric(df_positions["qty_net"], errors="coerce").fillna(0.0) > 0].copy()
         if "qty_net" in df_positions.columns
         else df_positions.copy()
     )

@@ -68,7 +68,12 @@ active_rf_rate = st.session_state.get("active_rf_rate", 0.035)
 
 # Lista dei ticker attivi
 if not pos.empty and "ticker" in pos.columns:
-    active_tickers = sorted(list(pos[pos.get("current_value", 0) > 0]["ticker"].unique()))
+    if "current_value" in pos.columns:
+        active_tickers = sorted(list(pos[pd.to_numeric(pos["current_value"], errors="coerce").fillna(0.0) > 0]["ticker"].unique()))
+    elif "qty_net" in pos.columns:
+        active_tickers = sorted(list(pos[pd.to_numeric(pos["qty_net"], errors="coerce").fillna(0.0) > 0]["ticker"].unique()))
+    else:
+        active_tickers = sorted(list(pos["ticker"].unique()))
     if not active_tickers:
         active_tickers = sorted(list(pos["ticker"].unique()))
 elif df_returns is not None and not df_returns.empty:
@@ -87,7 +92,15 @@ if has_real:
     tot_port_val = float(pos["current_value"].sum()) if not pos.empty and "current_value" in pos.columns else float(results.get("portfolio_value", 0.0))
     p_name = st.session_state.get("portfolio_name", "Master Wealth")
     p_run = st.session_state.get("run_id", "LIVE")
-    n_assets = len(pos[pos.get("qty_net", 1) > 1e-6]) if not pos.empty else len(df_returns.columns)
+    if not pos.empty:
+        if "qty_net" in pos.columns:
+            n_assets = len(pos[pd.to_numeric(pos["qty_net"], errors="coerce").fillna(0.0) > 1e-6])
+        elif "current_value" in pos.columns:
+            n_assets = len(pos[pd.to_numeric(pos["current_value"], errors="coerce").fillna(0.0) > 0])
+        else:
+            n_assets = len(pos)
+    else:
+        n_assets = len(df_returns.columns) if df_returns is not None else 0
     
     with st.expander(f"🟢 **Portafoglio Live Attivo: {p_name}** | Valore: **€ {tot_port_val:,.2f}** | {n_assets} Asset • *Opzioni di cambio portafoglio*", expanded=False):
         c_sw1, c_sw2, c_sw3 = st.columns([2.5, 1.5, 1.2], vertical_alignment="center")

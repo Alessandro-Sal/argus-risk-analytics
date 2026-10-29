@@ -248,7 +248,7 @@ if active_pos_tab == "📋 Posizioni Attive & Costi FIFO":
         )
         metric_card(
             "Posizioni attive",
-            str(con.get("n_active_positions", len(pos[pos.get("qty_net", 1) > 1e-6]) if not pos.empty else len(pos))),
+            str(con.get("n_active_positions", len(pos[pd.to_numeric(pos["qty_net"], errors="coerce").fillna(0.0) > 1e-6]) if (not pos.empty and "qty_net" in pos.columns) else len(pos))),
             help_text="Conteggio del numero di strumenti finanziari posseduti in modo netto."
         )
         metric_card(

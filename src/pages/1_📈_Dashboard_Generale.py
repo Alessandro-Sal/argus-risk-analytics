@@ -1784,7 +1784,7 @@ st.divider()
 section("📥 Centro Esportazione & Deliverable")
 
 _exp_port_name = str(st.session_state.get("portfolio_name", "Main Portfolio"))
-_exp_n_pos = int(len(pos[pos.get("qty_net", 1) > 1e-6])) if not pos.empty else 0
+_exp_n_pos = int(len(pos[pd.to_numeric(pos["qty_net"], errors="coerce").fillna(0.0) > 1e-6])) if (not pos.empty and "qty_net" in pos.columns) else (len(pos) if not pos.empty else 0)
 
 # ── 1-CLICK CRO INSTITUTIONAL DOSSIER (ALL-IN-ONE BATCH ZIP) ──
 st.markdown(

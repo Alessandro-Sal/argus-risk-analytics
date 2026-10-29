@@ -286,9 +286,14 @@ def generate_institutional_audit_dossier(
         val_col_name = "current_value" if "current_value" in pos.columns else ("market_value" if "market_value" in pos.columns else None)
         if val_col_name:
             pos["current_value"] = pd.to_numeric(pos[val_col_name], errors="coerce").fillna(0.0)
-        active_pos = pos[(pos.get("current_value", 0) > 0.01) & (pos.get("qty_net", pos.get("quantity", 1)) > 1e-6)].copy()
-        if active_pos.empty and (pos.get("current_value", 0) > 0.01).any():
-            active_pos = pos[pos.get("current_value", 0) > 0.01].copy()
+        has_val = "current_value" in pos.columns
+        qty_col = "qty_net" if "qty_net" in pos.columns else ("quantity" if "quantity" in pos.columns else None)
+        mask = pd.Series(True, index=pos.index)
+        if has_val:
+            mask &= (pd.to_numeric(pos["current_value"], errors="coerce").fillna(0.0) > 0.01)
+        if qty_col:
+            mask &= (pd.to_numeric(pos[qty_col], errors="coerce").fillna(0.0) > 1e-6)
+        active_pos = pos[mask].copy() if mask.any() else pos.copy()
     else:
         active_pos = pd.DataFrame()
 
