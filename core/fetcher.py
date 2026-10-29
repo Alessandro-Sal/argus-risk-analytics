@@ -331,6 +331,13 @@ def get_engine(
 
     Base.metadata.create_all(engine)
 
+    try:
+        from core.wealth.wealth_db import init_wealth_db
+
+        init_wealth_db(engine)
+    except Exception:
+        pass
+
     is_postgres = engine.dialect.name == "postgresql"
     legacy_cols = [
         "trailing_pe DECIMAL(10,2)",

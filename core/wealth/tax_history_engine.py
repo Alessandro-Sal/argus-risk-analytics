@@ -459,9 +459,14 @@ def get_tax_losses(
         params["status"] = status.upper()
     query += " ORDER BY expiration_year ASC, generation_year ASC"
 
-    with engine.connect() as conn:
-        res = conn.execute(sqlt(query), params).mappings().fetchall()
-        rows = [dict(r) for r in res]
+    rows = []
+    try:
+        with engine.connect() as conn:
+            res = conn.execute(sqlt(query), params).mappings().fetchall()
+            rows = [dict(r) for r in res]
+    except Exception as e:
+        logger.debug("get_tax_losses fallback (table may not exist yet): %s", e)
+        return []
 
     # Post-processing per stato dinamico e boolean conversion
     clean_rows = []
@@ -2658,7 +2663,11 @@ def reconcile_with_portfolio(
     delta_ivafe = round(port_ivafe_est - dec_ivafe, 2)
 
     # 4. Analisi Zainetto Fiscale e Scadenze
-    losses = get_tax_losses(engine, profile_id=profile_id, current_year=tax_year)
+    try:
+        losses = get_tax_losses(engine, profile_id=profile_id, current_year=tax_year)
+    except Exception as e:
+        logger.debug("compute_fiscal_reform_2026_etf_harmonization fallback: %s", e)
+        losses = []
     active_losses = [l for l in losses if l.get("status") == "ACTIVE" and l.get("remaining_amount", 0.0) > 0.0]
 
     # Minusvalenze in scadenza nell'anno (expiration_year <= tax_year)
@@ -4186,7 +4195,11 @@ def generate_commercialista_tax_dossier_html(
     filing_year = tax_year + 1
     audit = build_730_predisposition_and_variance_audit(engine, profile_id=profile_id, tax_year=tax_year)
     f24_slip = generate_f24_payment_slip(engine, profile_id=profile_id, tax_year=tax_year)
-    losses = get_tax_losses(engine, profile_id=profile_id, current_year=tax_year)
+    try:
+        losses = get_tax_losses(engine, profile_id=profile_id, current_year=tax_year)
+    except Exception as e:
+        logger.debug("compute_fiscal_reform_2026_etf_harmonization fallback: %s", e)
+        losses = []
     vdocs = get_verification_documents(engine, profile_id=profile_id, tax_year=tax_year)
 
     cu_docs = [v for v in vdocs if v.get("doc_type") == "CU"]
@@ -4508,7 +4521,11 @@ def compute_fiscal_reform_2026_etf_harmonization(
     consente alle plusvalenze da ETF (attualmente classificate come redditi di capitale non compensabili)
     di compensare direttamente le minusvalenze pregresse nello zainetto fiscale (Art. 68 TUIR).
     """
-    losses = get_tax_losses(engine, profile_id=profile_id, current_year=tax_year)
+    try:
+        losses = get_tax_losses(engine, profile_id=profile_id, current_year=tax_year)
+    except Exception as e:
+        logger.debug("compute_fiscal_reform_2026_etf_harmonization fallback: %s", e)
+        losses = []
     active_losses = [l for l in losses if l.get("status") == "ACTIVE"]
     tot_losses = round(sum(float(l.get("remaining_amount", 0.0)) for l in active_losses), 2)
 

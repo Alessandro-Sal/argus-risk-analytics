@@ -798,6 +798,45 @@ class V005_SSOTMultiTenantAndTombstones(BaseMigration):
         """)
         conn.execute("CREATE INDEX IF NOT EXISTS idx_tombstones_lookup ON tombstone_deletions(user_id, entity_type);")
 
+        # 1.1 Creazione tabelle fiscali se non presenti
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS tax_declarations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                profile_id TEXT NOT NULL DEFAULT 'default',
+                tax_year INTEGER NOT NULL,
+                filing_year INTEGER NOT NULL,
+                model_type TEXT NOT NULL DEFAULT 'PF',
+                protocol_id TEXT,
+                submission_date DATE,
+                quadro_rw_flag INTEGER NOT NULL DEFAULT 0,
+                quadro_rt_flag INTEGER NOT NULL DEFAULT 0,
+                quadro_rm_flag INTEGER NOT NULL DEFAULT 0,
+                total_due REAL NOT NULL DEFAULT 0.0,
+                status TEXT NOT NULL DEFAULT 'DRAFT',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS tax_loss_carryforward (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                profile_id TEXT NOT NULL DEFAULT 'default',
+                generation_year INTEGER NOT NULL,
+                expiration_year INTEGER NOT NULL,
+                initial_loss_amount REAL NOT NULL,
+                offset_amount REAL NOT NULL DEFAULT 0.0,
+                remaining_amount REAL NOT NULL,
+                status TEXT NOT NULL DEFAULT 'ACTIVE',
+                intermediary_or_broker TEXT,
+                notes TEXT,
+                is_officially_filed INTEGER NOT NULL DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+        cur.execute("SELECT name FROM sqlite_master WHERE type='table';")
+        tables = {row[0] for row in cur.fetchall()}
+
         # 2. Aggiunta colonne SSOT su tutte le tabelle chiave
         target_tables = [
             "portfolios",
