@@ -2291,14 +2291,40 @@ def build_sr117_audit_record(
     engine_name: str,
     model_version: str,
     latex_formulas: list[str],
-    inputs_dict: dict[str, Any],
-    outputs_dict: dict[str, Any],
+    inputs_dict: dict[str, Any] | None = None,
+    outputs_dict: dict[str, Any] | None = None,
     compute_ms: float = 4.2,
     regulatory_refs: list[str] | None = None,
+    assumptions: list[str] | None = None,
+    risk_limits: list[str] | None = None,
+    benchmark_supervisory: str | None = None,
+    **kwargs: Any,
 ) -> dict[str, Any]:
     """Build a deterministic Fed SR 11-7 / ECB TRIM Model Risk Management audit trail record."""
+    if regulatory_refs is not None:
+        resolved_regulatory_refs = list(regulatory_refs)
+    elif benchmark_supervisory:
+        resolved_regulatory_refs = (
+            [benchmark_supervisory] if isinstance(benchmark_supervisory, str) else list(benchmark_supervisory)
+        )
+    else:
+        resolved_regulatory_refs = ["Fed SR 11-7", "ECB TRIM", "BCBS-352"]
+
+    payload: dict[str, Any] = {
+        "engine": engine_name,
+        "version": model_version,
+        "inputs": inputs_dict or {},
+        "outputs": outputs_dict or {},
+    }
+    if assumptions:
+        payload["assumptions"] = assumptions
+    if risk_limits:
+        payload["risk_limits"] = risk_limits
+    if benchmark_supervisory:
+        payload["benchmark_supervisory"] = benchmark_supervisory
+
     canonical_payload = json.dumps(
-        {"engine": engine_name, "version": model_version, "inputs": inputs_dict, "outputs": outputs_dict},
+        payload,
         sort_keys=True,
         default=str,
     )
@@ -2309,8 +2335,11 @@ def build_sr117_audit_record(
         "sha256_audit_hash": sha256_hash,
         "compute_ms": round(float(compute_ms), 2),
         "timestamp_utc": datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "regulatory_references": regulatory_refs or ["Fed SR 11-7", "ECB TRIM", "BCBS-352"],
+        "regulatory_references": resolved_regulatory_refs,
         "latex_formulas": latex_formulas,
+        "assumptions": assumptions or [],
+        "risk_limits": risk_limits or [],
+        "benchmark_supervisory": benchmark_supervisory,
         "canonical_json": canonical_payload,
     }
 
@@ -2318,10 +2347,14 @@ def build_sr117_audit_record(
 def render_sr117_audit_drawer(
     engine_name: str,
     latex_formulas: list[str],
-    inputs_dict: dict[str, Any],
-    outputs_dict: dict[str, Any],
+    inputs_dict: dict[str, Any] | None = None,
+    outputs_dict: dict[str, Any] | None = None,
     compute_ms: float = 4.2,
     regulatory_refs: list[str] | None = None,
+    assumptions: list[str] | None = None,
+    risk_limits: list[str] | None = None,
+    benchmark_supervisory: str | None = None,
+    **kwargs: Any,
 ) -> dict[str, Any]:
     """Render collapsible Explain-the-Math & SR 11-7 Audit Trail drawer for a quantitative engine."""
     record = build_sr117_audit_record(
@@ -2332,6 +2365,10 @@ def render_sr117_audit_drawer(
         outputs_dict=outputs_dict,
         compute_ms=compute_ms,
         regulatory_refs=regulatory_refs,
+        assumptions=assumptions,
+        risk_limits=risk_limits,
+        benchmark_supervisory=benchmark_supervisory,
+        **kwargs,
     )
     if st is None:
         return record
@@ -2346,6 +2383,17 @@ def render_sr117_audit_drawer(
         )
         for formula in latex_formulas:
             st.latex(formula)
+
+        if assumptions:
+            st.markdown("**Ipotesi di Calcolo (Model Assumptions):**")
+            for asm in assumptions:
+                st.markdown(f"- {asm}")
+
+        if risk_limits:
+            st.markdown("**Limiti di Rischio e Limiti Operativi (Risk Boundaries & Limits):**")
+            for rl in risk_limits:
+                st.markdown(f"- ⚠️ {rl}")
+
         st.code(record["canonical_json"][:1200], language="json")
     return record
 

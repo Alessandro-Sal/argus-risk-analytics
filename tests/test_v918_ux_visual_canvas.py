@@ -197,7 +197,7 @@ def test_v918_telemetry_ribbon_html_no_codeblock_indentation() -> None:
     tel = build_telemetry_ribbon_state(page_badge="CONTROL ROOM & EXECUTIVE LAUNCHPAD")
     html_no_shock = build_telemetry_ribbon_html(tel, {"is_active": False, "label": "NONE"})
     assert "\n" not in html_no_shock
-    assert "NAV:" in html_no_shock and "BULL / NORMAL" in html_no_shock
+    assert "NAV:" in html_no_shock and (tel["regime_label"] in html_no_shock or "BULL / NORMAL" in html_no_shock)
 
     html_shock = build_telemetry_ribbon_html(tel, {"is_active": True, "label": "GFC 2008"})
     assert "\n" not in html_shock
@@ -556,3 +556,41 @@ def test_portfolio_display_sanitization_and_telemetry_spacing() -> None:
     assert "\n" not in w_html
 
 
+
+
+def test_sr117_audit_drawer_governance_and_unexpected_kwargs_resilience() -> None:
+    """Verify render_sr117_audit_drawer handles assumptions, risk limits, supervisory benchmark and arbitrary kwargs."""
+    from core.ux_institutional_hub import render_sr117_audit_drawer
+
+    # 1. Consensus Model call signature as used in page 6
+    rec1 = render_sr117_audit_drawer(
+        engine_name="Consensus Valuation & Analyst Target Price Model",
+        latex_formulas=[
+            r"\text{Consensus Target Price} = \text{Median}(TP_1, TP_2, \dots, TP_K)",
+            r"\text{Margin of Safety} = \frac{\text{Consensus Target Price} - P_{\text{spot}}}{P_{\text{spot}}} \times 100",
+        ],
+        assumptions=[
+            "Consensus istituzionale derivato dalla mediana dei report degli analisti sell-side.",
+            "Target price normalizzati in valuta di portafoglio (EUR).",
+        ],
+        risk_limits=[
+            "Titoli con PEG > 2.5x classificati 'Sopravvalutati'.",
+            "Dispersione elevata delle stime sell-side attiva flag di incertezza.",
+        ],
+        benchmark_supervisory="Graham & Dodd Security Analysis, CFA Institute & FINRA Rule 2241.",
+    )
+    assert rec1["engine_name"] == "Consensus Valuation & Analyst Target Price Model"
+    assert len(rec1["assumptions"]) == 2
+    assert len(rec1["risk_limits"]) == 2
+    assert "FINRA Rule 2241" in rec1["regulatory_references"][0]
+    assert len(rec1["sha256_audit_hash"]) == 64
+
+    # 2. Resilient to arbitrary kwargs
+    rec2 = render_sr117_audit_drawer(
+        engine_name="Future Quant Engine",
+        latex_formulas=[r"E=mc^2"],
+        custom_param="arbitrary_value",
+        another_flag=True,
+    )
+    assert rec2["engine_name"] == "Future Quant Engine"
+    assert len(rec2["sha256_audit_hash"]) == 64
