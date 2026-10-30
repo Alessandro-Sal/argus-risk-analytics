@@ -26,6 +26,8 @@ datas = [
     (os.path.join(spec_dir, "core"), "core"),
     (os.path.join(spec_dir, "components"), "components"),
     (os.path.join(spec_dir, "docs"), "docs"),
+    (os.path.join(spec_dir, "scripts"), "scripts"),
+    (os.path.join(spec_dir, "data"), "data"),
     (os.path.join(spec_dir, "app.py"), "."),
 ]
 
@@ -58,6 +60,8 @@ hiddenimports = [
 hiddenimports += collect_submodules("streamlit")
 hiddenimports += collect_submodules("core")
 hiddenimports += collect_submodules("components")
+hiddenimports += collect_submodules("scripts")
+hiddenimports += ["scripts.generate_realistic_portfolio"]
 
 # 4. Esclusioni Selettive per Ridurre il Bundle Size (Risparmio > 800 MB)
 excludes = [

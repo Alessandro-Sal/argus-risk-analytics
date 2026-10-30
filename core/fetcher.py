@@ -452,19 +452,25 @@ def fetch_and_store(df_clean: pd.DataFrame, engine, portfolio_id: int = None, be
     # ── Forzatura Tassi di Cambio (FX Risk) ──────────────────
     # Ottimizzazione: scarica solo i cambi realmente presenti nel portafoglio per evitare roundtrip inutili
     cur_list = df_clean["currency"].dropna().unique().tolist() if "currency" in df_clean.columns else []
+    b_curr = "EUR"
+    if "base_currency" in locals() and locals()["base_currency"]:
+        b_curr = str(locals()["base_currency"]).upper().strip()
+    elif "base_currency" in globals() and globals()["base_currency"]:
+        b_curr = str(globals()["base_currency"]).upper().strip()
     unique_currencies = [
         str(c).upper().strip()
         for c in cur_list
-        if str(c).upper().strip() not in ["EUR", "XXX", "CRYPTO", "NAN", "NONE", "NULL", ""]
+        if str(c).upper().strip() not in [b_curr, "EUR", "XXX", "CRYPTO", "NAN", "NONE", "NULL", ""]
         and len(str(c).upper().strip()) == 3
     ]
     for c_upper in unique_currencies:
-        fx_ticker = f"{c_upper}EUR=X"
-        fx_ticker_inv = f"EUR{c_upper}=X"
-        if fx_ticker not in tickers:
-            tickers.append(fx_ticker)
-        if fx_ticker_inv not in tickers:
-            tickers.append(fx_ticker_inv)
+        for bc in {b_curr, "EUR"}:
+            fx_ticker = f"{c_upper}{bc}=X"
+            fx_ticker_inv = f"{bc}{c_upper}=X"
+            if fx_ticker not in tickers:
+                tickers.append(fx_ticker)
+            if fx_ticker_inv not in tickers:
+                tickers.append(fx_ticker_inv)
 
     # ── Determinazione date di inizio incrementali per DB ───
     max_dates = {}

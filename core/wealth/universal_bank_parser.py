@@ -726,6 +726,7 @@ def parse_bank_statement_file(
         tot_in = 0.0
         tot_out = 0.0
         tr_cnt = 0
+        intra_day_seen_keys: Dict[str, int] = {}
 
         for _, row in df_raw.iterrows():
             raw_dt = row.get(col_date) if col_date else None
@@ -762,8 +763,11 @@ def parse_bank_statement_file(
             else:
                 tot_out += r_amt
 
-            # Calcolo hash deterministico univoco per deduplicazione idempotente
-            raw_hash_key = f"{account_name}|{clean_dt}|{r_amt:.2f}|{r_dir}|{raw_desc.strip().lower()}"
+            # Calcolo hash deterministico univoco per deduplicazione idempotente con contatore intra-giornaliero
+            seen_base_key = f"{account_name}|{clean_dt}|{r_amt:.2f}|{r_dir}|{raw_desc.strip().lower()}"
+            occ_count = intra_day_seen_keys.get(seen_base_key, 0)
+            intra_day_seen_keys[seen_base_key] = occ_count + 1
+            raw_hash_key = f"{seen_base_key}|{occ_count}" if occ_count > 0 else seen_base_key
             rec_hash = hashlib.sha256(raw_hash_key.encode("utf-8")).hexdigest()
 
             normalized_records.append(

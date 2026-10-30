@@ -920,7 +920,7 @@ def compute_executive_traffic_light_radar(
             "utilization_pct": round(var_util, 1),
             "sparkline": [1.45, 1.62, 1.84, max(1.84, live_var * 0.9), var_val],
             "status": var_status,
-            "target_page": "pages/2_🔴_Analisi_Rischio.py",
+            "target_page": "pages/3_🔴_Analisi_Rischio.py",
             "badge_color": "#10b981" if var_status == "PASS" else ("#f59e0b" if var_status == "WARNING" else "#ef4444"),
         }
     )
@@ -1282,7 +1282,7 @@ GLOBAL_COMMAND_REGISTRY: dict[str, dict[str, str]] = {
     },
     "SCREEN": {
         "command": "SCREEN <GO>",
-        "target_page": "src/pages/10_🎯_Screener_Opportunita.py",
+        "target_page": "src/pages/10_🔍_Screener_Opportunita.py",
         "workspace": "🎯 Screener Opportunità & Factor Model",
         "description": "Multi-Factor Screening (Value, Quality, Momentum, Low Volatility) & Universe Scanner",
     },
@@ -1312,37 +1312,37 @@ GLOBAL_COMMAND_REGISTRY: dict[str, dict[str, str]] = {
     },
     "ILLIQ": {
         "command": "ILLIQ <GO>",
-        "target_page": "src/pages/15_📦_Asset_Illiquidi_e_Orologi.py",
+        "target_page": "src/pages/15_⌚_Asset_Illiquidi_e_Orologi.py",
         "workspace": "📦 Asset Illiquidi, Orologi & Caveau",
         "description": "Luxury Watches, Art, Collectibles, Real Estate Appraisals & Illiquidity Haircut",
     },
     "PENS": {
         "command": "PENS <GO>",
-        "target_page": "src/pages/16_👵_Previdenza_e_Pension_Planning.py",
+        "target_page": "src/pages/16_🛡️_Previdenza_e_Pension_Planning.py",
         "workspace": "👵 Previdenza & Pension Planning Attuariale",
         "description": "INPS Pension Gap Calculator, Supplementary Pension Fund Tax Shield & Annuities",
     },
     "FIRE": {
         "command": "FIRE <GO>",
-        "target_page": "src/pages/17_🏖️_Indipendenza_Finanziaria_e_FIRE.py",
+        "target_page": "src/pages/17_🔥_Indipendenza_Finanziaria_e_FIRE.py",
         "workspace": "🏖️ Indipendenza Finanziaria & Movimento FIRE",
         "description": "Safe Withdrawal Rate (SWR), Trinity Study, Sequence of Returns & Coast/Lean FIRE",
     },
     "TAX": {
         "command": "TAX <GO>",
-        "target_page": "src/pages/18_⚖️_Fiscalita_e_Quadro_RW.py",
+        "target_page": "src/pages/18_📑_Fiscalita_e_Quadro_RW.py",
         "workspace": "⚖️ Fiscalità, Minusvalenze & Monitoraggio Fiscale",
         "description": "Tax-Loss Harvesting, Quadro RW / RT, IVAFE, Bollo & TUIR Art. 67-68",
     },
     "RE": {
         "command": "RE <GO>",
-        "target_page": "src/pages/19_🏠_Immobili_e_Mutui.py",
+        "target_page": "src/pages/19_🏡_Immobili_e_Mutui.py",
         "workspace": "🏠 Immobili, Mutui & Buy vs Rent",
         "description": "French Amortization Schedules, Weighted LTV Stress & Real Estate Net Worth",
     },
     "ESTATE": {
         "command": "ESTATE <GO>",
-        "target_page": "src/pages/20_📜_Pianificazione_Successoria.py",
+        "target_page": "src/pages/20_⚖️_Pianificazione_Successoria.py",
         "workspace": "📜 Pianificazione Successoria & Trust",
         "description": "Italian Civil Code Forced Heirship, Legittima vs Disponibile & Estate Tax TUS",
     },

@@ -53,10 +53,33 @@ def get_asset_tax_rate(asset_class: str, ticker: str = "") -> float:
 
 
 def is_etf(asset_class: str, ticker: str = "") -> bool:
-    """Returns True if asset is an ETF (Reddito di Capitale in Italy)."""
-    ac_lower = str(asset_class).lower()
-    t_upper = str(ticker).upper()
-    return "etf" in ac_lower or "etf" in t_upper or t_upper in ["CSPX", "VWCE", "IEMG", "AGGH", "EIMI", "MEUD", "XEON"]
+    """Returns True if asset is an ETF / OICR (Reddito di Capitale under Italian TUIR Art. 44)."""
+    ac_lower = str(asset_class).lower().strip()
+    t_upper = str(ticker).upper().strip()
+    clean_t = t_upper.split(".")[0]
+    
+    # Check asset_class strings
+    if any(k in ac_lower for k in ["etf", "oicr", "fondo", "fund"]):
+        return True
+        
+    # Check ticker indicators
+    if "etf" in t_upper.lower() or t_upper.endswith("ETF") or clean_t.endswith("ETF"):
+        return True
+
+    # Known UCITS ETF Tickers across European exchanges (Borsa Italiana, Xetra, Euronext, LSE)
+    known_etfs = {
+        "CSPX", "CSSPX", "VWCE", "SWDA", "IEMG", "AGGH", "EIMI", "MEUD", "XEON",
+        "VUSA", "XDWD", "LCWD", "C40", "CSEMUS", "ISAC", "SMH", "QDVE", "NDIA",
+        "DFEN", "DFND", "INRG", "SGLD", "XGLE", "EMIM", "AMEM", "IMEA", "DFNS"
+    }
+    if clean_t in known_etfs or t_upper in known_etfs:
+        return True
+
+    # European UCITS fund ISIN identifiers (IE, LU, FR, DE fund ISINs)
+    if clean_t.startswith(("IE00", "LU0", "LU1", "LU2", "FR00", "DE000A")):
+        return True
+
+    return False
 
 
 def compute_tax_and_harvesting(results: Dict[str, Any], db_engine=None, tax_year: int = None) -> Dict[str, Any]:
@@ -70,8 +93,8 @@ def compute_tax_and_harvesting(results: Dict[str, Any], db_engine=None, tax_year
     """
     pos = results.get("positions", pd.DataFrame())
 
-    # 1. Open positions analysis & Tax-Loss Harvesting
-    tot_gain_diversi, tot_gain_etf, tot_loss, tot_tax_due = 0.0, 0.0, 0.0, 0.0
+    # 1. Open positions analysis & Tax-Loss Harvesting con distinzione White List (12.5%) vs Standard (26%)
+    tot_gain_diversi_ord, tot_gain_diversi_wl, tot_gain_etf, tot_loss, tot_tax_due = 0.0, 0.0, 0.0, 0.0, 0.0
     harvest_rows = []
 
     if not pos.empty:
@@ -83,17 +106,21 @@ def compute_tax_and_harvesting(results: Dict[str, Any], db_engine=None, tax_year
 
             rate = get_asset_tax_rate(ac, ticker)
             etf_flag = is_etf(ac, ticker)
+            is_wl = (rate <= 0.126)  # White List government bond (12.5%)
 
             if pnl_realized > 0:
                 if etf_flag:
                     tot_gain_etf += pnl_realized
+                elif is_wl:
+                    tot_gain_diversi_wl += pnl_realized
                 else:
-                    tot_gain_diversi += pnl_realized
+                    tot_gain_diversi_ord += pnl_realized
             elif pnl_realized < 0:
                 tot_loss += abs(pnl_realized)
 
-            # Tax Loss Harvesting Candidate: Unrealized loss on non-ETF asset (Reddito Diverso)
-            if pnl_unrealized < 0 and not etf_flag:
+            # Tax Loss Harvesting Candidate: Unrealized losses generate valid tax credits (TUIR Art. 67)
+            if pnl_unrealized < 0:
+                qual_type = "Redditi Diversi (Minusvalenza ETF)" if etf_flag else ("Redditi Diversi (White List 12.5%)" if is_wl else "Redditi Diversi (Compensabile 26%)")
                 harvest_rows.append(
                     {
                         "ticker": ticker,
@@ -101,7 +128,7 @@ def compute_tax_and_harvesting(results: Dict[str, Any], db_engine=None, tax_year
                         "pnl_unrealized": round(pnl_unrealized, 2),
                         "potential_tax_saving_eur": round(abs(pnl_unrealized) * rate, 2),
                         "tax_rate_pct": round(rate * 100.0, 1),
-                        "qualifying_type": "Redditi Diversi (Compensabile)",
+                        "qualifying_type": qual_type,
                     }
                 )
 
@@ -109,12 +136,21 @@ def compute_tax_and_harvesting(results: Dict[str, Any], db_engine=None, tax_year
     if not df_harvest.empty:
         df_harvest = df_harvest.sort_values(by="potential_tax_saving_eur", ascending=False)
 
-    # Offset rules: Minusvalenze can ONLY offset Redditi Diversi (stocks/bonds), NOT ETF gains!
-    net_diversi = tot_gain_diversi - tot_loss
-    tax_due_diversi = max(0.0, net_diversi * 0.26) if net_diversi > 0 else 0.0
-    tax_due_etf = tot_gain_etf * 0.26
+    # Offset rules: Minusvalenze compensano per prime le plusvalenze ordinarie al 26% (efficienza fiscale)
+    rem_loss = tot_loss
+    offset_ord = min(tot_gain_diversi_ord, rem_loss)
+    net_diversi_ord = tot_gain_diversi_ord - offset_ord
+    rem_loss -= offset_ord
 
+    offset_wl = min(tot_gain_diversi_wl, rem_loss)
+    net_diversi_wl = tot_gain_diversi_wl - offset_wl
+    rem_loss -= offset_wl
+
+    tax_due_diversi = (net_diversi_ord * 0.26) + (net_diversi_wl * 0.125)
+    tax_due_etf = tot_gain_etf * 0.26
     total_tax_due = tax_due_diversi + tax_due_etf
+    tot_gain_diversi = tot_gain_diversi_ord + tot_gain_diversi_wl
+    net_diversi = tot_gain_diversi - tot_loss
     tax_credit = abs(net_diversi) if net_diversi < 0 else 0.0
     potential_savings = float(df_harvest["potential_tax_saving_eur"].sum()) if not df_harvest.empty else 0.0
 

@@ -4566,13 +4566,16 @@ def compute_fiscal_reform_2026_etf_harmonization(
                 pass
 
         # Fallback sintetico realistico se portafoglio vuoto
+        is_synthetic = False
         if etf_gains == 0.0 and stock_gains == 0.0:
+            is_synthetic = True
             etf_gains = 2450.00
             stock_gains = 1075.00
             etf_positions = [{"ticker": "VWCE.DE", "gain_eur": 1850.00}, {"ticker": "XEON.DE", "gain_eur": 600.00}]
             stock_positions = [{"ticker": "NVDA", "gain_eur": 675.00}, {"ticker": "AAPL", "gain_eur": 400.00}]
 
     if tot_losses == 0.0 and kwargs.get("simulated_losses") is None:
+        is_synthetic = True
         tot_losses = 800.00
     elif kwargs.get("simulated_losses") is not None:
         tot_losses = float(kwargs["simulated_losses"])

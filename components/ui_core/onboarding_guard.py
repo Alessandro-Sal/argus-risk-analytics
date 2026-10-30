@@ -168,13 +168,13 @@ def render_empty_state_screen(
 
         if uploaded_file is not None:
             try:
-                from core.broker_hub import detect_broker_format, parse_broker_csv
+                from core.adapters.broker_hub import detect_broker_format, parse_broker_csv
 
                 file_bytes = uploaded_file.getvalue()
                 detected_broker = detect_broker_format(file_bytes)
                 st.success(f"🎯 Broker rilevato: **{detected_broker.upper()}**")
 
-                df_parsed = parse_broker_csv(file_bytes, broker=detected_broker)
+                df_parsed, detected_broker, _ = parse_broker_csv(file_bytes, broker_key=detected_broker)
                 if df_parsed is not None and not df_parsed.empty:
                     st.info(
                         f"📊 Righe valide lette: **{len(df_parsed)}** | Ticker unici: **{df_parsed['ticker'].nunique()}**"

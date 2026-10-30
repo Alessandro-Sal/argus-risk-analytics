@@ -418,18 +418,27 @@ def query_sec_filings_rag(
             }
         )
 
-    answer_lead = (
-        f"Dall'analisi dei bilanci ufficiali depositati presso la SEC (Form 10-K/10-Q) per **{ticker.upper()}**:"
-    )
+    t_upper = str(ticker).upper().strip()
+    is_synthetic_boilerplate = t_upper not in ["AAPL", "APPLE", "NVDA", "NVIDIA", "MSFT", "MICROSOFT"]
+    if is_synthetic_boilerplate:
+        answer_lead = (
+            f"⚠️ *[PROFILO DIDATTICO STANDARD]* Ticker **{t_upper}** non presente nell'archivio 10-K locale (copertura nativa: AAPL, NVDA, MSFT).\n\n"
+            f"Dall'analisi delle clausole standard dei bilanci tipo SEC (Form 10-K/10-Q) per **{t_upper}**:"
+        )
+    else:
+        answer_lead = (
+            f"Dall'analisi dei bilanci ufficiali depositati presso la SEC (Form 10-K/10-Q) per **{t_upper}**:"
+        )
     insights_list = [f"• {c['text']}" for c in citations]
     synthesized_answer = f"{answer_lead}\n\n" + "\n".join(insights_list)
 
     return {
         "query": query,
-        "ticker": ticker.upper(),
+        "ticker": t_upper,
         "found": True,
         "top_relevance_pct": citations[0]["relevance_pct"] if citations else 0.0,
         "primary_section": citations[0]["section"] if citations else "10-K",
         "answer": synthesized_answer,
         "citations": citations,
+        "is_synthetic_boilerplate": is_synthetic_boilerplate,
     }

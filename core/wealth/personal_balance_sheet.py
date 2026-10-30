@@ -214,6 +214,19 @@ def compute_personal_balance_sheet(engine: Engine, portfolio_id: int = 1, year: 
     except Exception:
         active_risk_pids = []
 
+    # Fallback Bridge: Se nessun link esplicito è configurato, verifica se esiste un portafoglio trading
+    if not active_risk_pids and engine is not None:
+        try:
+            with engine.connect() as conn:
+                chk = conn.execute(
+                    sqlt("SELECT portfolio_id FROM portfolios WHERE portfolio_id = :pid LIMIT 1"),
+                    {"pid": portfolio_id}
+                ).fetchone()
+                if chk:
+                    active_risk_pids = [int(chk[0])]
+        except Exception:
+            pass
+
     # Recupera i portafogli collegati da portfolios / snapshot con cutoff temporale retroattivo
     if active_risk_pids:
         try:

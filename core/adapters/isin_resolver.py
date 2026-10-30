@@ -22,6 +22,15 @@ BASE_ISIN_TO_TICKER: Dict[str, str] = {
     "IE00B4L5Y983": "SWDA.MI",  # iShares Core MSCI World (Borsa Italiana)
     "IE00B3RBWM25": "VWCE.MI",  # Vanguard FTSE All-World (Borsa Italiana)
     "IE00B5BMR087": "CSSPX.MI",  # iShares Core S&P 500 (Borsa Italiana)
+    "LU0290358497": "XEON.DE",   # Xtrackers II EUR Overnight Rate Swap
+    "IE00BDBRDM35": "AGGH.MI",   # iShares Core Global Aggregate Bond
+    "IE00BTJRMP35": "EIMI.MI",   # iShares Core MSCI Emerging Markets IMI
+    "IE00BK5BQT80": "VWCE.DE",   # Vanguard FTSE All-World (Xetra)
+    "IE00B3XXRP09": "VUSA.MI",   # Vanguard S&P 500
+    "IE00BFM6TC58": "XDWD.DE",   # Xtrackers MSCI World
+    "LU1681045370": "LCWD.MI",   # Amundi Core MSCI World
+    "FR0010315770": "C40.PA",    # Amundi CAC 40
+    "IE00B0M62Q58": "CSEMUS.MI", # iShares MSCI USA
     "IE00B1XNHC34": "INRG.MI",  # iShares Global Clean Energy
     "LU1681043599": "AMEM.MI",  # Amundi MSCI Emerging Markets
     "IE00B4K48X80": "IMEA.SW",  # iShares Core MSCI Europe
@@ -136,8 +145,23 @@ def search_yahoo_isin_details(clean_isin: str, timeout: float = 5.0) -> Tuple[st
                 data = resp.json()
                 quotes = data.get("quotes", [])
                 if quotes and len(quotes) > 0:
-                    symbol = quotes[0].get("symbol", "").strip().upper()
-                    name = quotes[0].get("longname", quotes[0].get("shortname", ""))
+                    chosen_quote = quotes[0]
+                    c_pref = clean_isin[:2]
+                    if c_pref in {"IT", "DE", "FR", "IE", "LU", "NL", "ES", "AT", "BE", "CH", "GB"}:
+                        pref_sfx = [".MI", ".DE", ".PA", ".AS", ".SW", ".MC", ".L"]
+                        if c_pref == "IT":
+                            pref_sfx = [".MI", ".DE", ".PA"]
+                        elif c_pref == "DE":
+                            pref_sfx = [".DE", ".F", ".MI"]
+                        elif c_pref in {"IE", "LU"}:
+                            pref_sfx = [".MI", ".DE", ".PA", ".L"]
+                        for q in quotes:
+                            sq = q.get("symbol", "").strip().upper()
+                            if any(sq.endswith(sfx) for sfx in pref_sfx):
+                                chosen_quote = q
+                                break
+                    symbol = chosen_quote.get("symbol", "").strip().upper()
+                    name = chosen_quote.get("longname", chosen_quote.get("shortname", ""))
                     if isin_circuit_breaker:
                         isin_circuit_breaker.record_success()
                     return symbol, name

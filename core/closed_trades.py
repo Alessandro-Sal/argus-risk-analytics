@@ -12,7 +12,9 @@ def _normalize_asset_class(ac_raw: str, ticker: str = "") -> str:
     s = str(ac_raw).lower().strip()
     t = str(ticker).upper().strip()
 
-    if "etf" in s or "etf" in t or t in ["CSPX", "VWCE", "IEMG", "AGGH", "EIMI", "MEUD", "XEON", "NDIA.L"]:
+    clean_t = t.split(".")[0]
+    known_etfs = {"CSPX", "CSSPX", "VWCE", "SWDA", "IEMG", "AGGH", "EIMI", "MEUD", "XEON", "NDIA", "VUSA", "XDWD", "LCWD"}
+    if "etf" in s or "etf" in t.lower() or t.endswith("ETF") or clean_t in known_etfs or clean_t.endswith("ETF"):
         return "ETF & Fondi"
     elif "crypto" in s or "btc" in t or "eth" in t or "crypto" in t:
         return "Criptovalute"

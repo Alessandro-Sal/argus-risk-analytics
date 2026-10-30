@@ -45,6 +45,7 @@ class UnifiedCrossAssetStressEngine:
         Valuta l'impatto economico olistico su tutte le componenti del Total Balance Sheet.
         """
         # 1. VALUTAZIONE PORTAFOGLIO LIQUIDO (Factor Transmission)
+        is_fallback_proxy = False
         total_liquid_val = float(wealth_snapshot.get("liquid_investments", 0.0))
         liquid_pnl_pct = 0.0
 
@@ -104,6 +105,7 @@ class UnifiedCrossAssetStressEngine:
             liquid_pnl_pct = float((eq_impact + merged["norm_weight"] * (rate_impact + fx_impact)).sum())
         else:
             # Fallback macro standard se non vi sono posizioni dettagliate
+            is_fallback_proxy = True
             rate_shift_dec = shock.yield_curve_shift_bps / 10000.0
             liquid_pnl_pct = (0.65 * shock.equity_mkt_pct) - (0.35 * 6.0 * rate_shift_dec)
 
@@ -178,6 +180,7 @@ class UnifiedCrossAssetStressEngine:
 
         return {
             "scenario_name": shock.scenario_name,
+            "is_fallback_proxy": is_fallback_proxy,
             "liquid_pnl_pct": round(liquid_pnl_pct * 100.0, 2),
             "liquid_pnl_eur": round(liquid_pnl_eur, 2),
             "stressed_liquid_val": round(stressed_liquid_val, 2),

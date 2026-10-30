@@ -1,3 +1,41 @@
+import hashlib
+import time
+
+# Cache LRU in memoria per risposte LLM (TTL: 1 ora = 3600s)
+_AI_RESPONSE_CACHE: Dict[str, Tuple[float, str]] = {}
+_AI_CACHE_TTL_SECONDS = 3600.0
+
+
+def _get_cached_llm_response(prompt: str, model_name: str) -> Optional[str]:
+    cache_key = hashlib.sha256(f"{model_name}|{prompt}".encode("utf-8")).hexdigest()
+    if cache_key in _AI_RESPONSE_CACHE:
+        ts, resp = _AI_RESPONSE_CACHE[cache_key]
+        if time.time() - ts < _AI_CACHE_TTL_SECONDS:
+            return resp
+    return None
+
+
+def _set_cached_llm_response(prompt: str, model_name: str, response: str) -> None:
+    if not response or len(response) < 10:
+        return
+    cache_key = hashlib.sha256(f"{model_name}|{prompt}".encode("utf-8")).hexdigest()
+    _AI_RESPONSE_CACHE[cache_key] = (time.time(), response)
+
+
+def _resolve_unified_api_key(api_key: Optional[str] = None) -> str:
+    """Risolve la chiave API prioritizzando input UI, st.secrets e infine os.environ."""
+    k = (api_key or "").strip()
+    if not k:
+        try:
+            import streamlit as st
+            if hasattr(st, "secrets"):
+                k = st.secrets.get("GEMINI_API_KEY", "") or st.secrets.get("OPENAI_API_KEY", "")
+        except Exception:
+            pass
+    if not k:
+        k = (os.getenv("GEMINI_API_KEY") or os.getenv("OPENAI_API_KEY") or "").strip()
+    return k
+
 """
 ARGUS — Risk Analytics Platform
 Core Module: AI & LLM Narrative Intelligence (ARGUS AI Analyst)
@@ -419,6 +457,9 @@ def _parse_http_error(e: urllib.error.HTTPError) -> str:
 
 
 def _call_gemini_api(prompt: str, api_key: str, model: str = "gemini-1.5-flash") -> Optional[str]:
+    cached = _get_cached_llm_response(prompt, model)
+    if cached is not None:
+        return cached
     """Invia il prompt all'API REST ufficiale di Google Gemini con guardrail MiFID II e fallback automatico sui modelli."""
     cleaned_key = api_key.strip()
 
@@ -478,6 +519,9 @@ def _call_gemini_api(prompt: str, api_key: str, model: str = "gemini-1.5-flash")
 
 
 def _call_openai_api(prompt: str, api_key: str, model: str = "gpt-4o-mini") -> Optional[str]:
+    cached = _get_cached_llm_response(prompt, model)
+    if cached is not None:
+        return cached
     """Invia il prompt all'API REST ufficiale di OpenAI con guardrail MiFID II."""
     url = "https://api.openai.com/v1/chat/completions"
     payload = {
@@ -525,7 +569,7 @@ def generate_portfolio_narrative_memorandum(
             "context": {},
         }
 
-    key_clean = (api_key or os.getenv("GEMINI_API_KEY") or os.getenv("OPENAI_API_KEY") or "").strip()
+    key_clean = _resolve_unified_api_key(api_key)
 
     # Risoluzione automatica intelligente del provider in base al prefisso della chiave
     active_provider = provider
@@ -621,7 +665,7 @@ def query_argus_assistant(question: str, results: dict, api_key: Optional[str] =
     disclaimer_footer = "\n\n> ⚖️ *Nota MiFID II / CONSOB: Elaborazione quantitativa automatica a supporto decisionale. Non costituisce consulenza personalizzata né sollecitazione all'investimento.*"
 
     # Verifica se disponibile LLM remoto
-    key_clean = (api_key or os.getenv("GEMINI_API_KEY") or os.getenv("OPENAI_API_KEY") or "").strip()
+    key_clean = _resolve_unified_api_key(api_key)
     active_provider = provider
     if active_provider == "auto":
         if key_clean.startswith("sk-"):
@@ -694,7 +738,7 @@ Domanda Utente: "{question}"
     elif any(w in q_lower for w in ["consigli", "ribilanciare", "operazioni", "cosa fare"]):
         raw_ans = (
             f"💡 **Indicazioni Tattiche di ARGUS**:\n"
-            f"1. **Ribilanciamento**: Se desideri massimizzare lo Sharpe Ratio, consulta il modulo *3. Modelli Quantitativi*.\n"
+            f"1. **Ribilanciamento**: Se desideri massimizzare lo Sharpe Ratio, consulta il modulo *4. Modelli Quantitativi*.\n"
             f"2. **Copertura**: Il Beta sistemico è **{ctx.get('beta', 1.0):.2f}**. Valuta Put Delta-Hedging se prevedi alta volatilità.\n"
             f"3. **Salute Globale**: Il tuo Health Score attuale è **{ctx.get('health_score', 75)}/100**."
         )

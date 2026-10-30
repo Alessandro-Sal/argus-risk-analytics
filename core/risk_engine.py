@@ -653,9 +653,10 @@ def _compute_positions(df_tx: pd.DataFrame, df_prices: pd.DataFrame, warnings_li
         # Tasso di cambio storico (Serie) e corrente
         fx_series = None
         current_fx_rate = 1.0
-        if currency not in ["EUR", "XXX", "CRYPTO"] and len(currency) == 3:
-            fx_ticker = f"{currency}EUR=X"
-            fx_ticker_inv = f"EUR{currency}=X"
+        b_curr = str(base_currency or "EUR").upper().strip()
+        if currency not in [b_curr, "XXX", "CRYPTO"] and len(currency) == 3:
+            fx_ticker = f"{currency}{b_curr}=X"
+            fx_ticker_inv = f"{b_curr}{currency}=X"
             fx_prices = df_prices[df_prices["ticker"] == fx_ticker]
             fx_prices_inv = df_prices[df_prices["ticker"] == fx_ticker_inv]
 
@@ -669,7 +670,7 @@ def _compute_positions(df_tx: pd.DataFrame, df_prices: pd.DataFrame, warnings_li
             else:
                 if warnings_list is not None:
                     warnings_list.append(
-                        f"Tasso di cambio {fx_ticker} non trovato. I valori per {ticker} sono calcolati con tasso di cambio predefinito = 1.0 (EUR)."
+                        f"Tasso di cambio {fx_ticker} non trovato. I valori per {ticker} sono calcolati con tasso di cambio predefinito = 1.0."
                     )
 
         # Prezzi: ultimo disponibile
@@ -893,10 +894,11 @@ def _compute_returns(
     )
     for tk in df_positions["ticker"].unique():
         if tk in pivot.columns:
-            curr = str(curr_map.get(tk, "EUR")).upper().strip()
-            if curr not in ["EUR", "XXX", "CRYPTO", "NAN", "NONE"] and len(curr) == 3:
-                fx_ticker = f"{curr}EUR=X"
-                fx_ticker_inv = f"EUR{curr}=X"
+            curr = str(curr_map.get(tk, base_currency or "EUR")).upper().strip()
+            b_curr = str(base_currency or "EUR").upper().strip()
+            if curr not in [b_curr, "XXX", "CRYPTO", "NAN", "NONE"] and len(curr) == 3:
+                fx_ticker = f"{curr}{b_curr}=X"
+                fx_ticker_inv = f"{b_curr}{curr}=X"
                 if fx_ticker in pivot.columns:
                     fx_series = pivot[fx_ticker].ffill().bfill()
                     pivot[tk] = pivot[tk] * fx_series

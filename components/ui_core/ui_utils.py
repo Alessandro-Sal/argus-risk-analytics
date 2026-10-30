@@ -2763,12 +2763,12 @@ def render_spotlight_palette():
                     st.session_state["selected_val_company"] = tk
                     st.session_state["val_segmented_tab"] = "📊 Bilanci & Solvibilità (Altman & DuPont)"
                     st.session_state["show_spotlight_palette"] = False
-                    switch_to_page("pages/5_🏛️_Valutazione_Aziendale.py")
+                    switch_to_page("pages/6_🏛️_Valutazione_Aziendale.py")
             with c_tk2:
                 if st.button(f"📈 {tk} HP", key=f"spot_hp_{tk}", use_container_width=True):
                     st.session_state["tech_ticker_input"] = tk
                     st.session_state["show_spotlight_palette"] = False
-                    switch_to_page("pages/8_📈_Analisi_Tecnica.py")
+                    switch_to_page("pages/9_📈_Analisi_Tecnica.py")
 
     # ── COLONNA 3: SISTEMA & SHORTCUT CHEAT SHEET ───────────────────
     with col_res3:
@@ -7129,10 +7129,23 @@ def resolve_active_subtab(options: list, default: str = None, key: str = "active
         if not user_changed_selectbox and glob_candidate in options:
             target = glob_candidate
 
-    if target and target in options:
-        st.session_state[key] = target
-        st.session_state[f"{key}_selectbox"] = target
-        st.session_state[f"_synced_tab_val_{key}"] = target
+    # Risoluzione robusta esatta o con matching resiliente
+    resolved_target = None
+    if target:
+        if target in options:
+            resolved_target = target
+        else:
+            ct = re.sub(r"[^\w\s]", "", str(target)).lower().strip()
+            for opt in options:
+                co = re.sub(r"[^\w\s]", "", str(opt)).lower().strip()
+                if ct and (ct in co or co in ct):
+                    resolved_target = opt
+                    break
+
+    if resolved_target:
+        st.session_state[key] = resolved_target
+        st.session_state[f"{key}_selectbox"] = resolved_target
+        st.session_state[f"_synced_tab_val_{key}"] = resolved_target
     elif f"{key}_selectbox" in st.session_state and st.session_state[f"{key}_selectbox"] in options:
         st.session_state[key] = st.session_state[f"{key}_selectbox"]
         st.session_state[f"_synced_tab_val_{key}"] = st.session_state[f"{key}_selectbox"]
