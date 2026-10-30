@@ -1403,21 +1403,27 @@ elif active_nw_tab == "📑 Bilancio Personale & Stato Patrimoniale":
 
     st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
 
-    # ── SUB-TABS DEL BILANCIO PERSONALE ────────────────────────
-    sub_sp, sub_ce, sub_ind, sub_conti, sub_multi, sub_stress = st.tabs([
+    # ── SUB-TABS DEL BILANCIO PERSONALE (LAZY SEGMENTED TABS) ──
+    pbs_subtabs = [
         "🏛️ Stato Patrimoniale a Sezioni Contrapposte",
         "📈 Conto Economico di Gestione",
         "🎯 Indici di Bilancio & Benchmark",
         "🏦 Dettaglio Conti & Portafogli Risk",
         "📊 Bilancio Comparativo Pluriennale",
-        "🌪️ Stress Test sul Patrimonio Netto"
-    ])
-
+        "🌪️ Stress Test sul Patrimonio Netto",
+    ]
+    sel_pbs_tab = st.segmented_control(
+        "Sezione Bilancio Personale",
+        options=pbs_subtabs,
+        default=pbs_subtabs[0],
+        key="sel_subtab_pbs_p13",
+        label_visibility="collapsed",
+    ) or pbs_subtabs[0]
 
     # ──────────────────────────────────────────────────────────
     # SUB-TAB 1: STATO PATRIMONIALE A SEZIONI CONTRAPPOSTE
     # ──────────────────────────────────────────────────────────
-    with sub_sp:
+    if sel_pbs_tab == "🏛️ Stato Patrimoniale a Sezioni Contrapposte":
         # Top KPI Summary Bar
         kpi_c1, kpi_c2, kpi_c3, kpi_c4 = st.columns(4)
         with kpi_c1:
@@ -1581,7 +1587,7 @@ elif active_nw_tab == "📑 Bilancio Personale & Stato Patrimoniale":
     # ──────────────────────────────────────────────────────────
     # SUB-TAB 2: CONTO ECONOMICO DI GESTIONE
     # ──────────────────────────────────────────────────────────
-    with sub_ce:
+    elif sel_pbs_tab == "📈 Conto Economico di Gestione":
         c_ce_head1, c_ce_head2 = st.columns([3.2, 1.3])
         with c_ce_head1:
             st.markdown("##### 📈 Conto Economico Personale (Rendiconto di Gestione)")
@@ -1715,7 +1721,7 @@ elif active_nw_tab == "📑 Bilancio Personale & Stato Patrimoniale":
     # ──────────────────────────────────────────────────────────
     # SUB-TAB 3: INDICI DI BILANCIO & BENCHMARK PRIVATE BANKING
     # ──────────────────────────────────────────────────────────
-    with sub_ind:
+    elif sel_pbs_tab == "🎯 Indici di Bilancio & Benchmark":
         st.markdown(f"""
         <div style="background:rgba(22,27,34,0.8); border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:18px 22px; margin-bottom:18px;">
             <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
@@ -1814,7 +1820,7 @@ elif active_nw_tab == "📑 Bilancio Personale & Stato Patrimoniale":
     # ──────────────────────────────────────────────────────────
     # SUB-TAB 4: DETTAGLIO CONTI & PORTAFOGLI RISK
     # ──────────────────────────────────────────────────────────
-    with sub_conti:
+    elif sel_pbs_tab == "🏦 Dettaglio Conti & Portafogli Risk":
         section("🏦 Dettaglio Conti Correnti, Depositi e Carte")
         if not df_accounts.empty:
             cols_to_show = [c for c in ["name", "institution", "account_type", "currency", "balance", "iban"] if c in df_accounts.columns]
@@ -1881,7 +1887,7 @@ elif active_nw_tab == "📑 Bilancio Personale & Stato Patrimoniale":
     # ──────────────────────────────────────────────────────────
     # SUB-TAB 5: BILANCIO COMPARATIVO PLURIENNALE
     # ──────────────────────────────────────────────────────────
-    with sub_multi:
+    elif sel_pbs_tab == "📊 Bilancio Comparativo Pluriennale":
         section("📊 Bilancio Comparativo Pluriennale (Trend Storico degli Esercizi)")
         st.caption("Prospetto comparativo di Stato Patrimoniale, Conto Economico e indici di solidità anno su anno, con evidenza dei delta di ricchezza netta.")
 
@@ -1991,7 +1997,7 @@ elif active_nw_tab == "📑 Bilancio Personale & Stato Patrimoniale":
     # ──────────────────────────────────────────────────────────
     # SUB-TAB 6: STRESS TEST CONSOLIDATO SUL PATRIMONIO NETTO
     # ──────────────────────────────────────────────────────────
-    with sub_stress:
+    elif sel_pbs_tab == "🌪️ Stress Test sul Patrimonio Netto":
         from core.macro_stress_engine import compute_consolidated_wealth_stress_test
 
         section("🌪️ Stress Testing Macroeconomico Consolidato sul Patrimonio Netto (Total Wealth)")
@@ -2172,18 +2178,25 @@ elif active_nw_tab == "⏳ Wealth Temporal Desk":
 
     st.write("")
 
-    # Sottotab temporali
-    tab_traj, tab_attr, tab_bench, tab_mat, tab_under, tab_roll, tab_seas = st.tabs([
+    # Sottotab temporali (LAZY SEGMENTED TABS)
+    traj_subtabs = [
         "📈 Traiettoria & Asset Classes",
         "🔬 Attribuzione Crescita (Risparmio vs Mercato)",
         "⚖️ Resilienza vs Benchmark 60/40",
         "🗓️ Matrice Mensile di Risparmio",
         "📉 Curva Underwater & High-Water Mark",
         "🔄 Metriche Rolling (6 Mesi)",
-        "🍂 Pattern di Stagionalità"
-    ])
+        "🍂 Pattern di Stagionalità",
+    ]
+    sel_traj_tab = st.segmented_control(
+        "Dinamica Temporale",
+        options=traj_subtabs,
+        default=traj_subtabs[0],
+        key="sel_subtab_traj_p13",
+        label_visibility="collapsed",
+    ) or traj_subtabs[0]
 
-    with tab_traj:
+    if sel_traj_tab == "📈 Traiettoria & Asset Classes":
         df_h = prog_res["history_df"].reset_index()
         # Fallback difensivo proporzionale per cache Streamlit o DataFrame legacy
         if "physical_assets" not in df_h.columns or "pension_plans" not in df_h.columns:
@@ -2355,7 +2368,7 @@ elif active_nw_tab == "⏳ Wealth Temporal Desk":
         apply_plotly_theme(fig_hist)
         st.plotly_chart(fig_hist, use_container_width=True, config={"displayModeBar": False})
 
-    with tab_attr:
+    elif sel_traj_tab == "🔬 Attribuzione Crescita (Risparmio vs Mercato)":
         col_at_g, col_at_t = st.columns([13, 10])
         with col_at_g:
             st.markdown("##### 🔬 Scomposizione della Crescita Patrimoniale Cumulata")
@@ -2403,7 +2416,7 @@ elif active_nw_tab == "⏳ Wealth Temporal Desk":
             </div>
             """, unsafe_allow_html=True)
 
-    with tab_bench:
+    elif sel_traj_tab == "⚖️ Resilienza vs Benchmark 60/40":
         col_bm_g, col_bm_t = st.columns([13, 10])
         with col_bm_g:
             st.markdown("##### ⚖️ Dinamica vs Benchmark Globale 60/40 (Base 100)")
@@ -2437,7 +2450,7 @@ elif active_nw_tab == "⏳ Wealth Temporal Desk":
             ])
             st.dataframe(df_bm_table, use_container_width=True, hide_index=True)
 
-    with tab_mat:
+    elif sel_traj_tab == "🗓️ Matrice Mensile di Risparmio":
         st.markdown("##### 🗓️ Matrice Mensile dei Flussi Netti di Risparmio (€)")
 
         def color_wealth_flows(val):
@@ -2458,7 +2471,7 @@ elif active_nw_tab == "⏳ Wealth Temporal Desk":
 
         st.dataframe(styler_mat, use_container_width=True)
 
-    with tab_under:
+    elif sel_traj_tab == "📉 Curva Underwater & High-Water Mark":
         col_u_g, col_u_t = st.columns([13, 10])
         with col_u_g:
             st.markdown("##### 📉 Curva Underwater (Drawdown vs HWM)")
@@ -2500,7 +2513,7 @@ elif active_nw_tab == "⏳ Wealth Temporal Desk":
                 hide_index=True
             )
 
-    with tab_roll:
+    elif sel_traj_tab == "🔄 Metriche Rolling (6 Mesi)":
         st.markdown("##### 🔄 Metriche Rolling a Finestra Mobile (6 Mesi)")
         df_r = roll_df.reset_index()
         fig_roll = make_subplots(rows=2, cols=1, shared_xaxes=True, subplot_titles=["Tasso di Crescita Rolling Net Worth (% Ann.)", "Volatilità Rolling del Patrimonio (% Ann.)"])
@@ -2525,7 +2538,7 @@ elif active_nw_tab == "⏳ Wealth Temporal Desk":
         apply_plotly_theme(fig_roll)
         st.plotly_chart(fig_roll, use_container_width=True, config={"displayModeBar": False})
 
-    with tab_seas:
+    elif sel_traj_tab == "🍂 Pattern di Stagionalità":
         st.markdown("##### 🍂 Stagionalità dei Flussi di Cassa & Tasso di Risparmio Medio Mensile")
         df_seas_disp = seas_res["seasonality_df"][["month_name", "avg_inflow_eur", "avg_outflow_eur", "avg_net_savings_eur", "savings_rate_pct", "status"]].rename(columns={
             "month_name": "Mese",
@@ -2873,19 +2886,24 @@ elif active_nw_tab == "🌪️ Global Wealth Stress-Testing":
         )
 
     st.write("")
-    tab_wf, tab_sq, tab_mc = st.tabs([
+    stress_subtabs = [
         "📊 Waterfall Scomposizione Net Worth",
         "⏳ Liquidity Squeeze & Forced Selling",
-        "📈 Proiezione Ripresa Monte Carlo (10 Anni)"
-    ])
+        "📈 Proiezione Ripresa Monte Carlo (10 Anni)",
+    ]
+    sel_stress_tab = st.segmented_control(
+        "Analisi Stress & Recovery",
+        options=stress_subtabs,
+        default=stress_subtabs[0],
+        key="sel_subtab_stress_p13",
+        label_visibility="collapsed",
+    ) or stress_subtabs[0]
 
-    with tab_wf:
+    if sel_stress_tab == "📊 Waterfall Scomposizione Net Worth":
         st.plotly_chart(create_wealth_waterfall_chart(stress_out), use_container_width=True)
-
-    with tab_sq:
+    elif sel_stress_tab == "⏳ Liquidity Squeeze & Forced Selling":
         st.plotly_chart(create_liquidity_squeeze_timeline_chart(stress_out), use_container_width=True)
-
-    with tab_mc:
+    elif sel_stress_tab == "📈 Proiezione Ripresa Monte Carlo (10 Anni)":
         st.plotly_chart(simulate_wealth_recovery_trajectories(stress_out["post_shock"]["net_worth"]), use_container_width=True)
 
 
@@ -3074,15 +3092,22 @@ elif active_nw_tab == "💎 Prodotti Strutturati & PRIIPs/SFDR":
         model_label="Optimal Liquidation, ALM/LDI & Structured Desk",
     )
 
-    sub_struct_prod, sub_reg_rep, sub_comm_desk, sub_opt_liq, sub_alm_ldi = st.tabs([
+    desk_subtabs = [
         "💎 Certificati Strutturati & Greche",
         "📋 PRIIPs KID (SRI) & SFDR ESG",
         "🛢️ Commodity Futures (Schwartz 2F)",
         "⚡ Optimal Liquidation & VPIN (Almgren-Chriss)",
         "🏛️ ALM / LDI Immunization & Cash-Flow LP",
-    ])
+    ]
+    sel_desk_tab = st.segmented_control(
+        "Execution Desk Sub-Tabs",
+        options=desk_subtabs,
+        default=desk_subtabs[0],
+        key="sel_subtab_exec_p13",
+        label_visibility="collapsed",
+    ) or desk_subtabs[0]
 
-    with sub_struct_prod:
+    if sel_desk_tab == "💎 Certificati Strutturati & Greche":
         from core.structured_products_engine import compute_structured_product_pricing
 
         st.markdown("#### 💎 Valutazione Worst-Of Phoenix Autocallable & Reverse Convertible")
@@ -3192,7 +3217,7 @@ elif active_nw_tab == "💎 Prodotti Strutturati & PRIIPs/SFDR":
                 ],
             )
 
-    with sub_reg_rep:
+    elif sel_desk_tab == "📋 PRIIPs KID (SRI) & SFDR ESG":
         from core.regulatory_reporting_engine import compute_regulatory_dossier
 
         st.markdown("#### 📋 Prospetto Regolamentare PRIIPs KID & SFDR ESG (Annex I)")
@@ -3288,7 +3313,7 @@ elif active_nw_tab == "💎 Prodotti Strutturati & PRIIPs/SFDR":
             ],
         )
 
-    with sub_comm_desk:
+    elif sel_desk_tab == "🛢️ Commodity Futures (Schwartz 2F)":
         from core.commodity_engine import compute_commodity_term_structure
 
         section("🛢️ Schwartz (1997) 2-Factor Commodity Futures & Convenience Yield Term Structure")
@@ -3393,7 +3418,7 @@ elif active_nw_tab == "💎 Prodotti Strutturati & PRIIPs/SFDR":
             ],
         )
 
-    with sub_opt_liq:
+    elif sel_desk_tab == "⚡ Optimal Liquidation & VPIN (Almgren-Chriss)":
         from core.market_making_vpin_engine import compute_market_making_and_vpin
         from core.optimal_liquidation_engine import compute_optimal_execution_schedule
         from core.ux_quant_canvas import build_avellaneda_stoikov_microstructure_chart
@@ -3625,7 +3650,7 @@ elif active_nw_tab == "💎 Prodotti Strutturati & PRIIPs/SFDR":
             regulatory_refs=["Avellaneda & Stoikov (2008)", "Easley, López de Prado & O'Hara (2012)", "MiFID II RTS 6"],
         )
 
-    with sub_alm_ldi:
+    elif sel_desk_tab == "🏛️ ALM / LDI Immunization & Cash-Flow LP":
         from core.alm_ldi_engine import compute_alm_ldi_immunization
         from core.ux_quant_canvas import build_alm_cashflow_and_surplus_chart
 

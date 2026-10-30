@@ -629,12 +629,18 @@ elif active_bquant_tab == "📊 Excel Live Connector & RTD":
     
     # ── INTEGRATION CODE: VBA & OFFICE SCRIPTS ──
     st.markdown("##### 🔌 Script di Integrazione per Excel (VBA & Office Scripts)")
-    tab_vba, tab_ts = st.tabs(["💻 Modulo VBA Excel (Desktop .bas)", "🌐 Microsoft Office Script (TypeScript .ts)"])
-    
-    with tab_vba:
+    bquant_tabs = ["💻 Modulo VBA Excel (Desktop .bas)", "🌐 Microsoft Office Script (TypeScript .ts)"]
+    sel_bquant_tab = st.segmented_control(
+        "Script di Integrazione",
+        options=bquant_tabs,
+        default=bquant_tabs[0],
+        key="sel_bquant_script_tab",
+        label_visibility="collapsed",
+    ) or bquant_tabs[0]
+
+    if sel_bquant_tab == "💻 Modulo VBA Excel (Desktop .bas)":
         st.caption("Incolla questo modulo in Excel Desktop (Alt + F11 > Inserisci > Modulo) per abilitare le funzioni native `=ARGUS_BDP` e `=ARGUS_RISK`.")
         st.code(generate_vba_macro_code(), language="visual-basic")
-        
-    with tab_ts:
+    elif sel_bquant_tab == "🌐 Microsoft Office Script (TypeScript .ts)":
         st.caption("Incolla questo script in Excel per il Web o Microsoft 365 (Automatizza > Nuovo Script) per sincronizzare il foglio via fetch API.")
         st.code(generate_office_script_code(), language="typescript")

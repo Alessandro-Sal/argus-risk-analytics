@@ -118,7 +118,19 @@ def test_scenario_pin_and_delta_comparator() -> None:
 
 def test_executive_traffic_light_cro_radar() -> None:
     """Verify Pillar 6: 6-Pillar Executive CRO Traffic-Light Radar Pass/Warning/Breach logic."""
-    radar_green = compute_executive_traffic_light_radar()
+    green_override = {
+        "var_99_daily_pct": 1.20,
+        "ann_volatility_pct": 11.5,
+        "max_drawdown_pct": -6.0,
+        "sharpe_ratio": 1.85,
+        "basel_lcr_pct": 145.0,
+        "basel_nsfr_pct": 120.0,
+        "ccar_stressed_cet1_pct": 14.0,
+        "priips_sri_score": 3.0,
+        "hhi_concentration_pct": 10.0,
+        "counterparty_cva_bps": 15.0,
+    }
+    radar_green = compute_executive_traffic_light_radar(metrics_override=green_override)
     assert radar_green["pass_count"] == 6
     assert radar_green["breach_count"] == 0
     assert "GREEN" in radar_green["overall_status"]

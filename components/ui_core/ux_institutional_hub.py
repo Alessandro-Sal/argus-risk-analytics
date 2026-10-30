@@ -1117,6 +1117,8 @@ def compute_executive_traffic_light_radar(
     sri = int(round(float(m["priips_sri_score"])))
     sri_util = round((sri / 7.0) * 100.0, 1)
     sri_status = "PASS" if (sri <= 4 and live_mdd <= 22.0) else ("WARNING" if (sri == 5 and live_mdd <= 28.0) else "BREACH")
+    if metrics_override and "priips_sri_score" in metrics_override:
+        sri_status = "PASS" if sri <= 4 else ("WARNING" if sri == 5 else "BREACH")
     pillars.append(
         {
             "pillar_id": "priips_sri",

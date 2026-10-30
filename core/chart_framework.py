@@ -484,8 +484,10 @@ def apply_argus_theme(
     return fig
 
 
-# Alias per piena retrocompatibilità con core/ui_utils.py
+# Alias per piena retrocompatibilità con core/ui_utils.py e design system
 apply_custom_chart_layout = apply_argus_theme
+apply_institutional_layout = apply_argus_theme
+apply_chart_theme = apply_argus_theme
 
 
 # ==============================================================================

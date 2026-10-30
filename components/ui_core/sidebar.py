@@ -1477,266 +1477,29 @@ def render_sidebar():
         pass
 
     with st.sidebar:
-        # Zero Dead-Space Top Padding Override with Preserved Toggle Buttons
-        st.markdown(
-            """
-        <style>
-            header[data-testid="stHeader"],
-            [data-testid="stHeader"] {
-                background: transparent !important;
-                background-color: transparent !important;
-                color: #ffffff !important;
-                height: 0px !important;
-                min-height: 0px !important;
-                max-height: 0px !important;
-                padding: 0px !important;
-                margin: 0px !important;
-                border: none !important;
-                overflow: hidden !important;
-                pointer-events: none !important;
-                z-index: 99 !important;
-            }
+        # Global styles and anti-flickering are managed by components.ui_core.theme
 
-            /* Comprehensive Removal of Streamlit Deploy Button & Top Decoration ONLY */
-            [data-testid="stDecoration"],
-            .stDeployButton,
-            [data-testid="stDeployButton"],
-            .stAppDeployButton,
-            button[title="Deploy"],
-            div:has(> .stDeployButton) {
-                display: none !important;
-                visibility: hidden !important;
-                opacity: 0 !important;
-                height: 0px !important;
-                width: 0px !important;
-                pointer-events: none !important;
-            }
-
-            /* Ensure Streamlit Toolbar is transparent and allows collapsedControl to show */
-            header[data-testid="stHeader"],
-            [data-testid="stHeader"],
-            [data-testid="stToolbar"],
-            div[data-testid="stToolbar"] {
-                background: transparent !important;
-                background-color: transparent !important;
-                border: none !important;
-                height: 0px !important;
-                min-height: 0px !important;
-            }
-
-            /* Mantieni il controllo di apertura sidebar (Panel Dock Expand) sempre visibile a sidebar chiusa */
-            [data-testid="collapsedControl"],
-            button[data-testid="stSidebarCollapsedControl"],
-            div[data-testid="collapsedControl"],
-            [data-testid="stExpandSidebarButton"],
-            button[data-testid="stExpandSidebarButton"],
-            [data-testid="stHeader"] [data-testid="collapsedControl"],
-            [data-testid="stHeader"] [data-testid="stExpandSidebarButton"] {
-                display: flex !important;
-                visibility: visible !important;
-                opacity: 1 !important;
-                cursor: pointer !important;
-                pointer-events: auto !important;
-                position: fixed !important;
-                top: 6px !important;
-                left: 8px !important;
-                z-index: 999999 !important;
-            }
-            [data-testid="collapsedControl"] button,
-            button[data-testid="stSidebarCollapsedControl"],
-            [data-testid="stExpandSidebarButton"],
-            button[data-testid="stExpandSidebarButton"] {
-                display: inline-flex !important;
-                align-items: center !important;
-                justify-content: center !important;
-                visibility: visible !important;
-                color: #ff9900 !important;
-                background: rgba(22, 27, 34, 0.95) !important;
-                border: 1px solid rgba(255, 153, 0, 0.4) !important;
-                border-radius: 8px !important;
-                padding: 4px 6px !important;
-                width: 32px !important;
-                height: 32px !important;
-                box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4) !important;
-                transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
-            }
-            [data-testid="collapsedControl"] button svg,
-            button[data-testid="stSidebarCollapsedControl"] svg,
-            [data-testid="stExpandSidebarButton"] svg,
-            button[data-testid="stExpandSidebarButton"] svg {
-                display: none !important;
-            }
-            [data-testid="collapsedControl"] button::after,
-            button[data-testid="stSidebarCollapsedControl"]::after,
-            [data-testid="stExpandSidebarButton"]::after,
-            button[data-testid="stExpandSidebarButton"]::after {
-                content: "" !important;
-                display: block !important;
-                width: 18px !important;
-                height: 18px !important;
-                background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ff9900' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='18' height='18' x='3' y='3' rx='2'%3E%3C/rect%3E%3Cpath d='M9 3v18'%3E%3C/path%3E%3Cpath d='m14 9 3 3-3 3'%3E%3C/path%3E%3C/svg%3E") center / 18px 18px no-repeat !important;
-                transition: all 0.2s ease !important;
-            }
-            [data-testid="collapsedControl"] button:hover,
-            [data-testid="stExpandSidebarButton"]:hover,
-            button[data-testid="stExpandSidebarButton"]:hover {
-                border-color: #ff9900 !important;
-                background: rgba(33, 38, 45, 1) !important;
-                box-shadow: 0 0 12px rgba(255, 153, 0, 0.35) !important;
-            }
-            [data-testid="collapsedControl"] button:hover::after,
-            button[data-testid="stSidebarCollapsedControl"]:hover::after,
-            [data-testid="stExpandSidebarButton"]:hover::after,
-            button[data-testid="stExpandSidebarButton"]:hover::after {
-                background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='18' height='18' x='3' y='3' rx='2'%3E%3C/rect%3E%3Cpath d='M9 3v18'%3E%3C/path%3E%3Cpath d='m14 9 3 3-3 3'%3E%3C/path%3E%3C/svg%3E") !important;
-            }
-
-            /* Hide Streamlit Raw Page Nav */
-            [data-testid="stSidebarNav"] {
-                display: none !important;
-                height: 0px !important;
-                max-height: 0px !important;
-                padding: 0px !important;
-                margin: 0px !important;
-                visibility: hidden !important;
-                overflow: hidden !important;
-            }
-
-            /* Header compatto della sidebar con pulsante di chiusura (Modern Panel Dock) */
-            div[data-testid="stSidebarHeader"],
-            [data-testid="stSidebarHeader"] {
-                min-height: 34px !important;
-                padding: 4px 8px 0px 8px !important;
-                margin: 0px !important;
-                display: flex !important;
-                justify-content: flex-end !important;
-                align-items: center !important;
-                background: transparent !important;
-                visibility: visible !important;
-            }
-
-            /* Modern Panel Dock Collapse Button (Sostituisce il default <<) */
-            [data-testid="stSidebarCollapseButton"],
-            button[data-testid="stSidebarCollapseButton"],
-            div[data-testid="stSidebarCollapseButton"] button,
-            div[data-testid="stSidebarHeader"] button {
-                display: inline-flex !important;
-                align-items: center !important;
-                justify-content: center !important;
-                visibility: visible !important;
-                opacity: 1 !important;
-                color: #8b949e !important;
-                background: rgba(22, 27, 34, 0.7) !important;
-                border: 1px solid rgba(255, 255, 255, 0.1) !important;
-                padding: 4px !important;
-                width: 28px !important;
-                height: 28px !important;
-                margin: 0px !important;
-                cursor: pointer !important;
-                border-radius: 6px !important;
-                transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
-                box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3) !important;
-            }
-            [data-testid="stSidebarCollapseButton"] svg,
-            button[data-testid="stSidebarCollapseButton"] svg,
-            div[data-testid="stSidebarCollapseButton"] button svg,
-            div[data-testid="stSidebarHeader"] button svg {
-                display: none !important;
-            }
-            [data-testid="stSidebarCollapseButton"]::after,
-            button[data-testid="stSidebarCollapseButton"]::after,
-            div[data-testid="stSidebarCollapseButton"] button::after,
-            div[data-testid="stSidebarHeader"] button::after {
-                content: "" !important;
-                display: block !important;
-                width: 16px !important;
-                height: 16px !important;
-                background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238b949e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='18' height='18' x='3' y='3' rx='2'%3E%3C/rect%3E%3Cpath d='M9 3v18'%3E%3C/path%3E%3Cpath d='m16 15-3-3 3-3'%3E%3C/path%3E%3C/svg%3E") center / 16px 16px no-repeat !important;
-                transition: all 0.2s ease !important;
-            }
-            [data-testid="stSidebarCollapseButton"]:hover,
-            button[data-testid="stSidebarCollapseButton"]:hover,
-            div[data-testid="stSidebarHeader"] button:hover {
-                color: #ff9900 !important;
-                background: rgba(255, 153, 0, 0.15) !important;
-                border-color: rgba(255, 153, 0, 0.4) !important;
-                box-shadow: 0 0 10px rgba(255, 153, 0, 0.25) !important;
-            }
-            [data-testid="stSidebarCollapseButton"]:hover::after,
-            button[data-testid="stSidebarCollapseButton"]:hover::after,
-            div[data-testid="stSidebarHeader"] button:hover::after {
-                background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ff9900' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='18' height='18' x='3' y='3' rx='2'%3E%3C/rect%3E%3Cpath d='M9 3v18'%3E%3C/path%3E%3Cpath d='m16 15-3-3 3-3'%3E%3C/path%3E%3C/svg%3E") !important;
-            }
-
-            section[data-testid="stSidebar"],
-            [data-testid="stSidebar"] {
-                padding-top: 0px !important;
-                margin-top: 0px !important;
-            }
-
-            section[data-testid="stSidebar"] > div:first-child,
-            [data-testid="stSidebarContent"],
-            [data-testid="stSidebarUserContent"],
-            section[data-testid="stSidebar"] .stSidebarContent,
-            section[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] {
-                padding-top: 0.25rem !important;
-                padding-left: 0.75rem !important;
-                padding-right: 0.75rem !important;
-                margin-top: 0px !important;
-            }
-
-            section[data-testid="stSidebar"] [data-testid="stVerticalBlock"]:first-child,
-            section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] {
-                padding-top: 0px !important;
-                margin-top: 0px !important;
-                gap: 6px !important;
-            }
-
-            section[data-testid="stSidebar"] div[data-testid="stVerticalBlockBorderWrapper"]:first-child {
-                padding-top: 0px !important;
-                margin-top: 0px !important;
-            }
-
-            /* Institutional Sidebar Selectbox Layout & Comfort */
-            section[data-testid="stSidebar"] div[data-baseweb="select"] {
-                border-radius: 8px !important;
-                min-height: 38px !important;
-                background: rgba(22, 27, 34, 0.85) !important;
-                border: 1px solid rgba(255, 255, 255, 0.12) !important;
-                transition: border-color 0.15s ease, box-shadow 0.15s ease !important;
-            }
-            section[data-testid="stSidebar"] div[data-baseweb="select"]:hover {
-                border-color: rgba(16, 185, 129, 0.45) !important;
-            }
-            section[data-testid="stSidebar"] div[data-baseweb="select"] > div {
-                min-height: 38px !important;
-                align-items: center !important;
-                border-radius: 8px !important;
-            }
-        </style>
-        """,
-            unsafe_allow_html=True,
-        )
-
-        # Rilevamento portale attivo (Wealth vs Risk)
+        # ── 3-MODE PORTAL ROUTING: RISK • WEALTH • UNIFIED ─────────
         cur_page_name = get_current_page_name()
         in_wealth_page = any(
             w in cur_page_name for w in ["12_", "13_", "14_", "15_", "16_", "17_", "18_", "19_", "20_", "21_"]
         )
-        if "argus_portal_mode" not in st.session_state:
-            st.session_state.argus_portal_mode = "🏛️ Wealth Management" if in_wealth_page else "📊 Risk Analytics"
-        elif in_wealth_page and st.session_state.argus_portal_mode != "🏛️ Wealth Management":
-            st.session_state.argus_portal_mode = "🏛️ Wealth Management"
-        elif (
-            not in_wealth_page
-            and any(
-                w in cur_page_name for w in ["0_", "1_", "2_", "3_", "4_", "5_", "6_", "7_", "8_", "9_", "10_", "11_"]
-            )
-            and st.session_state.argus_portal_mode != "📊 Risk Analytics"
-        ):
-            st.session_state.argus_portal_mode = "📊 Risk Analytics"
+        
+        # Initialize or synchronize argus_portal_mode
+        stored_mode = st.session_state.get("argus_portal_mode")
+        if stored_mode not in ["📊 Institutional Trading & Risk", "🏛️ Wealth & Family Office", "🌐 Unified View"]:
+            if in_wealth_page:
+                st.session_state.argus_portal_mode = "🏛️ Wealth & Family Office"
+            else:
+                st.session_state.argus_portal_mode = "📊 Institutional Trading & Risk"
+        elif stored_mode != "🌐 Unified View":
+            if in_wealth_page and stored_mode != "🏛️ Wealth & Family Office":
+                st.session_state.argus_portal_mode = "🏛️ Wealth & Family Office"
+            elif not in_wealth_page and stored_mode != "📊 Institutional Trading & Risk":
+                st.session_state.argus_portal_mode = "📊 Institutional Trading & Risk"
 
-        is_wealth_mode = (st.session_state.argus_portal_mode == "🏛️ Wealth Management") or in_wealth_page
+        is_wealth_mode = (st.session_state.argus_portal_mode == "🏛️ Wealth & Family Office") or (in_wealth_page and st.session_state.argus_portal_mode != "📊 Institutional Trading & Risk")
+        is_unified_mode = (st.session_state.argus_portal_mode == "🌐 Unified View")
 
         # Header del Brand ARGUS con Logo Vettoriale Dinamico (Stesso Occhio della Control Room)
         theme = st.session_state.get("ui_theme", "Midnight Obsidian")
@@ -1767,6 +1530,20 @@ def render_sidebar():
         """,
             unsafe_allow_html=True,
         )
+
+        # ── INSTITUTIONAL STATUS BADGES (PROFILE • SANDBOX • CLOUD) ────
+        from components.ui_core.kpi_cards import render_state_badge
+        is_sb = bool(st.session_state.get("is_sandbox", False) or st.session_state.get("is_demo_mode", False))
+        is_off = bool(st.session_state.get("offline_mode", False))
+        has_cloud = bool(st.session_state.get("supabase_client_connected", False) or (os.getenv("SUPABASE_URL") and not is_off))
+
+        b_c1, b_c2 = st.columns(2)
+        with b_c1:
+            render_state_badge(mode="sandbox" if is_sb else "real")
+        with b_c2:
+            render_state_badge(mode="cloud" if has_cloud else "offline")
+
+        st.markdown("<div style='margin-bottom: 6px;'></div>", unsafe_allow_html=True)
 
         # ── 0. UNIVERSAL COMMAND PALETTE (CTRL+K) HOTKEY & QUICK FIND ──
         try:
@@ -2211,24 +1988,41 @@ def render_sidebar():
                 logger.debug("Sidebar portfolio selector notice: %s", _e_psel)
 
         st.markdown(
-            '<div class="sidebar-section-header" style="margin-top: 10px; margin-bottom: 4px; font-size: 10px; font-weight: 800; color: #8b949e; text-transform: uppercase; letter-spacing: 0.8px;">CAMBIA AMBIENTE</div>',
+            '<div class="sidebar-section-header" style="margin-top: 10px; margin-bottom: 4px; font-size: 10px; font-weight: 800; color: #8b949e; text-transform: uppercase; letter-spacing: 0.8px;">AMBIENTE & WORKSPACE</div>',
             unsafe_allow_html=True,
         )
 
-        # Switch rapido tra i due moduli
-        if is_wealth_mode:
-            if st.button("📊 Passa a Risk Analytics", key="sb_btn_switch_to_risk", use_container_width=True):
-                st.session_state.argus_portal_mode = "📊 Risk Analytics"
-                switch_to_page("0_Control_Room.py")
-        else:
-            if st.button("🏛️ Passa a Wealth Management", key="sb_btn_switch_to_wealth", use_container_width=True):
-                st.session_state.argus_portal_mode = "🏛️ Wealth Management"
+        # 3-Mode Switcher: Institutional Trading & Risk vs Wealth & FO vs Unified View
+        mode_options = [
+            "📊 Institutional Trading & Risk",
+            "🏛️ Wealth & Family Office",
+            "🌐 Unified View",
+        ]
+        curr_active_mode = st.session_state.get("argus_portal_mode") or "📊 Institutional Trading & Risk"
+        if curr_active_mode not in mode_options:
+            curr_active_mode = "🏛️ Wealth & Family Office" if in_wealth_page else "📊 Institutional Trading & Risk"
+
+        sel_portal_mode = st.segmented_control(
+            "Ambiente di Lavoro",
+            options=mode_options,
+            default=curr_active_mode,
+            key="sb_segmented_portal_mode_v10",
+            label_visibility="collapsed",
+        ) or curr_active_mode
+
+        if sel_portal_mode != st.session_state.get("argus_portal_mode"):
+            st.session_state.argus_portal_mode = sel_portal_mode
+            if sel_portal_mode == "🏛️ Wealth & Family Office" and not in_wealth_page:
                 if not st.session_state.get("wealth_active_portfolio_id"):
                     auth_pid = st.session_state.get("argus_auth_personal_profile_id")
                     st.session_state["wealth_active_portfolio_id"] = auth_pid or 1
                 switch_to_page("pages/12_🎛️_Wealth_Control_Room.py")
+            elif sel_portal_mode == "📊 Institutional Trading & Risk" and in_wealth_page:
+                switch_to_page("0_Control_Room.py")
+            st.rerun()
 
-        active_nav_modules = NAV_MODULES_WEALTH if is_wealth_mode else NAV_MODULES_RISK
+        is_wealth_mode = (sel_portal_mode == "🏛️ Wealth & Family Office") or (in_wealth_page and sel_portal_mode != "📊 Institutional Trading & Risk")
+        is_unified_mode = (sel_portal_mode == "🌐 Unified View")
 
         st.markdown(
             '<div class="sidebar-section-header" style="margin-top: 10px; margin-bottom: 8px; font-size: 10px; font-weight: 800; color: #8b949e; text-transform: uppercase; letter-spacing: 0.8px;">NAVIGAZIONE WORKSPACE</div>',
@@ -2261,7 +2055,7 @@ def render_sidebar():
             return False
 
         # ── 1.1 SINCRONIZZAZIONE BIDIREZIONALE SUBTABS ───────────────
-        for mod_item in active_nav_modules:
+        for mod_item in (NAV_MODULES_RISK + NAV_MODULES_WEALTH):
             if mod_item.get("has_subtabs") and mod_item.get("tab_key"):
                 tk = mod_item["tab_key"]
                 sb_k = f"{tk}_selectbox"
@@ -2290,31 +2084,25 @@ def render_sidebar():
                         st.session_state[tk] = curr_sb
                         st.session_state[sync_k] = curr_sb
 
-        # ── 2. RENDERING MODULI NAVIGAZIONE ─────────────────────────────
-        for mod in active_nav_modules:
-            is_active = _is_mod_active(mod, current_page)
-
-            # Se il modulo non ha sotto-schede (Control Room e Dashboard), renderizza un pulsante diretto a 1 riga
+        def _render_module_item(mod: dict, cur_page_str: str, key_pfx: str = ""):
+            is_active = _is_mod_active(mod, cur_page_str)
             if not mod["has_subtabs"]:
                 btn_prefix = "● " if is_active else "  "
                 btn_label = f"{btn_prefix}{mod['icon']} {mod['title']}"
                 btn_type = "primary" if is_active else "secondary"
-                if st.button(btn_label, key=f"nav_direct_{mod['key']}", use_container_width=True, type=btn_type):
+                if st.button(btn_label, key=f"nav_direct_{key_pfx}{mod['key']}", use_container_width=True, type=btn_type):
                     switch_to_page(mod["page_file"])
             else:
-                # Moduli con schede interne: expander compatto aperto solo se la pagina è attiva
                 active_icon_prefix = "● " if is_active else ""
                 expander_label = f"{active_icon_prefix}{mod['icon']}  {mod['title']}"
                 with st.expander(expander_label, expanded=is_active):
                     current_active_target = st.session_state.get(mod["tab_key"]) if mod["tab_key"] else None
-
                     for idx, sub in enumerate(mod["subtabs"]):
-                        sub_btn_key = f"nav_sub_{mod['key']}_{sub['label']}"
+                        sub_btn_key = f"nav_sub_{key_pfx}{mod['key']}_{sub['label']}"
                         is_sub_active = is_active and (
                             current_active_target == sub["target"] or (not current_active_target and idx == 0)
                         )
                         prefix = "▶ " if is_sub_active else "   "
-
                         if st.button(
                             f"{prefix}{sub['label']}",
                             key=sub_btn_key,
@@ -2328,6 +2116,21 @@ def render_sidebar():
                                 st.session_state[f"_synced_tab_val_{mod['tab_key']}"] = sub["target"]
                                 st.session_state["global_target_subtab"] = sub["target"]
                             switch_to_page(mod["page_file"])
+
+        # ── 2. RENDERING MODULI NAVIGAZIONE ─────────────────────────────
+        if is_unified_mode:
+            with st.expander("📊 Trading & Risk (Pagine 0–11)", expanded=not in_wealth_page):
+                for m in NAV_MODULES_RISK:
+                    _render_module_item(m, current_page, key_pfx="uni_risk_")
+            with st.expander("🏛️ Wealth & Family Office (Pagine 12–21)", expanded=in_wealth_page):
+                for m in NAV_MODULES_WEALTH:
+                    _render_module_item(m, current_page, key_pfx="uni_wlth_")
+        elif is_wealth_mode:
+            for m in NAV_MODULES_WEALTH:
+                _render_module_item(m, current_page, key_pfx="wlth_")
+        else:
+            for m in NAV_MODULES_RISK:
+                _render_module_item(m, current_page, key_pfx="risk_")
 
         st.divider()
 

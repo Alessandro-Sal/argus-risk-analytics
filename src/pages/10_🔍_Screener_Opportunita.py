@@ -316,9 +316,10 @@ active_screener_tab = render_segmented_tabs(
 
 
 # ── TAB 1: SCREENER MULTI-FATTORIALE ───────────────────────────
-if active_screener_tab == "🔍 Screener Multi-Fattoriale & Archetipi":
+@st.fragment
+def render_screener_multifactor_tab_fragment(df_raw: pd.DataFrame):
     st.markdown("#### 🎯 Selezione Strategica & Filtri Quantitativi")
-    
+
     # Selezione Modalità di Filtraggio (Archetipi vs Formula Engine EQS)
     filter_mode = st.radio(
         "Modalità di Screening:",
@@ -409,7 +410,7 @@ if active_screener_tab == "🔍 Screener Multi-Fattoriale & Archetipi":
             **Operatori Logici:** `AND`, `OR`, `NOT`, parentesi `(...)`  
             **Operatori di Confronto:** `>`, `<`, `>=`, `<=`, `==`, `!=`  
             **Operatori Aritmetici:** `+`, `-`, `*`, `/`  
-            
+
             **Campi Disponibili (Case-Insensitive):**
             - **Qualità & Bilancio:** `Piotroski`, `Altman` (o `Z_Score`), `ROE` (o `ROIC`), `Profit_Margin`, `DebtToEquity` (o `DE`), `FCF_Yield`, `WACC`
             - **Valutazione:** `PE` (o `Trailing_PE`), `Forward_PE`, `PEG`, `PB` (Price-to-Book), `DivYield`, `Upside`
@@ -449,7 +450,7 @@ if active_screener_tab == "🔍 Screener Multi-Fattoriale & Archetipi":
         # Pannello Espandibile di Micro-Filtri Manuali
         with st.expander("🛠️ Filtri Avanzati di Precisione (Personalizza Soglie Fondamentali & Tecniche)", expanded=False):
             f_col1, f_col2, f_col3, f_col4 = st.columns(4)
-            
+
             with f_col1:
                 max_pe = st.slider("P/E Massimo", 5.0, 100.0, 45.0, step=1.0)
                 max_peg = st.slider("PEG Ratio Massimo", 0.5, 4.0, 2.5, step=0.1)
@@ -480,13 +481,13 @@ if active_screener_tab == "🔍 Screener Multi-Fattoriale & Archetipi":
         raw_sectors = sorted([str(s) for s in df_raw["sector"].dropna().unique() if str(s) not in ["N/D", "nan"]])
         avail_sectors = ["Tutti i Settori"] + raw_sectors
         avail_mcaps = ["Tutte le Capitalizzazioni", "Mega-Cap (>$200B)", "Large-Cap ($10B-$200B)", "Mid-Cap ($2B-$10B)", "Small-Cap (<$2B)"]
-        
+
         col_f_sec, col_f_mcap = st.columns([1.5, 1.5])
         with col_f_sec:
             sel_sector = st.selectbox("🏢 Filtra per Settore:", avail_sectors, index=0, key="scr_filter_sector")
         with col_f_mcap:
             sel_mcap = st.selectbox("💰 Filtra per Capitalizzazione:", avail_mcaps, index=0, key="scr_filter_mcap")
-            
+
         if sel_sector != "Tutti i Settori":
             df_filtered = df_filtered[df_filtered["sector"] == sel_sector]
         if sel_mcap != "Tutte le Capitalizzazioni":
@@ -643,6 +644,11 @@ if active_screener_tab == "🔍 Screener Multi-Fattoriale & Archetipi":
             )
             apply_plotly_theme(fig_map)
             st.plotly_chart(fig_map, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
+
+
+# ── TAB 1: SCREENER MULTI-FATTORIALE ───────────────────────────
+if active_screener_tab == "🔍 Screener Multi-Fattoriale & Archetipi":
+    render_screener_multifactor_tab_fragment(df_raw)
 
 # ── TAB 2: PRE-TRADE PORTFOLIO IMPACT SIMULATOR ────────────────
 elif active_screener_tab == "🧪 Pre-Trade Portfolio Impact Simulator":

@@ -1415,129 +1415,133 @@ elif active_pos_tab == "💰 Ottimizzazione Fiscale (TUIR Art. 67)":
                 </div>
                 """, unsafe_allow_html=True)
 
-            # ── COCKPIT INTERATTIVO ZAINETTO FISCALE & HARVESTING OPTIMIZER ──
-            st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
-            col_zf_h1, col_zf_h2 = st.columns([3.2, 1.2])
-            with col_zf_h1:
-                st.markdown("##### 💼 Simulatore Zainetto Fiscale & Generatore Ordini di Harvesting")
-                st.caption("Algoritmo istituzionale di ottimizzazione fiscale: calcola il piano di realizzo minusvalenze e le strategie di Step-Up per azzerare le imposte sul capital gain.")
-            with col_zf_h2:
-                st.markdown('<div style="margin-top: 4px;"></div>', unsafe_allow_html=True)
-                glossary_modal(
-                    "📖 Guida Fiscale TUIR",
-                    """
-<div style="font-size: 13.5px; line-height: 1.5; color: #c9d1d9;">
-<div style="background: rgba(255, 153, 0, 0.08); border-left: 3px solid #ff9900; padding: 10px 14px; border-radius: 4px; margin-bottom: 12px;">
-  <b style="color: #ff9900;">📜 Regola dei 4 Anni (TUIR Art. 67)</b><br>
-  Le minusvalenze realizzate su azioni, obbligazioni e derivati possono essere compensate con future plusvalenze (Redditi Diversi) entro il 31 dicembre del 4° anno successivo a quello di realizzo.
-</div>
-<div><b>1. Raccolta Minusvalenze (Tax-Loss Harvesting):</b> Liquidare posizioni in perdita per accumulare credito fiscale immediato.<br>
-<b>2. Step-Up a 0€ Imposte:</b> Vendere e ricomprare titoli in forte utile compensandoli con lo zainetto prima che scada.<br>
-<b>3. Proxy Re-Entry:</b> Reinvestire in strumenti correlati per non perdere il trend di mercato.</div>
-</div>
-"""
-                )
-
-            col_z1, col_z2 = st.columns([2.0, 2.0])
-            with col_z1:
-                custom_zainetto = st.number_input(
-                    "Saldo Zainetto Fiscale Pregresso da Compensare (€):",
-                    value=float(tax_credit_val),
-                    step=250.0, format="%.2f",
-                    key="input_custom_zainetto_val",
-                    help="Inserisci le minusvalenze pregresse accumulate presso la tua banca o broker (Directa, Fineco, Degiro, IBKR)."
-                )
-            with col_z2:
-                tax_harvest_res = generate_tax_loss_harvesting_strategy(results, custom_zainetto_eur=custom_zainetto)
-                tot_shield = tax_harvest_res.get("total_tax_shield_created_eur", 0.0)
-                tot_saved = tax_harvest_res.get("total_tax_savings_eur", 0.0)
-                st.markdown(f"""
-                <div style="background: rgba(22, 27, 34, 0.75); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 12px 18px; margin-top: 4px; display: flex; justify-content: space-around; text-align: center;">
-                    <div>
-                        <div style="font-size: 10.5px; color: #8b949e; font-weight: 600;">RISPARMIO STEP-UP (0€ TASSE)</div>
-                        <div style="font-size: 17px; font-weight: 800; color: #3fb950;">€ {tot_saved:,.2f}</div>
-                    </div>
-                    <div style="border-left: 1px solid rgba(255,255,255,0.08);"></div>
-                    <div>
-                        <div style="font-size: 10.5px; color: #8b949e; font-weight: 600;">NUOVO CREDITO FISCALE</div>
-                        <div style="font-size: 17px; font-weight: 800; color: #58a6ff;">€ {tot_shield:,.2f}</div>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-
-            df_harvest_loss = tax_harvest_res.get("df_harvest_loss", pd.DataFrame())
-            df_step_up = tax_harvest_res.get("df_step_up", pd.DataFrame())
-
-            tab_harv1, tab_harv2 = st.tabs([
-                f"✂️ Raccolta Minusvalenze & Proxy Re-Entry ({len(df_harvest_loss)})",
-                f"🎯 Step-Up a 0€ Imposte ({len(df_step_up)})"
-            ])
-
-            with tab_harv1:
-                if not df_harvest_loss.empty:
-                    df_hl_disp = df_harvest_loss.rename(columns={
-                        "ticker": "Ticker", "asset_class": "Classe Asset", "qty_held": "Quote Detenute",
-                        "current_price_eur": "Prezzo (€)", "order_notional_eur": "Controvalore (€)",
-                        "unrealized_loss_eur": "Minus Realizzabile (€)", "unrealized_loss_pct": "Loss %",
-                        "tax_shield_created_eur": "Risparmio Fiscale (€)", "action": "Azione Consigliata",
-                        "replacement_proxy": "Re-Entry Proxy Correlato", "rationale": "Logica Operativa"
-                    })
-
-                    st.caption("Esegui gli ordini di vendita per registrare le minusvalenze e reinvesti contestualmente nel proxy consigliato per mantenere l'esposizione al trend.")
-                    cfg_hl = {
-                        "Ticker": st.column_config.TextColumn("Ticker", width="small"),
-                        "Classe Asset": st.column_config.TextColumn("Classe", width="small"),
-                        "Quote Detenute": st.column_config.NumberColumn("Quote", format="%.2f"),
-                        "Prezzo (€)": st.column_config.NumberColumn("Prezzo", format="€ %.2f"),
-                        "Controvalore (€)": st.column_config.NumberColumn("Controvalore", format="€ %.2f"),
-                        "Minus Realizzabile (€)": st.column_config.NumberColumn("Minus (€)", format="€ %.2f"),
-                        "Risparmio Fiscale (€)": st.column_config.NumberColumn("Risparmio Imposta", format="€ %.2f"),
-                        "Azione Consigliata": st.column_config.TextColumn("Azione", width="medium"),
-                        "Re-Entry Proxy Correlato": st.column_config.TextColumn("Proxy Re-Entry", width="medium"),
-                    }
-
-                    render_table_with_export(
-                        df_hl_disp[["Ticker", "Classe Asset", "Quote Detenute", "Prezzo (€)", "Controvalore (€)", "Minus Realizzabile (€)", "Risparmio Fiscale (€)", "Azione Consigliata", "Re-Entry Proxy Correlato"]],
-                        table_title="Ordini Suggeriti Tax-Loss Harvesting",
-                        file_prefix="ordini_tax_loss_harvesting",
-                        key_suffix="tax_harvest_orders",
-                        column_config=cfg_hl
+            @st.fragment
+            def render_tax_loss_harvesting_simulator_fragment(results_dict: dict, tax_res_dict: dict, tax_credit_base: float):
+                # ── COCKPIT INTERATTIVO ZAINETTO FISCALE & HARVESTING OPTIMIZER ──
+                st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+                col_zf_h1, col_zf_h2 = st.columns([3.2, 1.2])
+                with col_zf_h1:
+                    st.markdown("##### 💼 Simulatore Zainetto Fiscale & Generatore Ordini di Harvesting")
+                    st.caption("Algoritmo istituzionale di ottimizzazione fiscale: calcola il piano di realizzo minusvalenze e le strategie di Step-Up per azzerare le imposte sul capital gain.")
+                with col_zf_h2:
+                    st.markdown('<div style="margin-top: 4px;"></div>', unsafe_allow_html=True)
+                    glossary_modal(
+                        "📖 Guida Fiscale TUIR",
+                        """
+    <div style="font-size: 13.5px; line-height: 1.5; color: #c9d1d9;">
+    <div style="background: rgba(255, 153, 0, 0.08); border-left: 3px solid #ff9900; padding: 10px 14px; border-radius: 4px; margin-bottom: 12px;">
+      <b style="color: #ff9900;">📜 Regola dei 4 Anni (TUIR Art. 67)</b><br>
+      Le minusvalenze realizzate su azioni, obbligazioni e derivati possono essere compensate con future plusvalenze (Redditi Diversi) entro il 31 dicembre del 4° anno successivo a quello di realizzo.
+    </div>
+    <div><b>1. Raccolta Minusvalenze (Tax-Loss Harvesting):</b> Liquidare posizioni in perdita per accumulare credito fiscale immediato.<br>
+    <b>2. Step-Up a 0€ Imposte:</b> Vendere e ricomprare titoli in forte utile compensandoli con lo zainetto prima che scada.<br>
+    <b>3. Proxy Re-Entry:</b> Reinvestire in strumenti correlati per non perdere il trend di mercato.</div>
+    </div>
+    """
                     )
-                else:
-                    st.info("Nessuna posizione in perdita latente da raccogliere.")
 
-            with tab_harv2:
-                if not df_step_up.empty:
-                    df_su_disp = df_step_up.rename(columns={
-                        "ticker": "Ticker", "asset_class": "Classe Asset", "qty_held": "Quote Detenute",
-                        "current_price_eur": "Prezzo (€)", "unrealized_gain_eur": "Plusvalenza Latente (€)",
-                        "consumable_minus_eur": "Minus Compensabile (€)", "tax_saving_eur": "Tasse Azzerate (€)",
-                        "action": "Azione Consigliata", "replacement_proxy": "Re-Entry", "rationale": "Logica Operativa"
-                    })
-
-                    st.caption("Monetizza le plusvalenze compensandole al 100% con lo zainetto fiscale prima della scadenza dei 4 anni. Riacquista subito per alzare il prezzo di carico a 0€ di imposta.")
-                    
-                    cfg_su = {
-                        "Ticker": st.column_config.TextColumn("Ticker", width="small"),
-                        "Classe Asset": st.column_config.TextColumn("Classe", width="small"),
-                        "Quote Detenute": st.column_config.NumberColumn("Quote", format="%.2f"),
-                        "Prezzo (€)": st.column_config.NumberColumn("Prezzo", format="€ %.2f"),
-                        "Plusvalenza Latente (€)": st.column_config.NumberColumn("Plusvalenza (€)", format="€ %.2f"),
-                        "Minus Compensabile (€)": st.column_config.NumberColumn("Minus Compensata", format="€ %.2f"),
-                        "Tasse Azzerate (€)": st.column_config.NumberColumn("Tasse Risparmiate", format="€ %.2f"),
-                        "Azione Consigliata": st.column_config.TextColumn("Azione", width="medium"),
-                    }
-
-                    render_table_with_export(
-                        df_su_disp[["Ticker", "Classe Asset", "Quote Detenute", "Prezzo (€)", "Plusvalenza Latente (€)", "Minus Compensabile (€)", "Tasse Azzerate (€)", "Azione Consigliata"]],
-                        table_title="Opportunità Step-Up Fiscale a 0€ Imposte",
-                        file_prefix="step_up_fiscale",
-                        key_suffix="step_up_orders",
-                        column_config=cfg_su
+                col_z1, col_z2 = st.columns([2.0, 2.0])
+                with col_z1:
+                    custom_zainetto = st.number_input(
+                        "Saldo Zainetto Fiscale Pregresso da Compensare (€):",
+                        value=float(tax_credit_val),
+                        step=250.0, format="%.2f",
+                        key="input_custom_zainetto_val",
+                        help="Inserisci le minusvalenze pregresse accumulate presso la tua banca o broker (Directa, Fineco, Degiro, IBKR)."
                     )
-                else:
-                    st.info("Nessun candidato per Step-Up a 0€ imposte (richiede posizioni in utile su Redditi Diversi e saldo zainetto attivo).")
+                with col_z2:
+                    tax_harvest_res = generate_tax_loss_harvesting_strategy(results, custom_zainetto_eur=custom_zainetto)
+                    tot_shield = tax_harvest_res.get("total_tax_shield_created_eur", 0.0)
+                    tot_saved = tax_harvest_res.get("total_tax_savings_eur", 0.0)
+                    st.markdown(f"""
+                    <div style="background: rgba(22, 27, 34, 0.75); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 12px 18px; margin-top: 4px; display: flex; justify-content: space-around; text-align: center;">
+                        <div>
+                            <div style="font-size: 10.5px; color: #8b949e; font-weight: 600;">RISPARMIO STEP-UP (0€ TASSE)</div>
+                            <div style="font-size: 17px; font-weight: 800; color: #3fb950;">€ {tot_saved:,.2f}</div>
+                        </div>
+                        <div style="border-left: 1px solid rgba(255,255,255,0.08);"></div>
+                        <div>
+                            <div style="font-size: 10.5px; color: #8b949e; font-weight: 600;">NUOVO CREDITO FISCALE</div>
+                            <div style="font-size: 17px; font-weight: 800; color: #58a6ff;">€ {tot_shield:,.2f}</div>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
 
+                df_harvest_loss = tax_harvest_res.get("df_harvest_loss", pd.DataFrame())
+                df_step_up = tax_harvest_res.get("df_step_up", pd.DataFrame())
+
+                tab_harv1, tab_harv2 = st.tabs([
+                    f"✂️ Raccolta Minusvalenze & Proxy Re-Entry ({len(df_harvest_loss)})",
+                    f"🎯 Step-Up a 0€ Imposte ({len(df_step_up)})"
+                ])
+
+                with tab_harv1:
+                    if not df_harvest_loss.empty:
+                        df_hl_disp = df_harvest_loss.rename(columns={
+                            "ticker": "Ticker", "asset_class": "Classe Asset", "qty_held": "Quote Detenute",
+                            "current_price_eur": "Prezzo (€)", "order_notional_eur": "Controvalore (€)",
+                            "unrealized_loss_eur": "Minus Realizzabile (€)", "unrealized_loss_pct": "Loss %",
+                            "tax_shield_created_eur": "Risparmio Fiscale (€)", "action": "Azione Consigliata",
+                            "replacement_proxy": "Re-Entry Proxy Correlato", "rationale": "Logica Operativa"
+                        })
+
+                        st.caption("Esegui gli ordini di vendita per registrare le minusvalenze e reinvesti contestualmente nel proxy consigliato per mantenere l'esposizione al trend.")
+                        cfg_hl = {
+                            "Ticker": st.column_config.TextColumn("Ticker", width="small"),
+                            "Classe Asset": st.column_config.TextColumn("Classe", width="small"),
+                            "Quote Detenute": st.column_config.NumberColumn("Quote", format="%.2f"),
+                            "Prezzo (€)": st.column_config.NumberColumn("Prezzo", format="€ %.2f"),
+                            "Controvalore (€)": st.column_config.NumberColumn("Controvalore", format="€ %.2f"),
+                            "Minus Realizzabile (€)": st.column_config.NumberColumn("Minus (€)", format="€ %.2f"),
+                            "Risparmio Fiscale (€)": st.column_config.NumberColumn("Risparmio Imposta", format="€ %.2f"),
+                            "Azione Consigliata": st.column_config.TextColumn("Azione", width="medium"),
+                            "Re-Entry Proxy Correlato": st.column_config.TextColumn("Proxy Re-Entry", width="medium"),
+                        }
+
+                        render_table_with_export(
+                            df_hl_disp[["Ticker", "Classe Asset", "Quote Detenute", "Prezzo (€)", "Controvalore (€)", "Minus Realizzabile (€)", "Risparmio Fiscale (€)", "Azione Consigliata", "Re-Entry Proxy Correlato"]],
+                            table_title="Ordini Suggeriti Tax-Loss Harvesting",
+                            file_prefix="ordini_tax_loss_harvesting",
+                            key_suffix="tax_harvest_orders",
+                            column_config=cfg_hl
+                        )
+                    else:
+                        st.info("Nessuna posizione in perdita latente da raccogliere.")
+
+                with tab_harv2:
+                    if not df_step_up.empty:
+                        df_su_disp = df_step_up.rename(columns={
+                            "ticker": "Ticker", "asset_class": "Classe Asset", "qty_held": "Quote Detenute",
+                            "current_price_eur": "Prezzo (€)", "unrealized_gain_eur": "Plusvalenza Latente (€)",
+                            "consumable_minus_eur": "Minus Compensabile (€)", "tax_saving_eur": "Tasse Azzerate (€)",
+                            "action": "Azione Consigliata", "replacement_proxy": "Re-Entry", "rationale": "Logica Operativa"
+                        })
+
+                        st.caption("Monetizza le plusvalenze compensandole al 100% con lo zainetto fiscale prima della scadenza dei 4 anni. Riacquista subito per alzare il prezzo di carico a 0€ di imposta.")
+
+                        cfg_su = {
+                            "Ticker": st.column_config.TextColumn("Ticker", width="small"),
+                            "Classe Asset": st.column_config.TextColumn("Classe", width="small"),
+                            "Quote Detenute": st.column_config.NumberColumn("Quote", format="%.2f"),
+                            "Prezzo (€)": st.column_config.NumberColumn("Prezzo", format="€ %.2f"),
+                            "Plusvalenza Latente (€)": st.column_config.NumberColumn("Plusvalenza (€)", format="€ %.2f"),
+                            "Minus Compensabile (€)": st.column_config.NumberColumn("Minus Compensata", format="€ %.2f"),
+                            "Tasse Azzerate (€)": st.column_config.NumberColumn("Tasse Risparmiate", format="€ %.2f"),
+                            "Azione Consigliata": st.column_config.TextColumn("Azione", width="medium"),
+                        }
+
+                        render_table_with_export(
+                            df_su_disp[["Ticker", "Classe Asset", "Quote Detenute", "Prezzo (€)", "Plusvalenza Latente (€)", "Minus Compensabile (€)", "Tasse Azzerate (€)", "Azione Consigliata"]],
+                            table_title="Opportunità Step-Up Fiscale a 0€ Imposte",
+                            file_prefix="step_up_fiscale",
+                            key_suffix="step_up_orders",
+                            column_config=cfg_su
+                        )
+                    else:
+                        st.info("Nessun candidato per Step-Up a 0€ imposte (richiede posizioni in utile su Redditi Diversi e saldo zainetto attivo).")
+
+
+            render_tax_loss_harvesting_simulator_fragment(results, tax_res, tax_credit_val)
             # ── TIMELINE SCADENZA ZAINETTO ──
             df_zainetto = tax_res.get("zainetto_timeline", pd.DataFrame())
             if not df_zainetto.empty:

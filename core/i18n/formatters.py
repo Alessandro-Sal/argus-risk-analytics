@@ -302,3 +302,10 @@ def get_dataframe_styler_formats(
         elif ctype == "date":
             styler_map[col] = lambda x, l=locale: format_date(x, locale=l)
     return styler_map
+
+
+# Institutional Aliases for UI & Dashboard Consistency
+fmt_currency = format_currency
+fmt_percent = format_percent
+fmt_number = format_number
+fmt_date = format_date

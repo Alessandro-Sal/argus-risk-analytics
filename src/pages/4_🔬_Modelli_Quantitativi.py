@@ -2230,47 +2230,51 @@ elif active_quant_tab == "🧬 Tail Copula & Kelly":
                 st.plotly_chart(fig_k_bar, use_container_width=True)
 
         # ── SEZIONE 3: SIMULATORE INTERATTIVO DI TRADE SIZING (KELLY) ─
-        st.markdown("<div style='margin-top: 20px;'></div>", unsafe_allow_html=True)
-        st.markdown("#### ⚖️ Simulatore Interattivo Trade Sizing (Kelly Criterion)")
-        st.caption("Calcola il dimensionamento matematico ideale di una nuova posizione (o strategia) per massimizzare la crescita geometrica del capitale a zero rischio di rovina statistica.")
+        @st.fragment
+        def render_interactive_trade_kelly_fragment(results_dict: dict):
+            st.markdown("<div style='margin-top: 20px;'></div>", unsafe_allow_html=True)
+            st.markdown("#### ⚖️ Simulatore Interattivo Trade Sizing (Kelly Criterion)")
+            st.caption("Calcola il dimensionamento matematico ideale di una nuova posizione (o strategia) per massimizzare la crescita geometrica del capitale a zero rischio di rovina statistica.")
 
-        from core.advanced_quant import compute_interactive_trade_kelly
-        from core.closed_trades import compute_closed_trades_journal
+            from core.advanced_quant import compute_interactive_trade_kelly
+            from core.closed_trades import compute_closed_trades_journal
 
-        # Pre-popola con statistiche reali del Graveyard se disponibili
-        gy_stats = compute_closed_trades_journal(
-            df_tx=results.get("df_tx"),
-            df_prices=results.get("df_prices"),
-            df_positions=results.get("positions"),
-            is_sandbox=bool(results.get("is_sandbox"))
-        )
-        real_wr = gy_stats.get("win_rate_pct", 55.0) if gy_stats.get("has_closed_trades") else 55.0
-        real_pr = gy_stats.get("payoff_ratio", 1.8) if gy_stats.get("has_closed_trades") else 1.8
+            # Pre-popola con statistiche reali del Graveyard se disponibili
+            gy_stats = compute_closed_trades_journal(
+                df_tx=results_dict.get("df_tx"),
+                df_prices=results_dict.get("df_prices"),
+                df_positions=results_dict.get("positions"),
+                is_sandbox=bool(results_dict.get("is_sandbox"))
+            )
+            real_wr = gy_stats.get("win_rate_pct", 55.0) if gy_stats.get("has_closed_trades") else 55.0
+            real_pr = gy_stats.get("payoff_ratio", 1.8) if gy_stats.get("has_closed_trades") else 1.8
 
-        with st.expander("⚙️ Parametri della Nuova Idea di Trading", expanded=True):
-            col_k_in1, col_k_in2, col_k_in3, col_k_in4 = st.columns(4)
-            with col_k_in1:
-                k_win_rate = st.slider("Probabilità di Successo (Win Rate %):", 10.0, 90.0, float(real_wr), 1.0, help="Percentuale storica o stimata di trade vincenti.")
-            with col_k_in2:
-                k_payoff = st.slider("Payoff Ratio (Avg Win / Avg Loss):", 0.5, 5.0, float(real_pr), 0.1, help="Rapporto tra profitto medio su trade vincenti e perdita media su trade perdenti.")
-            with col_k_in3:
-                k_capital = st.number_input("Capitale di Riferimento Portafoglio (€):", min_value=1000.0, value=100000.0, step=5000.0)
-            with col_k_in4:
-                k_sl = st.slider("Stop-Loss Previsto (% sull'asset):", 1.0, 25.0, 5.0, 0.5, help="Distanza percentuale del livello di stop loss dal prezzo di ingresso.")
+            with st.expander("⚙️ Parametri della Nuova Idea di Trading", expanded=True):
+                col_k_in1, col_k_in2, col_k_in3, col_k_in4 = st.columns(4)
+                with col_k_in1:
+                    k_win_rate = st.slider("Probabilità di Successo (Win Rate %):", 10.0, 90.0, float(real_wr), 1.0, help="Percentuale storica o stimata di trade vincenti.")
+                with col_k_in2:
+                    k_payoff = st.slider("Payoff Ratio (Avg Win / Avg Loss):", 0.5, 5.0, float(real_pr), 0.1, help="Rapporto tra profitto medio su trade vincenti e perdita media su trade perdenti.")
+                with col_k_in3:
+                    k_capital = st.number_input("Capitale di Riferimento Portafoglio (€):", min_value=1000.0, value=100000.0, step=5000.0)
+                with col_k_in4:
+                    k_sl = st.slider("Stop-Loss Previsto (% sull'asset):", 1.0, 25.0, 5.0, 0.5, help="Distanza percentuale del livello di stop loss dal prezzo di ingresso.")
 
-        k_res = compute_interactive_trade_kelly(k_win_rate, k_payoff, k_capital, k_sl)
+            k_res = compute_interactive_trade_kelly(k_win_rate, k_payoff, k_capital, k_sl)
 
-        col_kr1, col_kr2, col_kr3, col_kr4 = st.columns(4)
-        with col_kr1:
-            metric_card("🎯 Half-Kelly (Consigliato)", f"{k_res['half_kelly_pct']:.2f}%", f"Rischio: € {k_res['risk_half_eur']:,.2f}", True)
-        with col_kr2:
-            metric_card("🔥 Full Kelly (Massima Leva)", f"{k_res['full_kelly_pct']:.2f}%", f"Rischio: € {k_res['risk_full_eur']:,.2f}", False)
-        with col_kr3:
-            metric_card("🛡️ Quarter-Kelly (Prudente)", f"{k_res['quarter_kelly_pct']:.2f}%", f"Rischio: € {k_res['risk_quarter_eur']:,.2f}", True)
-        with col_kr4:
-            metric_card("📦 Nozionale Suggerito (Half-K)", f"€ {k_res['pos_size_half_eur']:,.2f}", f"Con Stop al {k_sl:.1f}%", True)
+            col_kr1, col_kr2, col_kr3, col_kr4 = st.columns(4)
+            with col_kr1:
+                metric_card("🎯 Half-Kelly (Consigliato)", f"{k_res['half_kelly_pct']:.2f}%", f"Rischio: € {k_res['risk_half_eur']:,.2f}", True)
+            with col_kr2:
+                metric_card("🔥 Full Kelly (Massima Leva)", f"{k_res['full_kelly_pct']:.2f}%", f"Rischio: € {k_res['risk_full_eur']:,.2f}", False)
+            with col_kr3:
+                metric_card("🛡️ Quarter-Kelly (Prudente)", f"{k_res['quarter_kelly_pct']:.2f}%", f"Rischio: € {k_res['risk_quarter_eur']:,.2f}", True)
+            with col_kr4:
+                metric_card("📦 Nozionale Suggerito (Half-K)", f"€ {k_res['pos_size_half_eur']:,.2f}", f"Con Stop al {k_sl:.1f}%", True)
 
-        st.info(f"💡 **Edge Matematico della Strategia:** **{k_res['edge_pct']:+.2f}%** | **Tasso di Crescita Geometrico Teorico:** **{k_res['expected_growth_rate']:+.3f}% per operazione** | Profilo di Rischio Drawdown: **{k_res['drawdown_risk']}**")
+            st.info(f"💡 **Edge Matematico della Strategia:** **{k_res['edge_pct']:+.2f}%** | **Tasso di Crescita Geometrico Teorico:** **{k_res['expected_growth_rate']:+.3f}% per operazione** | Profilo di Rischio Drawdown: **{k_res['drawdown_risk']}**")
+
+        render_interactive_trade_kelly_fragment(results)
 
 # ── TAB 3: SIMULAZIONI STOCASTICHE ────────────────────────────
 elif active_quant_tab == "🎲 Monte Carlo & Merton":
@@ -2297,244 +2301,250 @@ elif active_quant_tab == "🎲 Monte Carlo & Merton":
     if not has_portfolio or results is None:
         st.warning("⚠️ Carica prima un portafoglio nella Control Room per eseguire le simulazioni Monte Carlo & Merton.")
     else:
-        with st.expander("⚙️ Pannello di Controllo Scenario Monte Carlo & Regimi di Stress", expanded=True):
-            mc_c1, mc_c2, mc_c3, mc_c4 = st.columns(4)
-            with mc_c1:
-                horizon_opt = st.selectbox(
-                    "Orizzonte Temporale Proiettato:",
-                    options=[63, 126, 252, 504, 756],
-                    index=2,
-                    format_func=lambda x: {63: "3 Mesi (63 gg)", 126: "6 Mesi (126 gg)", 252: "1 Anno (252 gg)", 504: "2 Anni (504 gg)", 756: "3 Anni (756 gg)"}[x]
-                )
-            with mc_c2:
-                vol_mult = st.slider("Moltiplicatore Volatilità (Stress):", 0.50, 2.50, 1.00, 0.25, help="1.0x = Condizioni Normali; 1.5x - 2.0x = Regime di Alta Volatilità / Crisi")
-            with mc_c3:
-                drift_shift = st.slider("Aggiustamento Trend / Drift Anno (%):", -20.0, 20.0, 0.0, 1.0, help="Shift % sul rendimento atteso anno")
-            with mc_c4:
-                dist_type = st.radio("Distribuzione Shock:", ["Gaussiana (Normale)", "Student-t (Code Grasse)"], horizontal=True)
-                dist_key = "student_t" if "Student-t" in dist_type else "gaussian"
+        @st.fragment
+        def render_interactive_monte_carlo_fragment(results_dict: dict):
+            with st.expander("⚙️ Pannello di Controllo Scenario Monte Carlo & Regimi di Stress", expanded=True):
+                mc_c1, mc_c2, mc_c3, mc_c4 = st.columns(4)
+                with mc_c1:
+                    horizon_opt = st.selectbox(
+                        "Orizzonte Temporale Proiettato:",
+                        options=[63, 126, 252, 504, 756],
+                        index=2,
+                        format_func=lambda x: {63: "3 Mesi (63 gg)", 126: "6 Mesi (126 gg)", 252: "1 Anno (252 gg)", 504: "2 Anni (504 gg)", 756: "3 Anni (756 gg)"}[x]
+                    )
+                with mc_c2:
+                    vol_mult = st.slider("Moltiplicatore Volatilità (Stress):", 0.50, 2.50, 1.00, 0.25, help="1.0x = Condizioni Normali; 1.5x - 2.0x = Regime di Alta Volatilità / Crisi")
+                with mc_c3:
+                    drift_shift = st.slider("Aggiustamento Trend / Drift Anno (%):", -20.0, 20.0, 0.0, 1.0, help="Shift % sul rendimento atteso anno")
+                with mc_c4:
+                    dist_type = st.radio("Distribuzione Shock:", ["Gaussiana (Normale)", "Student-t (Code Grasse)"], horizontal=True)
+                    dist_key = "student_t" if "Student-t" in dist_type else "gaussian"
 
-        # Esecuzione della Simulazione Monte Carlo con caching di sessione
-        mc_cache_key = f"mc_adv_{horizon_opt}_{vol_mult}_{drift_shift}_{dist_key}_{results.get('run_id', '')}"
-        if mc_cache_key in st.session_state:
-            mc_adv = st.session_state[mc_cache_key]
-        else:
-            mc_adv = run_advanced_monte_carlo_simulation(
-                results_dict=results,
-                horizon_days=horizon_opt,
-                volatility_multiplier=vol_mult,
-                drift_shift_pct=drift_shift,
-                distribution_type=dist_key,
-                n_simulations=3000
-            )
-            st.session_state[mc_cache_key] = mc_adv
+            # Esecuzione della Simulazione Monte Carlo con caching di sessione
+            mc_cache_key = f"mc_adv_{horizon_opt}_{vol_mult}_{drift_shift}_{dist_key}_{results.get('run_id', '')}"
+            if mc_cache_key in st.session_state:
+                mc_adv = st.session_state[mc_cache_key]
+            else:
+                mc_adv = run_advanced_monte_carlo_simulation(
+                    results_dict=results,
+                    horizon_days=horizon_opt,
+                    volatility_multiplier=vol_mult,
+                    drift_shift_pct=drift_shift,
+                    distribution_type=dist_key,
+                    n_simulations=3000
+                )
+                st.session_state[mc_cache_key] = mc_adv
+            st.session_state["_mc_horizon_days"] = horizon_opt
+            st.session_state["_mc_adv_last"] = mc_adv
 
-        if mc_adv:
-            # Head KPI Cards
-            mk1, mk2, mk3, mk4, mk5 = st.columns(5)
-            with mk1:
-                metric_card(
-                    "Valore Iniziale",
-                    fmt_eur_it(mc_adv['initial_portfolio_value']),
-                    "Capitale Base",
-                    True,
-                    help_text="Valore attuale complessivo del portafoglio utilizzato come base di simulazione."
-                )
-            with mk2:
-                metric_card(
-                    "Mediana Attesa (1Y)",
-                    fmt_eur_it(mc_adv['expected_value_median']),
-                    f"Rendimento: {mc_adv['expected_return_median_pct']:+.2f}%",
-                    mc_adv['expected_return_median_pct'] >= 0,
-                    help_text="Valore mediano del portafoglio al termine dell'orizzonte temporale."
-                )
-            with mk3:
-                metric_card(
-                    "VaR 95% (Rischio)",
-                    fmt_eur_it(mc_adv['var_95_val_eur']),
-                    f"Perdita Max: -{mc_adv['var_95_pct']:.2f}%",
-                    False,
-                    help_text="Perdita massima stimata al 95% di confidenza statistica."
-                )
-            with mk4:
-                metric_card(
-                    "CVaR 95% (Shortfall)",
-                    fmt_eur_it(mc_adv['cvar_95_val_eur']),
-                    f"Perdita Media: -{mc_adv['cvar_95_pct']:.2f}%",
-                    False,
-                    help_text="Expected Shortfall: perdita media attesa qualora si verifichi uno shock oltre il VaR 95%."
-                )
-            with mk5:
-                metric_card(
-                    "Probabilità Profitto",
-                    f"{mc_adv['prob_profit_pct']:.1f}%",
-                    "3.000 Simulazioni",
-                    mc_adv['prob_profit_pct'] >= 50.0,
-                    help_text="Frazione di percorsi stocastici che registrano un valore finale superiore al capitale iniziale."
-                )
+            if mc_adv:
+                # Head KPI Cards
+                mk1, mk2, mk3, mk4, mk5 = st.columns(5)
+                with mk1:
+                    metric_card(
+                        "Valore Iniziale",
+                        fmt_eur_it(mc_adv['initial_portfolio_value']),
+                        "Capitale Base",
+                        True,
+                        help_text="Valore attuale complessivo del portafoglio utilizzato come base di simulazione."
+                    )
+                with mk2:
+                    metric_card(
+                        "Mediana Attesa (1Y)",
+                        fmt_eur_it(mc_adv['expected_value_median']),
+                        f"Rendimento: {mc_adv['expected_return_median_pct']:+.2f}%",
+                        mc_adv['expected_return_median_pct'] >= 0,
+                        help_text="Valore mediano del portafoglio al termine dell'orizzonte temporale."
+                    )
+                with mk3:
+                    metric_card(
+                        "VaR 95% (Rischio)",
+                        fmt_eur_it(mc_adv['var_95_val_eur']),
+                        f"Perdita Max: -{mc_adv['var_95_pct']:.2f}%",
+                        False,
+                        help_text="Perdita massima stimata al 95% di confidenza statistica."
+                    )
+                with mk4:
+                    metric_card(
+                        "CVaR 95% (Shortfall)",
+                        fmt_eur_it(mc_adv['cvar_95_val_eur']),
+                        f"Perdita Media: -{mc_adv['cvar_95_pct']:.2f}%",
+                        False,
+                        help_text="Expected Shortfall: perdita media attesa qualora si verifichi uno shock oltre il VaR 95%."
+                    )
+                with mk5:
+                    metric_card(
+                        "Probabilità Profitto",
+                        f"{mc_adv['prob_profit_pct']:.1f}%",
+                        "3.000 Simulazioni",
+                        mc_adv['prob_profit_pct'] >= 50.0,
+                        help_text="Frazione di percorsi stocastici che registrano un valore finale superiore al capitale iniziale."
+                    )
 
-            st.divider()
+                st.divider()
 
-            # Grafico a Nastro (Ribbon & Path Generator Chart)
-            st.markdown("#### 📈 Proiezione Stocastica delle Traiettorie nel Tempo (Fan / Ribbon Chart)")
-            st.caption(f"Fascio stocastico di 3.000 traiettorie simulate su orizzonte di **{horizon_opt} giorni** ({dist_type}) con intervalli di confidenza percentili (P01 – P99).")
-            
-            t_days = mc_adv["time_axis"]
-            fig_fan = go.Figure()
+                # Grafico a Nastro (Ribbon & Path Generator Chart)
+                st.markdown("#### 📈 Proiezione Stocastica delle Traiettorie nel Tempo (Fan / Ribbon Chart)")
+                st.caption(f"Fascio stocastico di 3.000 traiettorie simulate su orizzonte di **{horizon_opt} giorni** ({dist_type}) con intervalli di confidenza percentili (P01 – P99).")
 
-            # 80 sample paths traslucidi per evidenziare il fascio esteso
-            sample_paths = mc_adv["sample_paths"]
-            for s_idx in range(sample_paths.shape[1]):
+                t_days = mc_adv["time_axis"]
+                fig_fan = go.Figure()
+
+                # 80 sample paths traslucidi per evidenziare il fascio esteso
+                sample_paths = mc_adv["sample_paths"]
+                for s_idx in range(sample_paths.shape[1]):
+                    fig_fan.add_trace(go.Scatter(
+                        x=t_days, y=sample_paths[:, s_idx],
+                        mode="lines",
+                        line=dict(color="rgba(72, 149, 239, 0.07)", width=1),
+                        showlegend=False,
+                        hoverinfo="skip"
+                    ))
+
+                # Fasce a nastro (Ribbon Fills)
                 fig_fan.add_trace(go.Scatter(
-                    x=t_days, y=sample_paths[:, s_idx],
-                    mode="lines",
-                    line=dict(color="rgba(72, 149, 239, 0.07)", width=1),
-                    showlegend=False,
-                    hoverinfo="skip"
+                    x=t_days, y=mc_adv["p99_path"], mode="lines", name="P99 (Scenario Ultra-Rialzista)",
+                    line=dict(color="rgba(0, 255, 153, 0.6)", width=1.5, dash="dot"),
+                    hovertemplate="<b>P99 (Scenario Ultra-Rialzista)</b><br>Giorno: %{x}<br>Valore: <b>€ %{y:,.2f}</b><extra></extra>"
+                ))
+                fig_fan.add_trace(go.Scatter(
+                    x=t_days, y=mc_adv["p75_path"], mode="lines", name="P75 (Scenario Positivo)",
+                    line=dict(color="rgba(0, 204, 255, 0.5)", width=1), fill="tonexty", fillcolor="rgba(0, 255, 153, 0.05)",
+                    hovertemplate="<b>P75 (Scenario Positivo)</b><br>Giorno: %{x}<br>Valore: <b>€ %{y:,.2f}</b><extra></extra>"
+                ))
+                fig_fan.add_trace(go.Scatter(
+                    x=t_days, y=mc_adv["p50_path"], mode="lines", name="P50 (Mediana Attesa)",
+                    line=dict(color="#00ff99", width=3),
+                    hovertemplate="<b>P50 (Mediana Attesa)</b><br>Giorno: %{x}<br>Valore: <b>€ %{y:,.2f}</b><extra></extra>"
+                ))
+                fig_fan.add_trace(go.Scatter(
+                    x=t_days, y=mc_adv["p25_path"], mode="lines", name="P25 (Scenario Conservativo)",
+                    line=dict(color="rgba(255, 204, 0, 0.5)", width=1), fill="tonexty", fillcolor="rgba(255, 204, 0, 0.05)",
+                    hovertemplate="<b>P25 (Scenario Conservativo)</b><br>Giorno: %{x}<br>Valore: <b>€ %{y:,.2f}</b><extra></extra>"
+                ))
+                fig_fan.add_trace(go.Scatter(
+                    x=t_days, y=mc_adv["p05_path"], mode="lines", name="P05 (VaR 95%)",
+                    line=dict(color="#ff9900", width=2, dash="dash"),
+                    hovertemplate="<b>P05 (VaR 95%)</b><br>Giorno: %{x}<br>Valore: <b>€ %{y:,.2f}</b><extra></extra>"
+                ))
+                fig_fan.add_trace(go.Scatter(
+                    x=t_days, y=mc_adv["p01_path"], mode="lines", name="P01 (Worst Case / VaR 99%)",
+                    line=dict(color="#ff3333", width=2.5, dash="dash"),
+                    hovertemplate="<b>P01 (Worst Case / VaR 99%)</b><br>Giorno: %{x}<br>Valore: <b>€ %{y:,.2f}</b><extra></extra>"
                 ))
 
-            # Fasce a nastro (Ribbon Fills)
-            fig_fan.add_trace(go.Scatter(
-                x=t_days, y=mc_adv["p99_path"], mode="lines", name="P99 (Scenario Ultra-Rialzista)",
-                line=dict(color="rgba(0, 255, 153, 0.6)", width=1.5, dash="dot"),
-                hovertemplate="<b>P99 (Scenario Ultra-Rialzista)</b><br>Giorno: %{x}<br>Valore: <b>€ %{y:,.2f}</b><extra></extra>"
-            ))
-            fig_fan.add_trace(go.Scatter(
-                x=t_days, y=mc_adv["p75_path"], mode="lines", name="P75 (Scenario Positivo)",
-                line=dict(color="rgba(0, 204, 255, 0.5)", width=1), fill="tonexty", fillcolor="rgba(0, 255, 153, 0.05)",
-                hovertemplate="<b>P75 (Scenario Positivo)</b><br>Giorno: %{x}<br>Valore: <b>€ %{y:,.2f}</b><extra></extra>"
-            ))
-            fig_fan.add_trace(go.Scatter(
-                x=t_days, y=mc_adv["p50_path"], mode="lines", name="P50 (Mediana Attesa)",
-                line=dict(color="#00ff99", width=3),
-                hovertemplate="<b>P50 (Mediana Attesa)</b><br>Giorno: %{x}<br>Valore: <b>€ %{y:,.2f}</b><extra></extra>"
-            ))
-            fig_fan.add_trace(go.Scatter(
-                x=t_days, y=mc_adv["p25_path"], mode="lines", name="P25 (Scenario Conservativo)",
-                line=dict(color="rgba(255, 204, 0, 0.5)", width=1), fill="tonexty", fillcolor="rgba(255, 204, 0, 0.05)",
-                hovertemplate="<b>P25 (Scenario Conservativo)</b><br>Giorno: %{x}<br>Valore: <b>€ %{y:,.2f}</b><extra></extra>"
-            ))
-            fig_fan.add_trace(go.Scatter(
-                x=t_days, y=mc_adv["p05_path"], mode="lines", name="P05 (VaR 95%)",
-                line=dict(color="#ff9900", width=2, dash="dash"),
-                hovertemplate="<b>P05 (VaR 95%)</b><br>Giorno: %{x}<br>Valore: <b>€ %{y:,.2f}</b><extra></extra>"
-            ))
-            fig_fan.add_trace(go.Scatter(
-                x=t_days, y=mc_adv["p01_path"], mode="lines", name="P01 (Worst Case / VaR 99%)",
-                line=dict(color="#ff3333", width=2.5, dash="dash"),
-                hovertemplate="<b>P01 (Worst Case / VaR 99%)</b><br>Giorno: %{x}<br>Valore: <b>€ %{y:,.2f}</b><extra></extra>"
-            ))
-
-            fig_fan.update_layout(
-                xaxis_title="Giorni di Contrattazione (Trading Days)",
-                yaxis_title="Valore stimato di Portafoglio (€)",
-                template="plotly_dark",
-                height=480,
-                margin=dict(t=50, b=40, l=55, r=25),
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(0,0,0,0)",
-                legend=dict(
-                    orientation="h",
-                    yanchor="bottom",
-                    y=1.02,
-                    xanchor="left",
-                    x=0.0,
-                    bgcolor="rgba(22, 27, 34, 0.85)",
-                    bordercolor="rgba(255, 255, 255, 0.12)",
-                    borderwidth=1,
-                    font=dict(size=11, color="#ffffff")
+                fig_fan.update_layout(
+                    xaxis_title="Giorni di Contrattazione (Trading Days)",
+                    yaxis_title="Valore stimato di Portafoglio (€)",
+                    template="plotly_dark",
+                    height=480,
+                    margin=dict(t=50, b=40, l=55, r=25),
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    legend=dict(
+                        orientation="h",
+                        yanchor="bottom",
+                        y=1.02,
+                        xanchor="left",
+                        x=0.0,
+                        bgcolor="rgba(22, 27, 34, 0.85)",
+                        bordercolor="rgba(255, 255, 255, 0.12)",
+                        borderwidth=1,
+                        font=dict(size=11, color="#ffffff")
+                    )
                 )
-            )
-            apply_plotly_theme(fig_fan)
-            st.plotly_chart(fig_fan, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
+                apply_plotly_theme(fig_fan)
+                st.plotly_chart(fig_fan, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
 
-            # ── RIGA 1: ISTOGRAMMA DEL VALORE FINALE & SOGLIE DI RISCHIO ───
-            st.markdown("#### 📊 Istogramma del Valore Finale & Soglie di Rischio (VaR / CVaR)")
-            st.caption("Distribuzione di frequenza empirica del capitale stimato a fine orizzonte con indicazione del capitale iniziale, della mediana attesa e dei livelli di VaR 95% e CVaR 95%.")
-            
-            final_vals = mc_adv["final_values"]
-            fig_hist_mc = go.Figure()
-            
-            fig_hist_mc.add_trace(go.Histogram(
-                x=final_vals, nbinsx=55, name="Valore Finale",
-                marker=dict(
-                    color="rgba(0, 243, 255, 0.45)",
-                    line=dict(color="#00f3ff", width=0.8)
-                ),
-                hovertemplate="<b>Capitale Finale: € %{x:,.0f}</b><br>Frequenza: %{y} simulazioni<extra></extra>"
-            ))
+                # ── RIGA 1: ISTOGRAMMA DEL VALORE FINALE & SOGLIE DI RISCHIO ───
+                st.markdown("#### 📊 Istogramma del Valore Finale & Soglie di Rischio (VaR / CVaR)")
+                st.caption("Distribuzione di frequenza empirica del capitale stimato a fine orizzonte con indicazione del capitale iniziale, della mediana attesa e dei livelli di VaR 95% e CVaR 95%.")
 
-            init_v = mc_adv["initial_portfolio_value"]
-            med_v = mc_adv["expected_value_median"]
-            var95_v = init_v - mc_adv["var_95_val_eur"]
-            cvar95_v = init_v - mc_adv["cvar_95_val_eur"]
+                final_vals = mc_adv["final_values"]
+                fig_hist_mc = go.Figure()
 
-            fig_hist_mc.add_vline(
-                x=cvar95_v, line_dash="dot", line_color="#ff3333", line_width=2,
-                annotation_text=f"<b>CVaR 95%</b>: {fmt_eur_it(cvar95_v)}", 
-                annotation_position="top left",
-                annotation=dict(bgcolor="rgba(22, 27, 34, 0.90)", bordercolor="#ff3333", borderwidth=1, borderpad=4, font=dict(color="#ff5252", size=11))
-            )
-            fig_hist_mc.add_vline(
-                x=var95_v, line_dash="dash", line_color="#ff9900", line_width=2,
-                annotation_text=f"<b>VaR 95%</b>: {fmt_eur_it(var95_v)}", 
-                annotation_position="top left",
-                annotation=dict(bgcolor="rgba(22, 27, 34, 0.90)", bordercolor="#ff9900", borderwidth=1, borderpad=4, font=dict(color="#ffab40", size=11), yshift=-35)
-            )
-            fig_hist_mc.add_vline(
-                x=init_v, line_dash="dash", line_color="#ffffff", line_width=1.8,
-                annotation_text=f"<b>Capitale Iniziale</b>: {fmt_eur_it(init_v)}", 
-                annotation_position="top right",
-                annotation=dict(bgcolor="rgba(22, 27, 34, 0.90)", bordercolor="rgba(255, 255, 255, 0.35)", borderwidth=1, borderpad=4, font=dict(color="#ffffff", size=11))
-            )
-            fig_hist_mc.add_vline(
-                x=med_v, line_dash="solid", line_color="#00ff99", line_width=2.2,
-                annotation_text=f"<b>Mediana Attesa</b>: {fmt_eur_it(med_v)}", 
-                annotation_position="top right",
-                annotation=dict(bgcolor="rgba(22, 27, 34, 0.90)", bordercolor="#00ff99", borderwidth=1, borderpad=4, font=dict(color="#00e676", size=11), yshift=-35)
-            )
+                fig_hist_mc.add_trace(go.Histogram(
+                    x=final_vals, nbinsx=55, name="Valore Finale",
+                    marker=dict(
+                        color="rgba(0, 243, 255, 0.45)",
+                        line=dict(color="#00f3ff", width=0.8)
+                    ),
+                    hovertemplate="<b>Capitale Finale: € %{x:,.0f}</b><br>Frequenza: %{y} simulazioni<extra></extra>"
+                ))
 
-            fig_hist_mc.update_layout(
-                xaxis_title="Valore Finale Stimato di Portafoglio (€)",
-                yaxis_title="Frequenza Simulazioni",
-                template="plotly_dark", height=415,
-                margin=dict(t=45, b=40, l=55, r=25),
-                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)"
-            )
-            apply_plotly_theme(fig_hist_mc)
-            st.plotly_chart(fig_hist_mc, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
+                init_v = mc_adv["initial_portfolio_value"]
+                med_v = mc_adv["expected_value_median"]
+                var95_v = init_v - mc_adv["var_95_val_eur"]
+                cvar95_v = init_v - mc_adv["cvar_95_val_eur"]
 
-            st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+                fig_hist_mc.add_vline(
+                    x=cvar95_v, line_dash="dot", line_color="#ff3333", line_width=2,
+                    annotation_text=f"<b>CVaR 95%</b>: {fmt_eur_it(cvar95_v)}", 
+                    annotation_position="top left",
+                    annotation=dict(bgcolor="rgba(22, 27, 34, 0.90)", bordercolor="#ff3333", borderwidth=1, borderpad=4, font=dict(color="#ff5252", size=11))
+                )
+                fig_hist_mc.add_vline(
+                    x=var95_v, line_dash="dash", line_color="#ff9900", line_width=2,
+                    annotation_text=f"<b>VaR 95%</b>: {fmt_eur_it(var95_v)}", 
+                    annotation_position="top left",
+                    annotation=dict(bgcolor="rgba(22, 27, 34, 0.90)", bordercolor="#ff9900", borderwidth=1, borderpad=4, font=dict(color="#ffab40", size=11), yshift=-35)
+                )
+                fig_hist_mc.add_vline(
+                    x=init_v, line_dash="dash", line_color="#ffffff", line_width=1.8,
+                    annotation_text=f"<b>Capitale Iniziale</b>: {fmt_eur_it(init_v)}", 
+                    annotation_position="top right",
+                    annotation=dict(bgcolor="rgba(22, 27, 34, 0.90)", bordercolor="rgba(255, 255, 255, 0.35)", borderwidth=1, borderpad=4, font=dict(color="#ffffff", size=11))
+                )
+                fig_hist_mc.add_vline(
+                    x=med_v, line_dash="solid", line_color="#00ff99", line_width=2.2,
+                    annotation_text=f"<b>Mediana Attesa</b>: {fmt_eur_it(med_v)}", 
+                    annotation_position="top right",
+                    annotation=dict(bgcolor="rgba(22, 27, 34, 0.90)", bordercolor="#00ff99", borderwidth=1, borderpad=4, font=dict(color="#00e676", size=11), yshift=-35)
+                )
 
-            # ── RIGA 2: MATRICE DELLE PROBABILITÀ & RISK PROFILE ───────────
-            st.caption("Valutazione quantitativa delle probabilità di successo e degli scenari di stress drawdown su 3.000 path simulati.")
-            
-            df_odds = pd.DataFrame([
-                {"Scenario Stocastico": "🟢 Probabilità di Profitto", "Probabilità / Valore": f"{mc_adv['prob_profit_pct']:.1f}%", "Condizione": "Rendimento Finale > 0%"},
-                {"Scenario Stocastico": "🚀 Target Moderato (≥ +10%)", "Probabilità / Valore": f"{mc_adv['prob_gain_10_pct']:.1f}%", "Condizione": "Guadagno Finale ≥ +10%"},
-                {"Scenario Stocastico": "🔥 Target Rialzista (≥ +20%)", "Probabilità / Valore": f"{mc_adv['prob_gain_20_pct']:.1f}%", "Condizione": "Guadagno Finale ≥ +20%"},
-                {"Scenario Stocastico": "⚠️ Rischio Ribasso (≤ -10%)", "Probabilità / Valore": f"{mc_adv['prob_loss_10_pct']:.1f}%", "Condizione": "Perdita Finale ≤ -10%"},
-                {"Scenario Stocastico": "🔴 Rischio Crollo (≤ -20%)", "Probabilità / Valore": f"{mc_adv['prob_loss_20_pct']:.1f}%", "Condizione": "Perdita Finale ≤ -20%"},
-                {"Scenario Stocastico": "📉 Max Drawdown Simulato Medio", "Probabilità / Valore": f"{mc_adv['avg_max_drawdown_pct']:.2f}%", "Condizione": "Perdita massima media registrata lungo il path"},
-                {"Scenario Stocastico": "💥 Max Drawdown Simulato Worst 1%", "Probabilità / Valore": f"{mc_adv['p99_max_drawdown_pct']:.2f}%", "Condizione": "Peggior drawdown nell'1% dei percorsi estremi"}
-            ])
+                fig_hist_mc.update_layout(
+                    xaxis_title="Valore Finale Stimato di Portafoglio (€)",
+                    yaxis_title="Frequenza Simulazioni",
+                    template="plotly_dark", height=415,
+                    margin=dict(t=45, b=40, l=55, r=25),
+                    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)"
+                )
+                apply_plotly_theme(fig_hist_mc)
+                st.plotly_chart(fig_hist_mc, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
 
-            odds_cfg = {
-                "Scenario Stocastico": st.column_config.TextColumn("Scenario Stocastico", width="medium"),
-                "Probabilità / Valore": st.column_config.TextColumn("Probabilità / Valore", width="small"),
-                "Condizione": st.column_config.TextColumn("Condizione di Verifica", width="large")
-            }
-            render_table_with_export(
-                df=df_odds,
-                table_title="Matrice delle Probabilità & Risk Profile",
-                file_prefix="monte_carlo_odds_matrix",
-                key_suffix="mq_mc_odds",
-                column_config=odds_cfg,
-                hide_index=True
-            )
+                st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
 
-        else:
-            st.info("Simulazione Monte Carlo non disponibile per gli asset selezionati.")
+                # ── RIGA 2: MATRICE DELLE PROBABILITÀ & RISK PROFILE ───────────
+                st.caption("Valutazione quantitativa delle probabilità di successo e degli scenari di stress drawdown su 3.000 path simulati.")
+
+                df_odds = pd.DataFrame([
+                    {"Scenario Stocastico": "🟢 Probabilità di Profitto", "Probabilità / Valore": f"{mc_adv['prob_profit_pct']:.1f}%", "Condizione": "Rendimento Finale > 0%"},
+                    {"Scenario Stocastico": "🚀 Target Moderato (≥ +10%)", "Probabilità / Valore": f"{mc_adv['prob_gain_10_pct']:.1f}%", "Condizione": "Guadagno Finale ≥ +10%"},
+                    {"Scenario Stocastico": "🔥 Target Rialzista (≥ +20%)", "Probabilità / Valore": f"{mc_adv['prob_gain_20_pct']:.1f}%", "Condizione": "Guadagno Finale ≥ +20%"},
+                    {"Scenario Stocastico": "⚠️ Rischio Ribasso (≤ -10%)", "Probabilità / Valore": f"{mc_adv['prob_loss_10_pct']:.1f}%", "Condizione": "Perdita Finale ≤ -10%"},
+                    {"Scenario Stocastico": "🔴 Rischio Crollo (≤ -20%)", "Probabilità / Valore": f"{mc_adv['prob_loss_20_pct']:.1f}%", "Condizione": "Perdita Finale ≤ -20%"},
+                    {"Scenario Stocastico": "📉 Max Drawdown Simulato Medio", "Probabilità / Valore": f"{mc_adv['avg_max_drawdown_pct']:.2f}%", "Condizione": "Perdita massima media registrata lungo il path"},
+                    {"Scenario Stocastico": "💥 Max Drawdown Simulato Worst 1%", "Probabilità / Valore": f"{mc_adv['p99_max_drawdown_pct']:.2f}%", "Condizione": "Peggior drawdown nell'1% dei percorsi estremi"}
+                ])
+
+                odds_cfg = {
+                    "Scenario Stocastico": st.column_config.TextColumn("Scenario Stocastico", width="medium"),
+                    "Probabilità / Valore": st.column_config.TextColumn("Probabilità / Valore", width="small"),
+                    "Condizione": st.column_config.TextColumn("Condizione di Verifica", width="large")
+                }
+                render_table_with_export(
+                    df=df_odds,
+                    table_title="Matrice delle Probabilità & Risk Profile",
+                    file_prefix="monte_carlo_odds_matrix",
+                    key_suffix="mq_mc_odds",
+                    column_config=odds_cfg,
+                    hide_index=True
+                )
+
+            else:
+                st.info("Simulazione Monte Carlo non disponibile per gli asset selezionati.")
+
+        render_interactive_monte_carlo_fragment(results)
 
         st.divider()
 
@@ -2810,14 +2820,17 @@ elif active_quant_tab == "🎲 Monte Carlo & Merton":
 
         from core.risk_engine import compute_merton_jump_diffusion_simulation
         sr_p_merton = results.get("portfolio_return", pd.Series(dtype=float)) if results else pd.Series(dtype=float)
+        horizon_merton = int(st.session_state.get("_mc_horizon_days", 252))
+        last_mc = st.session_state.get("_mc_adv_last")
+        init_merton = float(last_mc['initial_portfolio_value']) if (last_mc and 'initial_portfolio_value' in last_mc) else float(results.get("total_portfolio_value", 100000.0) if results else 100000.0)
         merton_res = compute_merton_jump_diffusion_simulation(
             sr_portfolio=sr_p_merton,
             n_sims=500,
-            time_horizon_days=horizon_opt,
+            time_horizon_days=horizon_merton,
             lambda_j=lambda_in,
             mu_j=mu_j_in,
             sigma_j=sigma_j_in,
-            initial_value=mc_adv['initial_portfolio_value'] if mc_adv else 100000.0
+            initial_value=init_merton
         )
 
         cmj1, cmj2, cmj3, cmj4 = st.columns(4)

@@ -278,46 +278,52 @@ with col_tape_ctrl:
     )
     st.markdown(tape_card_html, unsafe_allow_html=True)
 
-    # ── Fast Ladder / One-Click DOM Order Execution Panel ─────────────────────
-    with st.expander("⚡ Quick Trade DOM (One-Click Routing)", expanded=False):
-        qt_c1, qt_c2 = st.columns([1.2, 1.0])
-        with qt_c1:
-            qt_qty = st.number_input("Quantità:", min_value=1.0, value=50.0, step=10.0, key=f"qt_inp_qty_{active_tape_ticker}")
-        with qt_c2:
-            qt_algo = st.selectbox("Tipo:", ["MKT", "TWAP (15m)", "VWAP (30m)"], key=f"qt_inp_algo_{active_tape_ticker}")
-        
-        btn_b1, btn_b2, btn_b3 = st.columns(3)
-        with btn_b1:
-            if st.button("🟢 BUY", key=f"btn_qt_buy_{active_tape_ticker}", use_container_width=True):
-                otype = "TWAP" if "TWAP" in qt_algo else ("VWAP" if "VWAP" in qt_algo else "MKT")
-                ok, msg, _ = term_eng.place_order(active_tape_ticker, "BUY", qt_qty, otype, context=session_context)
-                if ok:
-                    st.success(msg)
-                else:
-                    st.error(msg)
-                st.rerun()
-        with btn_b2:
-            if st.button("🔴 SELL", key=f"btn_qt_sell_{active_tape_ticker}", use_container_width=True):
-                otype = "TWAP" if "TWAP" in qt_algo else ("VWAP" if "VWAP" in qt_algo else "MKT")
-                ok, msg, _ = term_eng.place_order(active_tape_ticker, "SELL", qt_qty, otype, context=session_context)
-                if ok:
-                    st.success(msg)
-                else:
-                    st.error(msg)
-                st.rerun()
-        with btn_b3:
-            pos_match = pos[pos["ticker"].astype(str).str.upper() == active_tape_ticker] if (not pos.empty and "ticker" in pos.columns) else pd.DataFrame()
-            curr_q = float(pos_match.iloc[0].get("qty_net", pos_match.iloc[0].get("quantity", 0.0))) if not pos_match.empty else 0.0
-            if st.button("🛑 Chiudi", key=f"btn_qt_close_{active_tape_ticker}", use_container_width=True, disabled=(curr_q <= 0), help=f"Posizione aperta: {curr_q:,.0f} quote"):
-                if curr_q > 0:
-                    ok, msg, _ = term_eng.place_order(active_tape_ticker, "SELL", curr_q, "MKT", context=session_context)
+    # ── Fast Ladder / One-Click DOM Order Execution Panel (FRAGMENT) ──────────
+    @st.fragment
+    def render_quick_trade_dom_fragment():
+        with st.expander("⚡ Quick Trade DOM (One-Click Routing)", expanded=False):
+
+            qt_c1, qt_c2 = st.columns([1.2, 1.0])
+            with qt_c1:
+                qt_qty = st.number_input("Quantità:", min_value=1.0, value=50.0, step=10.0, key=f"qt_inp_qty_{active_tape_ticker}")
+            with qt_c2:
+                qt_algo = st.selectbox("Tipo:", ["MKT", "TWAP (15m)", "VWAP (30m)"], key=f"qt_inp_algo_{active_tape_ticker}")
+
+            btn_b1, btn_b2, btn_b3 = st.columns(3)
+            with btn_b1:
+                if st.button("🟢 BUY", key=f"btn_qt_buy_{active_tape_ticker}", use_container_width=True):
+                    otype = "TWAP" if "TWAP" in qt_algo else ("VWAP" if "VWAP" in qt_algo else "MKT")
+                    ok, msg, _ = term_eng.place_order(active_tape_ticker, "BUY", qt_qty, otype, context=session_context)
                     if ok:
                         st.success(msg)
                     else:
                         st.error(msg)
                     st.rerun()
+            with btn_b2:
+                if st.button("🔴 SELL", key=f"btn_qt_sell_{active_tape_ticker}", use_container_width=True):
+                    otype = "TWAP" if "TWAP" in qt_algo else ("VWAP" if "VWAP" in qt_algo else "MKT")
+                    ok, msg, _ = term_eng.place_order(active_tape_ticker, "SELL", qt_qty, otype, context=session_context)
+                    if ok:
+                        st.success(msg)
+                    else:
+                        st.error(msg)
+                    st.rerun()
+            with btn_b3:
+                pos_match = pos[pos["ticker"].astype(str).str.upper() == active_tape_ticker] if (not pos.empty and "ticker" in pos.columns) else pd.DataFrame()
+                curr_q = float(pos_match.iloc[0].get("qty_net", pos_match.iloc[0].get("quantity", 0.0))) if not pos_match.empty else 0.0
+                if st.button("🛑 Chiudi", key=f"btn_qt_close_{active_tape_ticker}", use_container_width=True, disabled=(curr_q <= 0), help=f"Posizione aperta: {curr_q:,.0f} quote"):
+                    if curr_q > 0:
+                        ok, msg, _ = term_eng.place_order(active_tape_ticker, "SELL", curr_q, "MKT", context=session_context)
+                        if ok:
+                            st.success(msg)
+                        else:
+                            st.error(msg)
+                        st.rerun()
+
+    render_quick_trade_dom_fragment()
 
 with col_tape_book:
+
     # Matrice Level-2 Depth Book dinamica attorno al prezzo reale
     spread_step = max(0.01, round(display_px * 0.0001, 2))
     base_bid = round(display_px - spread_step, 2)
@@ -529,17 +535,24 @@ tot_px_eff = pnl_attrib.get("price_effect_eur", 0.0)
 tot_fx_eff = pnl_attrib.get("fx_effect_eur", 0.0)
 attrib_map = {r["ticker"]: r for r in pnl_attrib.get("by_asset", [])}
 
-tab_port_live, tab_heatmap_live, tab_rel_perf, tab_news_cat, tab_wl_live = st.tabs([
+live_terminal_subtabs = [
     "💼 Prezzi Live & PnL Attribution",
     "🗺️ Heatmap Portafoglio 1D",
     "📈 Relative Performance (Base 0%)",
     "📰 Live News & Macro Catalysts",
     "🌐 Watchlist Istituzionale"
-])
+]
+sel_live_tab = st.segmented_control(
+    "Desk Terminal View",
+    options=live_terminal_subtabs,
+    default=live_terminal_subtabs[0],
+    key="sel_subtab_live_terminal_p2",
+    label_visibility="collapsed",
+) or live_terminal_subtabs[0]
 
 port_live_raw_items = []
 
-with tab_port_live:
+if sel_live_tab == "💼 Prezzi Live & PnL Attribution":
     if active_pos.empty or "ticker" not in active_pos.columns:
         st.info("Nessuna posizione attiva aperta a mercato. Carica un portafoglio o una distinta transazioni per visualizzare i prezzi live.")
     else:
@@ -711,7 +724,7 @@ with tab_port_live:
             }
         )
 
-with tab_heatmap_live:
+elif sel_live_tab == "🗺️ Heatmap Portafoglio 1D":
     if not port_live_raw_items:
         st.info("Nessuna posizione attiva disponibile per generare la Heatmap.")
     else:
@@ -772,7 +785,7 @@ with tab_heatmap_live:
         apply_chart_theme(fig_heat, portal_mode="risk")
         st.plotly_chart(fig_heat, use_container_width=True, config={"displayModeBar": False})
 
-with tab_rel_perf:
+elif sel_live_tab == "📈 Relative Performance (Base 0%)":
     st.caption("Confronto dinamico dei rendimenti percentuali intraday normalizzati a base 0.00% rispetto ai principali benchmark globali.")
     port_day_ret_p = (tot_day_pnl / tot_prev_day_notional * 100.0) if ('tot_prev_day_notional' in locals() and tot_prev_day_notional > 0) else 0.0
     
@@ -924,7 +937,7 @@ with tab_rel_perf:
         }
     )
 
-with tab_news_cat:
+elif sel_live_tab == "📰 Live News & Macro Catalysts":
     st.caption("Catalyst di mercato, earnings countdown ed eventi macroeconomici ad alto impatto monitorati dal desk.")
     cats_data = fetch_market_catalysts(pos_tickers if pos_tickers else ["AAPL", "NVDA", "MSFT", "TSLA"])
     df_cats = pd.DataFrame(cats_data)
@@ -943,7 +956,7 @@ with tab_news_cat:
         }
     )
 
-with tab_wl_live:
+elif sel_live_tab == "🌐 Watchlist Istituzionale":
     col_wl_add, col_wl_info = st.columns([1.5, 2.5], vertical_alignment="bottom")
     with col_wl_add:
         col_in_tk, col_bt_tk = st.columns([2.0, 1.0])
@@ -1022,95 +1035,99 @@ with tab_wl_live:
 
 st.divider()
 
-# ── SEZIONE 3: INTERACTIVE BLOOMBERG CLI (FULL-WIDTH ROW) ────────────────────
-st.markdown("#### ⌨️ Console Interattiva Bloomberg CLI")
+@st.fragment
+def render_bloomberg_cli_console_fragment():
+    # ── SEZIONE 3: INTERACTIVE BLOOMBERG CLI (FULL-WIDTH ROW) ────────────────────
+    st.markdown("#### ⌨️ Console Interattiva Bloomberg CLI")
 
-port_name_display = st.session_state.get("portfolio_name", "Master Wealth") or "Master Wealth"
-n_pos_count = len(active_pos) if isinstance(active_pos, pd.DataFrame) and not active_pos.empty else 0
-pos_badge_color = "#3fb950" if n_pos_count > 0 else "#ff9900"
-pos_badge_text = "🟢 CONNESSO AL PORTAFOGLIO" if n_pos_count > 0 else "🟡 MODALITÀ SANDBOX"
+    port_name_display = st.session_state.get("portfolio_name", "Master Wealth") or "Master Wealth"
+    n_pos_count = len(active_pos) if isinstance(active_pos, pd.DataFrame) and not active_pos.empty else 0
+    pos_badge_color = "#3fb950" if n_pos_count > 0 else "#ff9900"
+    pos_badge_text = "🟢 CONNESSO AL PORTAFOGLIO" if n_pos_count > 0 else "🟡 MODALITÀ SANDBOX"
 
-st.markdown(f"""
-<div style="background: rgba(13,17,23,0.95); border: 1px solid #30363d; border-left: 4px solid {pos_badge_color}; border-radius: 6px; padding: 8px 14px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 12px; font-family: monospace;">
-    <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 8px;">
-        <span>💼 <b>CONSOLE PORTFOLIO CONTEXT:</b></span>
-        <span style="color:#58a6ff; font-weight:700;">{port_name_display}</span>
-        <span style="color:#8b949e;">&bull;</span>
-        <span style="color:#c9d1d9;"><b>{n_pos_count}</b> Titoli Attivi</span>
-        <span style="color:#8b949e;">&bull;</span>
-        <span style="color:#3fb950; font-weight:700;">Valore: € {tot_port_val:,.2f}</span>
+    st.markdown(f"""
+    <div style="background: rgba(13,17,23,0.95); border: 1px solid #30363d; border-left: 4px solid {pos_badge_color}; border-radius: 6px; padding: 8px 14px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 12px; font-family: monospace;">
+        <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 8px;">
+            <span>💼 <b>CONSOLE PORTFOLIO CONTEXT:</b></span>
+            <span style="color:#58a6ff; font-weight:700;">{port_name_display}</span>
+            <span style="color:#8b949e;">&bull;</span>
+            <span style="color:#c9d1d9;"><b>{n_pos_count}</b> Titoli Attivi</span>
+            <span style="color:#8b949e;">&bull;</span>
+            <span style="color:#3fb950; font-weight:700;">Valore: € {tot_port_val:,.2f}</span>
+        </div>
+        <div style="color:{pos_badge_color}; font-weight:700; background:rgba(255,255,255,0.05); padding:3px 10px; border-radius:12px; font-size:11px; white-space:nowrap; border:1px solid rgba(255,255,255,0.08);">
+            {pos_badge_text}
+        </div>
     </div>
-    <div style="color:{pos_badge_color}; font-weight:700; background:rgba(255,255,255,0.05); padding:3px 10px; border-radius:12px; font-size:11px; white-space:nowrap; border:1px solid rgba(255,255,255,0.08);">
-        {pos_badge_text}
-    </div>
-</div>
-""", unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
-# Chip di scelta rapida con ticker di portafoglio dinamico
-top_ticker_chip = top_w_sym if (top_w_sym and top_w_sym != "N/A") else "AAPL"
-st.caption("Comandi Rapidi:")
-chips_cols = st.columns(8)
-quick_cmds = ["PORT LIVE", "PORT RISK", f"NEWS {top_ticker_chip}", f"{top_ticker_chip} DES", "SHOCK -5%", "CORR MATRIX", "VAR 95", "REBAL"]
-for idx, qc in enumerate(quick_cmds):
-    with chips_cols[idx]:
-        if st.button(qc, key=f"btn_chip_p2_{idx}", use_container_width=True):
-            cmd_res = term_eng.execute_command(qc, session_context)
+    # Chip di scelta rapida con ticker di portafoglio dinamico
+    top_ticker_chip = top_w_sym if (top_w_sym and top_w_sym != "N/A") else "AAPL"
+    st.caption("Comandi Rapidi:")
+    chips_cols = st.columns(8)
+    quick_cmds = ["PORT LIVE", "PORT RISK", f"NEWS {top_ticker_chip}", f"{top_ticker_chip} DES", "SHOCK -5%", "CORR MATRIX", "VAR 95", "REBAL"]
+    for idx, qc in enumerate(quick_cmds):
+        with chips_cols[idx]:
+            if st.button(qc, key=f"btn_chip_p2_{idx}", use_container_width=True):
+                cmd_res = term_eng.execute_command(qc, session_context)
+                term_eng.output_buffer.insert(0, cmd_res)
+                st.rerun()
+
+    st.markdown("<div style='margin-top: 4px;'></div>", unsafe_allow_html=True)
+
+    # Form interattivo con supporto a pressione tasto INVIO (Enter Key) e submit immediato
+    with st.form(key="term_cli_interactive_form_page2", clear_on_submit=True):
+        col_inp, col_run = st.columns([5.5, 0.8])
+        with col_inp:
+            cmd_input = st.text_input(
+                "Command Prompt",
+                placeholder=f"ARGUS:LIVE [{port_name_display}]> Digita comando per {port_name_display} (es. 'PORT LIVE', 'PORT RISK', 'SHOCK -5%', '{top_ticker_chip} DES', 'CLOSE {top_ticker_chip}', 'VAR 95')...",
+                key="term_cli_input_box_page2",
+                label_visibility="collapsed"
+            )
+        with col_run:
+            btn_run_cmd = st.form_submit_button("▶ Esegui", type="primary", use_container_width=True)
+
+        if btn_run_cmd and cmd_input.strip():
+            cmd_res = term_eng.execute_command(cmd_input.strip(), session_context)
             term_eng.output_buffer.insert(0, cmd_res)
             st.rerun()
 
-st.markdown("<div style='margin-top: 4px;'></div>", unsafe_allow_html=True)
-
-# Form interattivo con supporto a pressione tasto INVIO (Enter Key) e submit immediato
-with st.form(key="term_cli_interactive_form_page2", clear_on_submit=True):
-    col_inp, col_run = st.columns([5.5, 0.8])
-    with col_inp:
-        cmd_input = st.text_input(
-            "Command Prompt",
-            placeholder=f"ARGUS:LIVE [{port_name_display}]> Digita comando per {port_name_display} (es. 'PORT LIVE', 'PORT RISK', 'SHOCK -5%', '{top_ticker_chip} DES', 'CLOSE {top_ticker_chip}', 'VAR 95')...",
-            key="term_cli_input_box_page2",
-            label_visibility="collapsed"
+    # Buffer di Output Terminale a tutta larghezza (Stile JetBrains Mono Dark Screen)
+    terminal_screen_lines = []
+    for item in term_eng.output_buffer[:12]:
+        status_color = "#3fb950" if item.status == "SUCCESS" else ("#f85149" if item.status == "ERROR" else "#ff9900")
+        esc_cmd = html.escape(str(item.command))
+        esc_out = html.escape(str(item.output_text)).replace("\n", "<br>")
+        terminal_screen_lines.append(
+            f"<div style='margin-bottom: 16px;'>"
+            f"<div style='margin-bottom: 6px; font-family: monospace; font-size: 12px;'>"
+            f"<span style='color:#8b949e;'>[{item.timestamp.strftime('%H:%M:%S')}]</span> "
+            f"<span style='color:{status_color}; font-weight:700;'>ARGUS:LIVE [{port_name_display}]&gt;</span> "
+            f"<span style='color:#e6edf3; font-weight:600;'>{esc_cmd}</span>"
+            f"</div>"
+            f"<div style=\"font-family: 'Consolas', 'JetBrains Mono', 'Fira Code', 'Courier New', monospace; font-size: 11.5px; color: #c9d1d9; white-space: pre; overflow-x: auto; line-height: 1.4; padding-left: 2px;\">{esc_out}</div>"
+            f"<div style='border-bottom: 1px dashed rgba(255,255,255,0.08); margin-top: 12px;'></div>"
+            f"</div>"
         )
-    with col_run:
-        btn_run_cmd = st.form_submit_button("▶ Esegui", type="primary", use_container_width=True)
 
-    if btn_run_cmd and cmd_input.strip():
-        cmd_res = term_eng.execute_command(cmd_input.strip(), session_context)
-        term_eng.output_buffer.insert(0, cmd_res)
-        st.rerun()
+    terminal_screen_html = "".join(terminal_screen_lines)
 
-# Buffer di Output Terminale a tutta larghezza (Stile JetBrains Mono Dark Screen)
-terminal_screen_lines = []
-for item in term_eng.output_buffer[:12]:
-    status_color = "#3fb950" if item.status == "SUCCESS" else ("#f85149" if item.status == "ERROR" else "#ff9900")
-    esc_cmd = html.escape(str(item.command))
-    esc_out = html.escape(str(item.output_text)).replace("\n", "<br>")
-    terminal_screen_lines.append(
-        f"<div style='margin-bottom: 16px;'>"
-        f"<div style='margin-bottom: 6px; font-family: monospace; font-size: 12px;'>"
-        f"<span style='color:#8b949e;'>[{item.timestamp.strftime('%H:%M:%S')}]</span> "
-        f"<span style='color:{status_color}; font-weight:700;'>ARGUS:LIVE [{port_name_display}]&gt;</span> "
-        f"<span style='color:#e6edf3; font-weight:600;'>{esc_cmd}</span>"
-        f"</div>"
-        f"<div style=\"font-family: 'Consolas', 'JetBrains Mono', 'Fira Code', 'Courier New', monospace; font-size: 11.5px; color: #c9d1d9; white-space: pre; overflow-x: auto; line-height: 1.4; padding-left: 2px;\">{esc_out}</div>"
-        f"<div style='border-bottom: 1px dashed rgba(255,255,255,0.08); margin-top: 12px;'></div>"
-        f"</div>"
+    terminal_box_html = (
+        f'<div style="background: #090d13; border: 1.5px solid #30363d; border-radius: 8px; padding: 14px 18px; font-family: \'Consolas\', \'JetBrains Mono\', \'Fira Code\', \'Courier New\', monospace; height: 420px; overflow-y: auto; overflow-x: auto; box-shadow: inset 0 2px 12px rgba(0,0,0,0.85);">'
+        f'{terminal_screen_html}'
+        f'</div>'
     )
+    st.markdown(terminal_box_html, unsafe_allow_html=True)
 
-terminal_screen_html = "".join(terminal_screen_lines)
+    col_cls1, col_cls2 = st.columns([1.2, 5.0])
+    with col_cls1:
+        if st.button("🧹 Pulisci Schermo", key="btn_term_clear_buf_page2", use_container_width=True):
+            term_eng.output_buffer.clear()
+            st.rerun()
 
-terminal_box_html = (
-    f'<div style="background: #090d13; border: 1.5px solid #30363d; border-radius: 8px; padding: 14px 18px; font-family: \'Consolas\', \'JetBrains Mono\', \'Fira Code\', \'Courier New\', monospace; height: 420px; overflow-y: auto; overflow-x: auto; box-shadow: inset 0 2px 12px rgba(0,0,0,0.85);">'
-    f'{terminal_screen_html}'
-    f'</div>'
-)
-st.markdown(terminal_box_html, unsafe_allow_html=True)
 
-col_cls1, col_cls2 = st.columns([1.2, 5.0])
-with col_cls1:
-    if st.button("🧹 Pulisci Schermo", key="btn_term_clear_buf_page2", use_container_width=True):
-        term_eng.output_buffer.clear()
-        st.rerun()
-
+render_bloomberg_cli_console_fragment()
 st.divider()
 
 # ── SEZIONE 4: LIVE OMS / EMSX EXECUTION BLOTTER & FIX 4.4 ROUTER ─────────────

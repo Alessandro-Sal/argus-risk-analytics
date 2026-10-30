@@ -1062,14 +1062,21 @@ if active_cr_tab == "📥 Data Pipeline & Ingestion":
 # TAB 2: GESTIONE CONTI, PORTAFOGLI RISK & CATEGORIE
 # =============================================================
 elif active_cr_tab == "⚙️ Gestione Conti & Categorie":
-    subtab_accs, tab_risk_sub, subtab_cats = st.tabs([
+    cr_subtabs = [
         "🏦 Anagrafica Conti Bancari",
         "🔗 Portafogli Risk Analytics",
-        "🏷️ Categorie & Regola 50/30/20"
-    ])
+        "🏷️ Categorie & Regola 50/30/20",
+    ]
+    sel_cr_subtab = st.segmented_control(
+        "Sezione Gestione Conti",
+        options=cr_subtabs,
+        default=cr_subtabs[0],
+        key="sel_subtab_cr_p12",
+        label_visibility="collapsed",
+    ) or cr_subtabs[0]
 
-    # ── SUBTAB A: ANAGRAFICA CONTI ──────────────────────────
-    with subtab_accs:
+    # ── SUBTAB A: ANAGRAFICA CONTI (LAZY) ───────────────────
+    if sel_cr_subtab == "🏦 Anagrafica Conti Bancari":
         tab_acc_c1, tab_acc_c2 = st.columns([3, 1.2])
         with tab_acc_c1:
             st.markdown(f"##### 🏦 Conti Bancari del Profilo '{profile_map.get(current_pid, 'Principale')}'")
@@ -1165,7 +1172,7 @@ elif active_cr_tab == "⚙️ Gestione Conti & Categorie":
             st.info("Nessun conto bancario censito in questo profilo.")
 
     # ── SUBTAB B: PORTAFOGLI RISK ANALYTICS ─────────────────
-    with tab_risk_sub:
+    elif sel_cr_subtab == "🔗 Portafogli Risk Analytics":
         st.markdown(f"##### 🔗 Portafogli Risk Analytics Collegati al Profilo '{profile_map.get(current_pid, 'Principale')}'")
         st.caption("Collega uno o più portafogli titoli, ETF o crypto del modulo Risk per sommare il loro controvalore agli investimenti finanziari del Net Worth.")
 
@@ -1254,7 +1261,7 @@ elif active_cr_tab == "⚙️ Gestione Conti & Categorie":
                     )
 
     # ── SUBTAB C: CATEGORIE 50/30/20 ─────────────────────────
-    with subtab_cats:
+    elif sel_cr_subtab == "🏷️ Categorie & Regola 50/30/20":
         st.markdown("##### 🏷️ Categorie Standard & Regola 50/30/20")
         st.caption("Tutte le spese ed entrate sono mappate semanticamente secondo il framework di pianificazione finanziaria istituzionale:")
 

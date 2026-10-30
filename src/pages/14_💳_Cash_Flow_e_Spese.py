@@ -1153,79 +1153,85 @@ elif active_cf_tab == "🔁 Abbonamenti & Costi Fissi":
 
 # ── 6. OTTIMIZZAZIONE PAC & WHAT-IF ─────────────────────────
 elif active_cf_tab == "🔄 Ottimizzazione PAC & What-If":
-    st.markdown("### 🔄 Simulatore di Conversione: Spese Superflue ➔ PAC Azionario")
-    st.caption("Simulatore 'What-If': Calcola la crescita esponenziale del patrimonio se tagli una quota di desideri/lifestyle e la investi a lungo termine.")
-    
-    # Calcola la base mensilizzata delle spese discrezionali (Wants)
-    n_m_cf = 1
-    if "tx_date" in df_cf_filtered.columns and not df_cf_filtered.empty:
-        df_cf_filtered_dt = pd.to_datetime(df_cf_filtered["tx_date"])
-        n_m_cf = max(1, df_cf_filtered_dt.dt.strftime("%Y-%m").nunique())
-    
-    r_wants_tot = cf_analytics.get("rule_50_30_20", {}).get("wants_amount", 500.0)
-    r_wants_monthly = max(50.0, r_wants_tot / n_m_cf)
-    
-    w_col1, w_col2, w_col3 = st.columns(3)
-    with w_col1:
-        cut_pct = st.slider(
-            f"Taglio Spese Discrezionali (Wants ~{fmt_eur(r_wants_monthly)}/m) %:",
-            min_value=5, max_value=60, value=20, step=5, format="%d%%"
-        )
-    with w_col2:
-        ret_rate = st.slider("Rendimento Annuo Stimato PAC / ETF %:", min_value=3.0, max_value=12.0, value=7.0, step=0.5, format="%.1f%%")
-    with w_col3:
-        sim_years = st.slider("Orizzonte di Accumulo (Anni):", min_value=5, max_value=35, value=25, step=5, format="%d Anni")
+    @st.fragment
+    def render_whatif_pac_simulator_fragment(df_cf_filtered: pd.DataFrame, cf_analytics: dict):
+            st.markdown("### 🔄 Simulatore di Conversione: Spese Superflue ➔ PAC Azionario")
+            st.caption("Simulatore 'What-If': Calcola la crescita esponenziale del patrimonio se tagli una quota di desideri/lifestyle e la investi a lungo termine.")
 
-    monthly_boost = max(10.0, round(r_wants_monthly * (cut_pct / 100.0), 2))
-    sim_res = compute_cashflow_whatif_reinvestment(monthly_boost, annual_return_rate=ret_rate/100.0, max_years=sim_years)
+            # Calcola la base mensilizzata delle spese discrezionali (Wants)
+            n_m_cf = 1
+            if "tx_date" in df_cf_filtered.columns and not df_cf_filtered.empty:
+                df_cf_filtered_dt = pd.to_datetime(df_cf_filtered["tx_date"])
+                n_m_cf = max(1, df_cf_filtered_dt.dt.strftime("%Y-%m").nunique())
 
-    wk1, wk2, wk3, wk4 = st.columns(4)
-    with wk1:
-        metric_card("Risparmio Extra / Mese", fmt_eur(monthly_boost), delta=f"-{cut_pct}% su Svago & Lifestyle", delta_color="normal")
-    with wk2:
-        metric_card("Patrimonio a 10 Anni", fmt_eur(sim_res["val_10y"]), delta=f"Rendimento {ret_rate:.1f}% annuo", delta_color="normal")
-    with wk3:
-        metric_card("Patrimonio a 20 Anni", fmt_eur(sim_res["val_20y"]), delta="Effetto Interesse Composto", delta_color="normal")
-    with wk4:
-        metric_card(f"Patrimonio a {sim_years} Anni", fmt_eur(sim_res.get(f"val_{sim_years}y", sim_res["timeline"]["patrimonio_totale"].iloc[-1])), delta="Capitale Accumulato Finale", delta_color="normal")
+            r_wants_tot = cf_analytics.get("rule_50_30_20", {}).get("wants_amount", 500.0)
+            r_wants_monthly = max(50.0, r_wants_tot / n_m_cf)
 
-    st.write("")
-    df_wt = sim_res["timeline"]
-    fig_w = go.Figure()
-    fig_w.add_trace(go.Scatter(
-        x=df_wt["anno"],
-        y=df_wt["capitale_versato"],
-        mode="lines",
-        name="Capitale Versato (Effort Diretto)",
-        line=dict(color="#38bdf8", width=2),
-        fill="tozeroy",
-        fillcolor="rgba(56, 189, 248, 0.15)",
-        hovertemplate="<b>Anno %{x}</b><br>Versato: <b>€ %{y:,.2f}</b><extra></extra>"
-    ))
-    fig_w.add_trace(go.Scatter(
-        x=df_wt["anno"],
-        y=df_wt["patrimonio_totale"],
-        mode="lines+markers",
-        name="Patrimonio Totale (+ Interessi Composti)",
-        line=dict(color="#10b981", width=3),
-        fill="tonexty",
-        fillcolor="rgba(16, 185, 129, 0.20)",
-        hovertemplate="<b>Anno %{x}</b><br>Totale: <b>€ %{y:,.2f}</b><extra></extra>"
-    ))
-    fig_w.update_layout(
-        title=dict(text=f"Proiezione di Crescita Patrimoniale con PAC di {fmt_eur(monthly_boost)}/mese al {ret_rate:.1f}% annuo", font=dict(size=14, color="#ffffff")),
-        template="plotly_dark",
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        height=330,
-        margin=dict(l=10, r=10, t=50, b=20),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-    )
-    apply_chart_theme(fig_w, portal_mode="wealth")
-    st.plotly_chart(fig_w, use_container_width=True, config={'displayModeBar': False})
+            w_col1, w_col2, w_col3 = st.columns(3)
+            with w_col1:
+                cut_pct = st.slider(
+                    f"Taglio Spese Discrezionali (Wants ~{fmt_eur(r_wants_monthly)}/m) %:",
+                    min_value=5, max_value=60, value=20, step=5, format="%d%%"
+                )
+            with w_col2:
+                ret_rate = st.slider("Rendimento Annuo Stimato PAC / ETF %:", min_value=3.0, max_value=12.0, value=7.0, step=0.5, format="%.1f%%")
+            with w_col3:
+                sim_years = st.slider("Orizzonte di Accumulo (Anni):", min_value=5, max_value=35, value=25, step=5, format="%d Anni")
+
+            monthly_boost = max(10.0, round(r_wants_monthly * (cut_pct / 100.0), 2))
+            sim_res = compute_cashflow_whatif_reinvestment(monthly_boost, annual_return_rate=ret_rate/100.0, max_years=sim_years)
+
+            wk1, wk2, wk3, wk4 = st.columns(4)
+            with wk1:
+                metric_card("Risparmio Extra / Mese", fmt_eur(monthly_boost), delta=f"-{cut_pct}% su Svago & Lifestyle", delta_color="normal")
+            with wk2:
+                metric_card("Patrimonio a 10 Anni", fmt_eur(sim_res["val_10y"]), delta=f"Rendimento {ret_rate:.1f}% annuo", delta_color="normal")
+            with wk3:
+                metric_card("Patrimonio a 20 Anni", fmt_eur(sim_res["val_20y"]), delta="Effetto Interesse Composto", delta_color="normal")
+            with wk4:
+                metric_card(f"Patrimonio a {sim_years} Anni", fmt_eur(sim_res.get(f"val_{sim_years}y", sim_res["timeline"]["patrimonio_totale"].iloc[-1])), delta="Capitale Accumulato Finale", delta_color="normal")
+
+            st.write("")
+            df_wt = sim_res["timeline"]
+            fig_w = go.Figure()
+            fig_w.add_trace(go.Scatter(
+                x=df_wt["anno"],
+                y=df_wt["capitale_versato"],
+                mode="lines",
+                name="Capitale Versato (Effort Diretto)",
+                line=dict(color="#38bdf8", width=2),
+                fill="tozeroy",
+                fillcolor="rgba(56, 189, 248, 0.15)",
+                hovertemplate="<b>Anno %{x}</b><br>Versato: <b>€ %{y:,.2f}</b><extra></extra>"
+            ))
+            fig_w.add_trace(go.Scatter(
+                x=df_wt["anno"],
+                y=df_wt["patrimonio_totale"],
+                mode="lines+markers",
+                name="Patrimonio Totale (+ Interessi Composti)",
+                line=dict(color="#10b981", width=3),
+                fill="tonexty",
+                fillcolor="rgba(16, 185, 129, 0.20)",
+                hovertemplate="<b>Anno %{x}</b><br>Totale: <b>€ %{y:,.2f}</b><extra></extra>"
+            ))
+            fig_w.update_layout(
+                title=dict(text=f"Proiezione di Crescita Patrimoniale con PAC di {fmt_eur(monthly_boost)}/mese al {ret_rate:.1f}% annuo", font=dict(size=14, color="#ffffff")),
+                template="plotly_dark",
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                height=330,
+                margin=dict(l=10, r=10, t=50, b=20),
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+            )
+            apply_chart_theme(fig_w, portal_mode="wealth")
+            st.plotly_chart(fig_w, use_container_width=True, config={'displayModeBar': False})
 
 
-# ── 7. PREVISIONE CASSA & ANOMALIE ──────────────────────────
+        # ── 7. PREVISIONE CASSA & ANOMALIE ──────────────────────────
+
+
+    render_whatif_pac_simulator_fragment(df_cf_filtered, cf_analytics)
+
 elif active_cf_tab == "🔮 Previsione Cassa & Anomalie":
     st.markdown("### 🔮 Previsione Cassa Rolling & Rilevamento Anomalie Z-Score")
     st.caption("Proiezione probabilistica della liquidità a 3 e 6 mesi e identificazione automatica di spike o uscite straordinarie.")

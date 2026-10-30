@@ -39,6 +39,8 @@ SYSTEM_PERSISTENT_KEYS: Set[str] = {
     "splash_completed",
     "sidebar_expanded",
     "theme",
+    "ui_theme",
+    "_argus_css_injected_theme",
     "argus_portal_mode",
     "_app_initialized",
     "session_cleared",
