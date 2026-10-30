@@ -1994,33 +1994,36 @@ def render_sidebar():
 
         # 3-Mode Switcher: Institutional Trading & Risk vs Wealth & FO vs Unified View
         mode_options = [
-            "📊 Institutional Trading & Risk",
-            "🏛️ Wealth & Family Office",
-            "🌐 Unified View",
+            ("📊 Institutional Trading & Risk", "risk"),
+            ("🏛️ Wealth & Family Office", "wealth"),
+            ("🌐 Unified View", "unified"),
         ]
         curr_active_mode = st.session_state.get("argus_portal_mode") or "📊 Institutional Trading & Risk"
-        if curr_active_mode not in mode_options:
+        if curr_active_mode not in [m[0] for m in mode_options]:
             curr_active_mode = "🏛️ Wealth & Family Office" if in_wealth_page else "📊 Institutional Trading & Risk"
 
-        sel_portal_mode = st.segmented_control(
-            "Ambiente di Lavoro",
-            options=mode_options,
-            default=curr_active_mode,
-            key="sb_segmented_portal_mode_v10",
-            label_visibility="collapsed",
-        ) or curr_active_mode
+        for label, m_key in mode_options:
+            is_active = (curr_active_mode == label)
+            btn_prefix = "● " if is_active else "  "
+            btn_type = "primary" if is_active else "secondary"
+            if st.button(
+                f"{btn_prefix}{label}",
+                key=f"sb_portal_mode_btn_{m_key}",
+                use_container_width=True,
+                type=btn_type,
+            ):
+                if label != st.session_state.get("argus_portal_mode"):
+                    st.session_state.argus_portal_mode = label
+                    if m_key == "wealth" and not in_wealth_page:
+                        if not st.session_state.get("wealth_active_portfolio_id"):
+                            auth_pid = st.session_state.get("argus_auth_personal_profile_id")
+                            st.session_state["wealth_active_portfolio_id"] = auth_pid or 1
+                        switch_to_page("pages/12_🎛️_Wealth_Control_Room.py")
+                    elif m_key == "risk" and in_wealth_page:
+                        switch_to_page("0_Control_Room.py")
+                    st.rerun()
 
-        if sel_portal_mode != st.session_state.get("argus_portal_mode"):
-            st.session_state.argus_portal_mode = sel_portal_mode
-            if sel_portal_mode == "🏛️ Wealth & Family Office" and not in_wealth_page:
-                if not st.session_state.get("wealth_active_portfolio_id"):
-                    auth_pid = st.session_state.get("argus_auth_personal_profile_id")
-                    st.session_state["wealth_active_portfolio_id"] = auth_pid or 1
-                switch_to_page("pages/12_🎛️_Wealth_Control_Room.py")
-            elif sel_portal_mode == "📊 Institutional Trading & Risk" and in_wealth_page:
-                switch_to_page("0_Control_Room.py")
-            st.rerun()
-
+        sel_portal_mode = curr_active_mode
         is_wealth_mode = (sel_portal_mode == "🏛️ Wealth & Family Office") or (in_wealth_page and sel_portal_mode != "📊 Institutional Trading & Risk")
         is_unified_mode = (sel_portal_mode == "🌐 Unified View")
 
