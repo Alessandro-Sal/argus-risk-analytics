@@ -1531,20 +1531,7 @@ def render_sidebar():
             unsafe_allow_html=True,
         )
 
-        # ── INSTITUTIONAL STATUS BADGES (PROFILE • SANDBOX • CLOUD) ────
-        from components.ui_core.kpi_cards import render_state_badge
-        is_sb = bool(st.session_state.get("is_sandbox", False) or st.session_state.get("is_demo_mode", False))
-        is_off = bool(st.session_state.get("offline_mode", False))
-        has_cloud = bool(st.session_state.get("supabase_client_connected", False) or (os.getenv("SUPABASE_URL") and not is_off))
-
-        b_c1, b_c2 = st.columns(2)
-        with b_c1:
-            render_state_badge(mode="sandbox" if is_sb else "real")
-        with b_c2:
-            render_state_badge(mode="cloud" if has_cloud else "offline")
-
-        st.markdown("<div style='margin-bottom: 6px;'></div>", unsafe_allow_html=True)
-
+        st.markdown("<div style='margin-bottom: 4px;'></div>", unsafe_allow_html=True)
         # ── 0. UNIVERSAL COMMAND PALETTE (CTRL+K) HOTKEY & QUICK FIND ──
         try:
             from components.command_palette import inject_command_palette_support

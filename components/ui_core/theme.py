@@ -61,14 +61,15 @@ def inject_custom_css(force: bool = False) -> None:
     theme = st.session_state.get("ui_theme", "Midnight Obsidian") if hasattr(st, "session_state") else "Midnight Obsidian"
 
     # Anti-duplicazione nel MEDESIMO run di esecuzione (senza bloccare i rerun successivi)
+    # Streamlit resetta ctx.cursors = {} all'inizio di ogni singolo run/rerun in ScriptRunContext.reset()
     try:
         from streamlit.runtime.scriptrunner import get_script_run_ctx
 
         ctx = get_script_run_ctx()
-        if ctx is not None:
-            if not force and getattr(ctx, "_argus_css_injected_in_run", False):
+        if ctx is not None and hasattr(ctx, "cursors") and isinstance(ctx.cursors, dict):
+            if not force and ctx.cursors.get("_argus_css_injected_in_run", False):
                 return
-            ctx._argus_css_injected_in_run = True
+            ctx.cursors["_argus_css_injected_in_run"] = True
     except Exception:
         pass
 

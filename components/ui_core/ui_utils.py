@@ -328,7 +328,7 @@ def render_command_bar():
 
     with st.container(key="argus_top_command_bar_container"):
         col_title, col_actions = st.columns(
-            [1.5, 3.5],
+            [1.2, 3.8],
             vertical_alignment="center",
         )
         with col_title:
@@ -350,7 +350,7 @@ def render_command_bar():
 
         with col_actions:
             c_pills, c_dens, c_spot, c_bell = st.columns(
-                [2.0, 1.0, 0.9, 0.9],
+                [2.4, 0.9, 0.8, 0.8],
                 vertical_alignment="center",
             )
             with c_pills:
@@ -7422,7 +7422,7 @@ def render_wealth_command_bar(engine, current_pid: int, prof_name: str, key_suff
 
     with st.container(key=f"argus_wealth_command_bar_container_{key_suffix}"):
         col_title, col_actions = st.columns(
-            [1.5, 3.5],
+            [1.2, 3.8],
             vertical_alignment="center",
         )
         with col_title:
@@ -7442,7 +7442,7 @@ def render_wealth_command_bar(engine, current_pid: int, prof_name: str, key_suff
 
         with col_actions:
             c_pills, c_spot, c_bell = st.columns(
-                [2.6, 1.1, 1.1],
+                [3.0, 0.9, 0.9],
                 vertical_alignment="center",
             )
             with c_pills:
@@ -7755,7 +7755,7 @@ def render_omni_command_bar(portal: str = "auto", context_name: Optional[str] = 
 
     with st.container(key=f"argus_omni_command_bar_container_{key_suffix}"):
         col_title, col_actions = st.columns(
-            [1.5, 3.5],
+            [1.2, 3.8],
             vertical_alignment="center",
         )
         with col_title:
@@ -7777,7 +7777,7 @@ def render_omni_command_bar(portal: str = "auto", context_name: Optional[str] = 
 
         with col_actions:
             c_pills, c_spot, c_bell = st.columns(
-                [2.6, 1.1, 1.1],
+                [3.0, 0.9, 0.9],
                 vertical_alignment="center",
             )
             with c_pills:
@@ -7786,10 +7786,10 @@ def render_omni_command_bar(portal: str = "auto", context_name: Optional[str] = 
                     w_needs = int(st.session_state.get("wealth_budget_needs_pct", 50.0))
                     w_wants = int(st.session_state.get("wealth_budget_wants_pct", 30.0))
                     w_savings = int(st.session_state.get("wealth_budget_savings_pct", 20.0))
-                    extra_pill = f'<div class="argus-command-pill" style="background:rgba(16, 185, 129, 0.12); border-color:rgba(16, 185, 129, 0.3); color:#34d399;">🏷️ <b>{w_needs}/{w_wants}/{w_savings}</b></div>'
+                    extra_pill = f'<div class="argus-command-pill" style="display:inline-flex !important; align-items:center !important; justify-content:center !important; height:32px !important; padding:0 8px !important; border-radius:6px !important; font-size:11.5px !important; font-weight:600 !important; background:rgba(16, 185, 129, 0.12) !important; border:1px solid rgba(16, 185, 129, 0.3) !important; color:#34d399 !important; white-space:nowrap !important; flex-shrink:0 !important; box-sizing:border-box !important;">🏷️ <b>{w_needs}/{w_wants}/{w_savings}</b></div>'
                 else:
                     bench = st.session_state.get("benchmark", "SPY")
-                    extra_pill = f'<div class="argus-command-pill">📊 <b>{bench}</b></div>'
+                    extra_pill = f'<div class="argus-command-pill" style="display:inline-flex !important; align-items:center !important; justify-content:center !important; height:32px !important; padding:0 8px !important; border-radius:6px !important; font-size:11.5px !important; font-weight:600 !important; background:rgba(255,255,255,0.04) !important; border:1px solid rgba(255,255,255,0.12) !important; color:#c9d1d9 !important; white-space:nowrap !important; flex-shrink:0 !important; box-sizing:border-box !important;">📊 <b>{bench}</b></div>'
 
                 pills_html = (
                     '<div class="argus-command-pills-cluster" style="display:flex !important; flex-direction:row !important; align-items:center !important; justify-content:flex-end !important; flex-wrap:nowrap !important; gap:6px !important; height:32px !important; line-height:1 !important; margin:0 !important; padding:0 !important; width:100% !important;">'
