@@ -97,8 +97,10 @@ def compute_risk(
 
     df_tx_adj, corp_actions_audit = adjust_transactions_for_splits(df_tx, auto_fetch=True)
 
-    df_positions = _compute_positions(df_tx_adj, df_prices, warnings_list)
-    df_returns, sr_portfolio = _compute_returns(df_positions, df_prices, df_tx_adj, warnings_list=warnings_list)
+    df_positions = _compute_positions(df_tx_adj, df_prices, warnings_list, base_currency=base_currency)
+    df_returns, sr_portfolio = _compute_returns(
+        df_positions, df_prices, df_tx_adj, warnings_list=warnings_list, base_currency=base_currency
+    )
     sr_benchmark = _load_benchmark(benchmark_ticker, df_prices, df_returns.index)
 
     # Calcolo Beta empirico per ciascun asset vs Benchmark (vettorizzato ad alte prestazioni)
@@ -635,7 +637,9 @@ def _fifo_engine(grp: pd.DataFrame, fx_series: pd.Series = None) -> dict:
 # ── Posizioni correnti ───────────────────────────────────────
 
 
-def _compute_positions(df_tx: pd.DataFrame, df_prices: pd.DataFrame, warnings_list: list = None) -> pd.DataFrame:
+def _compute_positions(
+    df_tx: pd.DataFrame, df_prices: pd.DataFrame, warnings_list: list = None, base_currency: str = "EUR"
+) -> pd.DataFrame:
     rows = []
 
     for ticker, grp in df_tx.groupby("ticker"):
@@ -877,7 +881,11 @@ def _compute_dynamic_holdings_twr(
 
 
 def _compute_returns(
-    df_positions: pd.DataFrame, df_prices: pd.DataFrame, df_tx: pd.DataFrame, warnings_list: list = None
+    df_positions: pd.DataFrame,
+    df_prices: pd.DataFrame,
+    df_tx: pd.DataFrame,
+    warnings_list: list = None,
+    base_currency: str = "EUR",
 ) -> tuple:
     pivot = df_prices.pivot(index="price_date", columns="ticker", values="close")
 

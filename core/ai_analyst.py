@@ -1,5 +1,20 @@
+"""
+ARGUS — Risk Analytics Platform
+Core Module: AI & LLM Narrative Intelligence (ARGUS AI Analyst)
+Generates natural-language executive memorandums and provides an interactive
+portfolio copilot with dual-engine architecture:
+1. Online Remote LLM (Google Gemini & OpenAI REST API)
+2. Offline Deterministic Quantitative NLG Engine (Zero-dependency fallback)
+"""
+
 import hashlib
+import json
+import os
 import time
+import urllib.error
+import urllib.request
+from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple
 
 # Cache LRU in memoria per risposte LLM (TTL: 1 ora = 3600s)
 _AI_RESPONSE_CACHE: Dict[str, Tuple[float, str]] = {}
@@ -35,22 +50,6 @@ def _resolve_unified_api_key(api_key: Optional[str] = None) -> str:
     if not k:
         k = (os.getenv("GEMINI_API_KEY") or os.getenv("OPENAI_API_KEY") or "").strip()
     return k
-
-"""
-ARGUS — Risk Analytics Platform
-Core Module: AI & LLM Narrative Intelligence (ARGUS AI Analyst)
-Generates natural-language executive memorandums and provides an interactive
-portfolio copilot with dual-engine architecture:
-1. Online Remote LLM (Google Gemini & OpenAI REST API)
-2. Offline Deterministic Quantitative NLG Engine (Zero-dependency fallback)
-"""
-
-import json
-import os
-import urllib.error
-import urllib.request
-from datetime import datetime
-from typing import Any, Dict, List, Optional
 
 # ==============================================================================
 # GUARDRAILS DI COMPLIANCE & DISCLAIMER NORMATIVO (MiFID II / CONSOB)

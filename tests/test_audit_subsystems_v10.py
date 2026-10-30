@@ -8,15 +8,16 @@ Unit tests for the 5 Subsystems Audit and Hardening in ARGUS v10.0.0:
 """
 
 import os
-import pytest
+
 import pandas as pd
+import pytest
 from sqlalchemy import create_engine
 
 
 # ── 1. NAVIGATION & PAGE ROUTING ─────────────────────────────────────────────
 def test_navigation_subsystem_page_routing():
-    from core.workspace_manager import resolve_page_path
     from components.ui_core.ui_utils import resolve_active_subtab
+    from core.workspace_manager import resolve_page_path
 
     # Resolves canonical paths for shifted/renamed pages
     assert "6_🏛️_Valutazione_Aziendale.py" in resolve_page_path("Valutazione_Aziendale")
@@ -37,12 +38,12 @@ def test_navigation_subsystem_page_routing():
 # ── 2. BROKER ADAPTERS & ISIN RESOLUTION ─────────────────────────────────────
 def test_broker_hub_facade_and_isin_european_resolution():
     # Broker hub facade works cleanly
-    from core.broker_hub import detect_broker_format, parse_broker_csv, SUPPORTED_BROKERS
+    from core.broker_hub import SUPPORTED_BROKERS, detect_broker_format, parse_broker_csv
     assert "degiro" in SUPPORTED_BROKERS
     assert callable(parse_broker_csv)
 
     # ISIN Resolver recognizes common European ETFs
-    from core.adapters.isin_resolver import resolve_isin_to_ticker, BASE_ISIN_TO_TICKER
+    from core.adapters.isin_resolver import BASE_ISIN_TO_TICKER, resolve_isin_to_ticker
     assert BASE_ISIN_TO_TICKER.get("IE00B4L5Y983") == "SWDA.MI"
     assert BASE_ISIN_TO_TICKER.get("IE00B5BMR087") == "CSSPX.MI"
     assert BASE_ISIN_TO_TICKER.get("LU0290358497") == "XEON.DE"
@@ -82,7 +83,7 @@ def test_personal_balance_sheet_fallback_bridge():
 
 
 def test_unified_stress_bridge_fallback_transparency():
-    from core.wealth.unified_stress_bridge import UnifiedCrossAssetStressEngine, MacroFactorShock
+    from core.wealth.unified_stress_bridge import MacroFactorShock, UnifiedCrossAssetStressEngine
 
     # Empty positions -> should trigger fallback and flag is_fallback_proxy=True
     engine = UnifiedCrossAssetStressEngine(portfolio_positions=pd.DataFrame(), factor_betas=pd.DataFrame())
@@ -94,7 +95,7 @@ def test_unified_stress_bridge_fallback_transparency():
 
 # ── 4. ITALIAN TAX COMPLIANCE ────────────────────────────────────────────────
 def test_italian_tax_etf_classification_and_whitelist():
-    from core.tax_engine import is_etf, get_asset_tax_rate, compute_tax_and_harvesting
+    from core.tax_engine import compute_tax_and_harvesting, get_asset_tax_rate, is_etf
 
     # UCITS ETF recognition regardless of exchange suffixes
     assert is_etf("stock", "SWDA.MI") is True
@@ -146,7 +147,7 @@ def test_sec_rag_engine_synthetic_boilerplate_flag():
 
 
 def test_ai_analyst_cache_and_unified_key():
-    from core.ai_analyst import _get_cached_llm_response, _set_cached_llm_response, _resolve_unified_api_key
+    from core.ai_analyst import _get_cached_llm_response, _resolve_unified_api_key, _set_cached_llm_response
 
     # Cache mechanism works
     test_prompt = "Spiegami il rischio del portafoglio"
