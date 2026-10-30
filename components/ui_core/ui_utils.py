@@ -328,7 +328,7 @@ def render_command_bar():
 
     with st.container(key="argus_top_command_bar_container"):
         col_title, col_actions = st.columns(
-            [2.15, 2.85],
+            [1.5, 3.5],
             vertical_alignment="center",
         )
         with col_title:
@@ -349,22 +349,25 @@ def render_command_bar():
             )
 
         with col_actions:
-            with st.container(key="argus_top_command_bar_actions"):
-                st.markdown(
-                    f"""
-                <div class="argus-command-pills-cluster">
-                    <div class="argus-command-pill">💱 <b>{base_curr}</b></div>
-                    <div class="argus-command-pill">📊 <b>{bench}</b></div>
-                    <div class="argus-command-pill" style="background:{mode_bg}; border-color:{mode_border}; color:{mode_color};">
-                        <span style="width:6px; height:6px; border-radius:50%; background:{mode_color}; display:inline-block; margin-right:5px;"></span>{mode_str}
-                    </div>
-                </div>
-                """,
-                    unsafe_allow_html=True,
+            c_pills, c_dens, c_spot, c_bell = st.columns(
+                [2.0, 1.0, 0.9, 0.9],
+                vertical_alignment="center",
+            )
+            with c_pills:
+                pills_html = (
+                    '<div class="argus-command-pills-cluster">'
+                    f'<div class="argus-command-pill">💱 <b>{base_curr}</b></div>'
+                    f'<div class="argus-command-pill">📊 <b>{bench}</b></div>'
+                    f'<div class="argus-command-pill" style="background:{mode_bg}; border-color:{mode_border}; color:{mode_color};">'
+                    f'<span style="width:6px; height:6px; border-radius:50%; background:{mode_color}; display:inline-block; margin-right:5px;"></span>{mode_str}'
+                    "</div></div>"
                 )
+                st.markdown(pills_html, unsafe_allow_html=True)
+
+            with c_dens:
                 dens_labels = {"L1": "👤 L1 Client", "L2": "📊 L2 Desk", "L3": "🔬 L3 Quant"}
                 cur_label = dens_labels.get(density, "🔬 L3 Quant")
-                with st.popover(cur_label, use_container_width=False):
+                with st.popover(cur_label, use_container_width=True):
                     st.markdown(
                         "<div style='font-size:11px; font-weight:700; color:#8b949e; margin-bottom:6px;'>SELETTORE DENSITÀ VISIVA</div>",
                         unsafe_allow_html=True,
@@ -385,14 +388,16 @@ def render_command_bar():
                             st.query_params["density"] = code_sel
                         st.rerun()
 
+            with c_spot:
                 if st.button(
                     "⚡ Ctrl+K",
                     key="btn_open_spotlight",
-                    use_container_width=False,
+                    use_container_width=True,
                     help="Bloomberg-style Omni-Command Gateway (Ctrl+K) & Cheatsheet (?)",
                 ):
                     render_spotlight_palette()
 
+            with c_bell:
                 try:
                     from core.watchdog.unified_notification_center import render_institutional_notification_bell
 
@@ -7417,7 +7422,7 @@ def render_wealth_command_bar(engine, current_pid: int, prof_name: str, key_suff
 
     with st.container(key=f"argus_wealth_command_bar_container_{key_suffix}"):
         col_title, col_actions = st.columns(
-            [2.15, 2.85],
+            [1.5, 3.5],
             vertical_alignment="center",
         )
         with col_title:
@@ -7436,29 +7441,32 @@ def render_wealth_command_bar(engine, current_pid: int, prof_name: str, key_suff
             )
 
         with col_actions:
-            with st.container(key=f"argus_wealth_command_bar_actions_{key_suffix}"):
-                st.markdown(
-                    f"""
-                <div class="argus-command-pills-cluster">
-                    <div class="argus-command-pill">💱 <b>{base_curr}</b></div>
-                    <div class="argus-command-pill" style="background:rgba(16, 185, 129, 0.12); border-color:rgba(16, 185, 129, 0.3); color:#34d399;">
-                        🏷️ <b>{rule_label}</b>
-                    </div>
-                    <div class="argus-command-pill" style="background:{mode_bg}; border-color:{mode_border}; color:{mode_color};">
-                        <span style="width:6px; height:6px; border-radius:50%; background:{mode_color}; display:inline-block; margin-right:5px;"></span>{mode_str}
-                    </div>
-                </div>
-                """,
-                    unsafe_allow_html=True,
+            c_pills, c_spot, c_bell = st.columns(
+                [2.6, 1.1, 1.1],
+                vertical_alignment="center",
+            )
+            with c_pills:
+                pills_html = (
+                    '<div class="argus-command-pills-cluster">'
+                    f'<div class="argus-command-pill">💱 <b>{base_curr}</b></div>'
+                    '<div class="argus-command-pill" style="background:rgba(16, 185, 129, 0.12); border-color:rgba(16, 185, 129, 0.3); color:#34d399;">'
+                    f'🏷️ <b>{rule_label}</b></div>'
+                    f'<div class="argus-command-pill" style="background:{mode_bg}; border-color:{mode_border}; color:{mode_color};">'
+                    f'<span style="width:6px; height:6px; border-radius:50%; background:{mode_color}; display:inline-block; margin-right:5px;"></span>{mode_str}'
+                    "</div></div>"
                 )
+                st.markdown(pills_html, unsafe_allow_html=True)
+
+            with c_spot:
                 if st.button(
                     "⚡ Ctrl+K",
                     key=f"btn_open_spotlight_{key_suffix}",
-                    use_container_width=False,
+                    use_container_width=True,
                     help="Cerca pagine, schede o lancia comandi rapidi Wealth (Ctrl+K)",
                 ):
                     render_wealth_spotlight_palette()
 
+            with c_bell:
                 try:
                     from core.watchdog.unified_notification_center import render_institutional_notification_bell
 
@@ -7747,7 +7755,7 @@ def render_omni_command_bar(portal: str = "auto", context_name: Optional[str] = 
 
     with st.container(key=f"argus_omni_command_bar_container_{key_suffix}"):
         col_title, col_actions = st.columns(
-            [2.15, 2.85],
+            [1.5, 3.5],
             vertical_alignment="center",
         )
         with col_title:
@@ -7768,7 +7776,11 @@ def render_omni_command_bar(portal: str = "auto", context_name: Optional[str] = 
             )
 
         with col_actions:
-            with st.container(key=f"argus_omni_command_bar_actions_{key_suffix}"):
+            c_pills, c_spot, c_bell = st.columns(
+                [2.6, 1.1, 1.1],
+                vertical_alignment="center",
+            )
+            with c_pills:
                 extra_pill = ""
                 if is_wealth:
                     w_needs = int(st.session_state.get("wealth_budget_needs_pct", 50.0))
@@ -7779,22 +7791,21 @@ def render_omni_command_bar(portal: str = "auto", context_name: Optional[str] = 
                     bench = st.session_state.get("benchmark", "SPY")
                     extra_pill = f'<div class="argus-command-pill">📊 <b>{bench}</b></div>'
 
-                st.markdown(
-                    f"""
-                <div class="argus-command-pills-cluster">
-                    <div class="argus-command-pill">💱 <b>{base_curr}</b></div>
-                    {extra_pill}
-                    <div class="argus-command-pill" style="background:{mode_bg}; border-color:{mode_border}; color:{mode_color};">
-                        <span style="width:6px; height:6px; border-radius:50%; background:{mode_color}; display:inline-block; margin-right:5px;"></span>{mode_str}
-                    </div>
-                </div>
-                """,
-                    unsafe_allow_html=True,
+                pills_html = (
+                    '<div class="argus-command-pills-cluster">'
+                    f'<div class="argus-command-pill">💱 <b>{base_curr}</b></div>'
+                    f'{extra_pill}'
+                    f'<div class="argus-command-pill" style="background:{mode_bg}; border-color:{mode_border}; color:{mode_color};">'
+                    f'<span style="width:6px; height:6px; border-radius:50%; background:{mode_color}; display:inline-block; margin-right:5px;"></span>{mode_str}'
+                    "</div></div>"
                 )
+                st.markdown(pills_html, unsafe_allow_html=True)
+
+            with c_spot:
                 if st.button(
                     "⚡ Ctrl+K",
                     key=f"omni_btn_spotlight_{key_suffix}",
-                    use_container_width=False,
+                    use_container_width=True,
                     help="Cerca pagine, comandi o ticker (Ctrl+K)",
                 ):
                     if is_wealth:
@@ -7802,6 +7813,7 @@ def render_omni_command_bar(portal: str = "auto", context_name: Optional[str] = 
                     else:
                         render_spotlight_palette()
 
+            with c_bell:
                 try:
                     from core.watchdog.unified_notification_center import render_institutional_notification_bell
 

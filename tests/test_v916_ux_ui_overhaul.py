@@ -251,3 +251,30 @@ def test_known_metrics_knowledge_base_entries() -> None:
             assert len(entry[field]) > 10, f"Field {field} too short in {k}"
 
 
+
+
+def test_command_bar_horizontal_subcolumns() -> None:
+    """Verify top command bars use sub-columns and flex-row nowrap layout to prevent vertical stacking."""
+    from pathlib import Path
+
+    ui_utils_path = Path("components/ui_core/ui_utils.py")
+    assert ui_utils_path.exists(), "ui_utils.py missing"
+    text_ui = ui_utils_path.read_text(encoding="utf-8")
+
+    # Ensure vertical container wrappers are removed
+    assert 'with st.container(key="argus_top_command_bar_actions"):' not in text_ui
+    assert 'with st.container(key=f"argus_wealth_command_bar_actions_{key_suffix}"):' not in text_ui
+    assert 'with st.container(key=f"argus_omni_command_bar_actions_{key_suffix}"):' not in text_ui
+
+    # Ensure native horizontal sub-columns are used
+    assert "c_pills, c_dens, c_spot, c_bell = st.columns(" in text_ui
+    assert "c_pills, c_spot, c_bell = st.columns(" in text_ui
+
+    theme_path = Path("components/ui_core/theme.py")
+    assert theme_path.exists(), "theme.py missing"
+    text_theme = theme_path.read_text(encoding="utf-8")
+
+    # Verify CSS enforces row layout without wrapping
+    assert ".argus-command-pills-cluster" in text_theme
+    assert "flex-direction: row !important;" in text_theme
+    assert "flex-wrap: nowrap !important;" in text_theme

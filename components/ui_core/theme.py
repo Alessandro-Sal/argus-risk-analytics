@@ -901,8 +901,10 @@ def inject_custom_css(force: bool = False) -> None:
         div[class*="st-key-argus_wealth_command_bar_container"] [data-testid="stHorizontalBlock"],
         div[class*="st-key-argus_omni_command_bar_container"] [data-testid="stHorizontalBlock"] {{
             align-items: center !important;
-            gap: 12px !important;
+            gap: 8px !important;
             width: 100% !important;
+            margin: 0px !important;
+            padding: 0px !important;
         }}
 
         div[class*="st-key-argus_top_command_bar_container"] [data-testid="stColumn"],
@@ -910,7 +912,10 @@ def inject_custom_css(force: bool = False) -> None:
         div[class*="st-key-argus_omni_command_bar_container"] [data-testid="stColumn"] {{
             display: flex !important;
             align-items: center !important;
-            min-height: 34px !important;
+            min-height: 32px !important;
+            height: 32px !important;
+            margin: 0px !important;
+            padding: 0px !important;
         }}
 
         div[class*="st-key-argus_top_command_bar_container"] [data-testid="stColumn"] > div,
@@ -919,112 +924,61 @@ def inject_custom_css(force: bool = False) -> None:
             width: 100% !important;
             display: flex !important;
             align-items: center !important;
+            height: 32px !important;
+            margin: 0px !important;
+            padding: 0px !important;
         }}
 
-        /* Unified Right-Side Institutional Action Dock: Single Flush Row, Right-Aligned */
-        div[class*="st-key-argus_top_command_bar_actions"],
-        div[class*="st-key-argus_wealth_command_bar_actions"],
-        div[class*="st-key-argus_omni_command_bar_actions"] {{
-            padding-right: 14px !important;
-        }}
-
-        div[class*="st-key-argus_top_command_bar_actions"],
-        div[class*="st-key-argus_wealth_command_bar_actions"],
-        div[class*="st-key-argus_omni_command_bar_actions"],
-        div[class*="st-key-argus_top_command_bar_actions"] > div,
-        div[class*="st-key-argus_wealth_command_bar_actions"] > div,
-        div[class*="st-key-argus_omni_command_bar_actions"] > div,
-        div[class*="st-key-argus_top_command_bar_actions"] [data-testid="stVerticalBlock"],
-        div[class*="st-key-argus_wealth_command_bar_actions"] [data-testid="stVerticalBlock"],
-        div[class*="st-key-argus_omni_command_bar_actions"] [data-testid="stVerticalBlock"],
-        div[class*="st-key-argus_top_command_bar_actions"] [data-testid="stVerticalBlockBorderWrapper"] > div,
-        div[class*="st-key-argus_wealth_command_bar_actions"] [data-testid="stVerticalBlockBorderWrapper"] > div,
-        div[class*="st-key-argus_omni_command_bar_actions"] [data-testid="stVerticalBlockBorderWrapper"] > div {{
-            display: flex !important;
-            flex-direction: row !important;
-            justify-content: flex-end !important;
-            align-items: center !important;
-            flex-wrap: nowrap !important;
-            gap: 6px !important;
+        div[class*="st-key-argus_top_command_bar_container"] [data-testid="stElementContainer"],
+        div[class*="st-key-argus_wealth_command_bar_container"] [data-testid="stElementContainer"],
+        div[class*="st-key-argus_omni_command_bar_container"] [data-testid="stElementContainer"] {{
             width: 100% !important;
             margin: 0px !important;
-            padding-top: 0px !important;
-            padding-bottom: 0px !important;
-            padding-left: 0px !important;
-            overflow-x: auto !important;
-            overflow-y: hidden !important;
-            scrollbar-width: none !important;
-        }}
-        div[class*="st-key-argus_top_command_bar_actions"]::-webkit-scrollbar,
-        div[class*="st-key-argus_wealth_command_bar_actions"]::-webkit-scrollbar,
-        div[class*="st-key-argus_omni_command_bar_actions"]::-webkit-scrollbar {{
-            display: none !important;
-        }}
-
-        div[class*="st-key-argus_top_command_bar_actions"] [data-testid="stElementContainer"],
-        div[class*="st-key-argus_wealth_command_bar_actions"] [data-testid="stElementContainer"],
-        div[class*="st-key-argus_omni_command_bar_actions"] [data-testid="stElementContainer"] {{
-            width: auto !important;
-            flex: 0 0 auto !important;
-            min-width: max-content !important;
-            margin: 0px !important;
             padding: 0px !important;
-            display: inline-flex !important;
+            display: flex !important;
             align-items: center !important;
+            height: 32px !important;
         }}
 
-        div[class*="st-key-argus_top_command_bar_actions"] .stMarkdown,
-        div[class*="st-key-argus_wealth_command_bar_actions"] .stMarkdown,
-        div[class*="st-key-argus_omni_command_bar_actions"] .stMarkdown,
-        div[class*="st-key-argus_top_command_bar_actions"] [data-testid="stMarkdownContainer"],
-        div[class*="st-key-argus_wealth_command_bar_actions"] [data-testid="stMarkdownContainer"],
-        div[class*="st-key-argus_omni_command_bar_actions"] [data-testid="stMarkdownContainer"] {{
-            width: auto !important;
-            min-width: max-content !important;
-            flex: 0 0 auto !important;
-            display: inline-flex !important;
-            align-items: center !important;
+        div[class*="st-key-argus_top_command_bar_container"] [data-testid="stMarkdownContainer"],
+        div[class*="st-key-argus_wealth_command_bar_container"] [data-testid="stMarkdownContainer"],
+        div[class*="st-key-argus_omni_command_bar_container"] [data-testid="stMarkdownContainer"] {{
+            width: 100% !important;
             margin: 0px !important;
             padding: 0px !important;
         }}
 
-        div[class*="st-key-argus_top_command_bar_actions"] [data-testid="stPopover"],
-        div[class*="st-key-argus_wealth_command_bar_actions"] [data-testid="stPopover"],
-        div[class*="st-key-argus_omni_command_bar_actions"] [data-testid="stPopover"],
-        div[class*="st-key-argus_top_command_bar_actions"] .stButton,
-        div[class*="st-key-argus_wealth_command_bar_actions"] .stButton,
-        div[class*="st-key-argus_omni_command_bar_actions"] .stButton {{
-            width: auto !important;
-            min-width: max-content !important;
-            flex: 0 0 auto !important;
-            flex-shrink: 0 !important;
-            display: inline-flex !important;
-            align-items: center !important;
+        div[class*="st-key-argus_top_command_bar_container"] [data-testid="stMarkdownContainer"] > p,
+        div[class*="st-key-argus_wealth_command_bar_container"] [data-testid="stMarkdownContainer"] > p,
+        div[class*="st-key-argus_omni_command_bar_container"] [data-testid="stMarkdownContainer"] > p {{
             margin: 0px !important;
             padding: 0px !important;
-            position: relative !important;
+            line-height: 1 !important;
         }}
 
         .argus-command-pills-cluster {{
-            display: inline-flex !important;
+            display: flex !important;
+            flex-direction: row !important;
             align-items: center !important;
             justify-content: flex-end !important;
+            flex-wrap: nowrap !important;
             gap: 4px !important;
             height: 32px !important;
             line-height: 1 !important;
             white-space: nowrap !important;
             margin: 0px !important;
-            margin-right: 4px !important;
             padding: 0px !important;
-            flex: 0 0 auto !important;
-            flex-shrink: 0 !important;
-            min-width: max-content !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
         }}
 
         /* Command Bar Buttons & Popovers Matching Pill Density & Height */
         div[class*="st-key-argus_top_command_bar_container"] button,
         div[class*="st-key-argus_wealth_command_bar_container"] button,
         div[class*="st-key-argus_omni_command_bar_container"] button,
+        div[class*="st-key-argus_top_command_bar_container"] [data-testid="stPopover"],
+        div[class*="st-key-argus_wealth_command_bar_container"] [data-testid="stPopover"],
+        div[class*="st-key-argus_omni_command_bar_container"] [data-testid="stPopover"],
         div[class*="st-key-argus_top_command_bar_container"] [data-testid="stPopover"] button,
         div[class*="st-key-argus_wealth_command_bar_container"] [data-testid="stPopover"] button,
         div[class*="st-key-argus_omni_command_bar_container"] [data-testid="stPopover"] button {{
@@ -1041,10 +995,7 @@ def inject_custom_css(force: bool = False) -> None:
             justify-content: center !important;
             margin: 0px !important;
             white-space: nowrap !important;
-            width: auto !important;
-            min-width: max-content !important;
-            flex: 0 0 auto !important;
-            flex-shrink: 0 !important;
+            width: 100% !important;
             background: rgba(255, 255, 255, 0.04) !important;
             border: 1px solid rgba(255, 255, 255, 0.12) !important;
             color: #c9d1d9 !important;
