@@ -536,23 +536,49 @@ def lttb_downsample(x: Any, y: Any, n_buckets: int = 1000) -> Tuple[Any, Any]:
     sampled[-1] = n_points - 1
 
     bucket_size = (n_points - 2) / (n_buckets - 2)
+
+    # Pre-calcolo indici dei bucket (splits)
+    indices = np.arange(n_buckets, dtype=np.float64)
+    splits = (indices * bucket_size).astype(np.int64) + 1
+    splits[0] = 1
+    splits = np.minimum(splits, n_points)
+
+    # Pre-calcolo prefix sums per calcolare avg_x e avg_y in O(1) senza ri-allocazioni
+    cumsum_x = np.empty(n_points + 1, dtype=np.float64)
+    cumsum_x[0] = 0.0
+    np.cumsum(x_num, out=cumsum_x[1:])
+
+    cumsum_y = np.empty(n_points + 1, dtype=np.float64)
+    cumsum_y[0] = 0.0
+    np.cumsum(y_arr, out=cumsum_y[1:])
+
+    # Medie punto C per ogni bucket i in range(1, n_buckets - 1): intervallo splits[i] : splits[i+1]
+    c_starts = splits[1 : n_buckets - 1]
+    c_ends = splits[2:n_buckets]
+    c_counts = np.maximum(c_ends - c_starts, 1)
+
+    avg_x_all = (cumsum_x[c_ends] - cumsum_x[c_starts]) / c_counts
+    avg_y_all = (cumsum_y[c_ends] - cumsum_y[c_starts]) / c_counts
+
+    fallback_mask = c_ends <= c_starts
+    if np.any(fallback_mask):
+        avg_x_all[fallback_mask] = x_num[-1]
+        avg_y_all[fallback_mask] = y_arr[-1]
+
     a_idx = 0
 
     for i in range(1, n_buckets - 1):
         # Range del bucket corrente B_i
-        b_start = int(np.floor((i - 1) * bucket_size)) + 1
-        b_end = min(int(np.floor(i * bucket_size)) + 1, n_points - 1)
+        b_start = splits[i - 1]
+        b_end = min(splits[i], n_points - 1)
 
-        # Range del bucket successivo B_{i+1} per punto medio C
-        c_start = int(np.floor(i * bucket_size)) + 1
-        c_end = min(int(np.floor((i + 1) * bucket_size)) + 1, n_points)
+        if b_end <= b_start:
+            sampled[i] = b_start
+            a_idx = b_start
+            continue
 
-        if c_end > c_start:
-            avg_x_c = np.mean(x_num[c_start:c_end])
-            avg_y_c = np.mean(y_arr[c_start:c_end])
-        else:
-            avg_x_c = x_num[-1]
-            avg_y_c = y_arr[-1]
+        avg_x_c = avg_x_all[i - 1]
+        avg_y_c = avg_y_all[i - 1]
 
         # Punto A (selezionato nel bucket precedente)
         x_a = x_num[a_idx]
@@ -561,11 +587,6 @@ def lttb_downsample(x: Any, y: Any, n_buckets: int = 1000) -> Tuple[Any, Any]:
         # Punti candidati B nel bucket corrente
         x_b = x_num[b_start:b_end]
         y_b = y_arr[b_start:b_end]
-
-        if len(x_b) == 0:
-            sampled[i] = b_start
-            a_idx = b_start
-            continue
 
         # Calcolo vettoriale area del triangolo: Area = 0.5 * |(x_a - avg_x_c)(y_b - y_a) - (x_a - x_b)(avg_y_c - y_a)|
         areas = np.abs((x_a - avg_x_c) * (y_b - y_a) - (x_a - x_b) * (avg_y_c - y_a))
