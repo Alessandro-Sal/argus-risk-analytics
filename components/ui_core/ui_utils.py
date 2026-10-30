@@ -355,11 +355,11 @@ def render_command_bar():
             )
             with c_pills:
                 pills_html = (
-                    '<div class="argus-command-pills-cluster">'
-                    f'<div class="argus-command-pill">💱 <b>{base_curr}</b></div>'
-                    f'<div class="argus-command-pill">📊 <b>{bench}</b></div>'
-                    f'<div class="argus-command-pill" style="background:{mode_bg}; border-color:{mode_border}; color:{mode_color};">'
-                    f'<span style="width:6px; height:6px; border-radius:50%; background:{mode_color}; display:inline-block; margin-right:5px;"></span>{mode_str}'
+                    '<div class="argus-command-pills-cluster" style="display:flex !important; flex-direction:row !important; align-items:center !important; justify-content:flex-end !important; flex-wrap:nowrap !important; gap:6px !important; height:32px !important; line-height:1 !important; margin:0 !important; padding:0 !important; width:100% !important;">'
+                    f'<div class="argus-command-pill" style="display:inline-flex !important; align-items:center !important; justify-content:center !important; height:32px !important; padding:0 8px !important; border-radius:6px !important; font-size:11.5px !important; font-weight:600 !important; background:rgba(255,255,255,0.04) !important; border:1px solid rgba(255,255,255,0.12) !important; color:#c9d1d9 !important; white-space:nowrap !important; flex-shrink:0 !important;">💱 <b>{base_curr}</b></div>'
+                    f'<div class="argus-command-pill" style="display:inline-flex !important; align-items:center !important; justify-content:center !important; height:32px !important; padding:0 8px !important; border-radius:6px !important; font-size:11.5px !important; font-weight:600 !important; background:rgba(255,255,255,0.04) !important; border:1px solid rgba(255,255,255,0.12) !important; color:#c9d1d9 !important; white-space:nowrap !important; flex-shrink:0 !important;">📊 <b>{bench}</b></div>'
+                    f'<div class="argus-command-pill" style="display:inline-flex !important; align-items:center !important; justify-content:center !important; height:32px !important; padding:0 8px !important; border-radius:6px !important; font-size:11.5px !important; font-weight:600 !important; background:{mode_bg} !important; border:1px solid {mode_border} !important; color:{mode_color} !important; white-space:nowrap !important; flex-shrink:0 !important;">'
+                    f'<span style="width:6px; height:6px; border-radius:50%; background:{mode_color}; display:inline-block; margin-right:5px; flex-shrink:0;"></span>{mode_str}'
                     "</div></div>"
                 )
                 st.markdown(pills_html, unsafe_allow_html=True)
@@ -7447,12 +7447,12 @@ def render_wealth_command_bar(engine, current_pid: int, prof_name: str, key_suff
             )
             with c_pills:
                 pills_html = (
-                    '<div class="argus-command-pills-cluster">'
-                    f'<div class="argus-command-pill">💱 <b>{base_curr}</b></div>'
-                    '<div class="argus-command-pill" style="background:rgba(16, 185, 129, 0.12); border-color:rgba(16, 185, 129, 0.3); color:#34d399;">'
+                    '<div class="argus-command-pills-cluster" style="display:flex !important; flex-direction:row !important; align-items:center !important; justify-content:flex-end !important; flex-wrap:nowrap !important; gap:6px !important; height:32px !important; line-height:1 !important; margin:0 !important; padding:0 !important; width:100% !important;">'
+                    f'<div class="argus-command-pill" style="display:inline-flex !important; align-items:center !important; justify-content:center !important; height:32px !important; padding:0 8px !important; border-radius:6px !important; font-size:11.5px !important; font-weight:600 !important; background:rgba(255,255,255,0.04) !important; border:1px solid rgba(255,255,255,0.12) !important; color:#c9d1d9 !important; white-space:nowrap !important; flex-shrink:0 !important;">💱 <b>{base_curr}</b></div>'
+                    '<div class="argus-command-pill" style="display:inline-flex !important; align-items:center !important; justify-content:center !important; height:32px !important; padding:0 8px !important; border-radius:6px !important; font-size:11.5px !important; font-weight:600 !important; background:rgba(16, 185, 129, 0.12) !important; border:1px solid rgba(16, 185, 129, 0.3) !important; color:#34d399 !important; white-space:nowrap !important; flex-shrink:0 !important;">'
                     f'🏷️ <b>{rule_label}</b></div>'
-                    f'<div class="argus-command-pill" style="background:{mode_bg}; border-color:{mode_border}; color:{mode_color};">'
-                    f'<span style="width:6px; height:6px; border-radius:50%; background:{mode_color}; display:inline-block; margin-right:5px;"></span>{mode_str}'
+                    f'<div class="argus-command-pill" style="display:inline-flex !important; align-items:center !important; justify-content:center !important; height:32px !important; padding:0 8px !important; border-radius:6px !important; font-size:11.5px !important; font-weight:600 !important; background:{mode_bg} !important; border:1px solid {mode_border} !important; color:{mode_color} !important; white-space:nowrap !important; flex-shrink:0 !important;">'
+                    f'<span style="width:6px; height:6px; border-radius:50%; background:{mode_color}; display:inline-block; margin-right:5px; flex-shrink:0;"></span>{mode_str}'
                     "</div></div>"
                 )
                 st.markdown(pills_html, unsafe_allow_html=True)
@@ -7792,11 +7792,11 @@ def render_omni_command_bar(portal: str = "auto", context_name: Optional[str] = 
                     extra_pill = f'<div class="argus-command-pill">📊 <b>{bench}</b></div>'
 
                 pills_html = (
-                    '<div class="argus-command-pills-cluster">'
-                    f'<div class="argus-command-pill">💱 <b>{base_curr}</b></div>'
+                    '<div class="argus-command-pills-cluster" style="display:flex !important; flex-direction:row !important; align-items:center !important; justify-content:flex-end !important; flex-wrap:nowrap !important; gap:6px !important; height:32px !important; line-height:1 !important; margin:0 !important; padding:0 !important; width:100% !important;">'
+                    f'<div class="argus-command-pill" style="display:inline-flex !important; align-items:center !important; justify-content:center !important; height:32px !important; padding:0 8px !important; border-radius:6px !important; font-size:11.5px !important; font-weight:600 !important; background:rgba(255,255,255,0.04) !important; border:1px solid rgba(255,255,255,0.12) !important; color:#c9d1d9 !important; white-space:nowrap !important; flex-shrink:0 !important;">💱 <b>{base_curr}</b></div>'
                     f'{extra_pill}'
-                    f'<div class="argus-command-pill" style="background:{mode_bg}; border-color:{mode_border}; color:{mode_color};">'
-                    f'<span style="width:6px; height:6px; border-radius:50%; background:{mode_color}; display:inline-block; margin-right:5px;"></span>{mode_str}'
+                    f'<div class="argus-command-pill" style="display:inline-flex !important; align-items:center !important; justify-content:center !important; height:32px !important; padding:0 8px !important; border-radius:6px !important; font-size:11.5px !important; font-weight:600 !important; background:{mode_bg} !important; border:1px solid {mode_border} !important; color:{mode_color} !important; white-space:nowrap !important; flex-shrink:0 !important;">'
+                    f'<span style="width:6px; height:6px; border-radius:50%; background:{mode_color}; display:inline-block; margin-right:5px; flex-shrink:0;"></span>{mode_str}'
                     "</div></div>"
                 )
                 st.markdown(pills_html, unsafe_allow_html=True)

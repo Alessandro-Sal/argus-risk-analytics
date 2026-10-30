@@ -57,12 +57,20 @@ def get_active_theme_config() -> Dict[str, str]:
     return THEME_CONFIGS.get(theme_name, THEME_CONFIGS["Midnight Obsidian"])
 
 def inject_custom_css(force: bool = False) -> None:
-    """Inietta il foglio di stile CSS istituzionale garantendo zero duplicazioni e zero layout shift."""
+    """Inietta il foglio di stile CSS istituzionale garantendo zero duplicazioni nel medesimo run e persistenza continua nei rerun."""
     theme = st.session_state.get("ui_theme", "Midnight Obsidian") if hasattr(st, "session_state") else "Midnight Obsidian"
-    
-    # Anti-flickering guard: inietta solo se non ancora iniettato per questo tema, oppure se force=True
-    if not force and hasattr(st, "session_state") and st.session_state.get("_argus_css_injected_theme") == theme:
-        return
+
+    # Anti-duplicazione nel MEDESIMO run di esecuzione (senza bloccare i rerun successivi)
+    try:
+        from streamlit.runtime.scriptrunner import get_script_run_ctx
+
+        ctx = get_script_run_ctx()
+        if ctx is not None:
+            if not force and getattr(ctx, "_argus_css_injected_in_run", False):
+                return
+            ctx._argus_css_injected_in_run = True
+    except Exception:
+        pass
 
     try:
         from components.ui_core.loading_states import inject_loading_css
@@ -1603,7 +1611,7 @@ def inject_custom_css(force: bool = False) -> None:
         unsafe_allow_html=True,
     )
     if hasattr(st, "session_state"):
-        st.session_state["_argus_css_injected_theme"] = theme
+        st.session_state.pop("_argus_css_injected_theme", None)
 
 
 apply_custom_css = inject_custom_css
