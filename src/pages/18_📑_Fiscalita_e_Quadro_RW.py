@@ -139,14 +139,29 @@ with col_fisc_h2:
         render_fiscal_methodology_modal()
 
 # Calcolo Dati Fiscali Consolidati
-fiscal = compute_fiscal_analytics(engine, portfolio_id=current_pid)
+fiscal = compute_fiscal_analytics(engine, portfolio_id=current_pid) if engine is not None else {}
+if not isinstance(fiscal, dict):
+    fiscal = {}
+
+tot_active_losses = float(fiscal.get("total_active_losses", fiscal.get("total_minusvalenze", 0.0)) or 0.0)
+tot_shield = float(fiscal.get("total_tax_shield_eur", fiscal.get("tax_shield_potential", tot_active_losses * 0.26)) or 0.0)
+urgent_losses = float(fiscal.get("urgent_losses_amount", 0.0) or 0.0)
+if urgent_losses == 0.0 and "minusvalenze_schedule" in fiscal:
+    urgent_losses = sum(
+        float(m.get("importo", 0.0) or 0.0)
+        for m in (fiscal.get("minusvalenze_schedule") or [])
+        if "Scadenza" in str(m.get("stato", "")) or "Quest'Anno" in str(m.get("stato", ""))
+    )
+tot_est_cost = float(fiscal.get("estimated_annual_fiscal_cost", 0.0) or 0.0)
+tot_bollo = float(fiscal.get("total_bollo", 0.0) or 0.0)
+tot_ivafe = float(fiscal.get("total_ivafe", 0.0) or 0.0)
 
 # ── TOP KPI ROW FISCALITÀ ──────────────────────────────────
 c1, c2, c3, c4 = st.columns(4)
 with c1:
     metric_card(
         "Zainetto Minusvalenze",
-        fmt_eur(fiscal["total_active_losses"]),
+        fmt_eur(tot_active_losses),
         delta="Credito Fiscale Attivo (4Y)",
         delta_color="normal",
         help_text="Minusvalenze complessive ancora compensabili entro il quadriennio fiscale solare (Art. 68 TUIR)."
@@ -154,25 +169,25 @@ with c1:
 with c2:
     metric_card(
         "Risparmio Potenziale 26%",
-        fmt_eur(fiscal["total_tax_shield_eur"]),
+        fmt_eur(tot_shield),
         delta="Scudo Fiscale Totale",
         delta_color="normal",
         help_text="Controvalore effettivo delle imposte risparmiabili mediante compensazione delle minusvalenze con plusvalenze future."
     )
 with c3:
-    urgent_lbl = f"{fmt_eur(fiscal['urgent_losses_amount'])} In Decadenza" if fiscal['urgent_losses_amount'] > 0 else "Nessuna Urgenza"
+    urgent_lbl = f"{fmt_eur(urgent_losses)} In Decadenza" if urgent_losses > 0 else "Nessuna Urgenza"
     metric_card(
         "Minusvalenze in Scadenza",
-        fmt_eur(fiscal["urgent_losses_amount"]),
+        fmt_eur(urgent_losses),
         delta=urgent_lbl,
-        delta_color="inverse" if fiscal['urgent_losses_amount'] > 0 else "normal",
+        delta_color="inverse" if urgent_losses > 0 else "normal",
         help_text="Quota parte dello stock minusvalenze in scadenza definitiva al 31 dicembre dell'anno solare corrente."
     )
 with c4:
     metric_card(
         "Imposte Patrimoniali Totali",
-        fmt_eur(fiscal["estimated_annual_fiscal_cost"]),
-        delta=f"Bollo IT: {fmt_eur(fiscal['total_bollo'])} | IVAFE: {fmt_eur(fiscal['total_ivafe'])}",
+        fmt_eur(tot_est_cost),
+        delta=f"Bollo IT: {fmt_eur(tot_bollo)} | IVAFE: {fmt_eur(tot_ivafe)}",
         delta_color="inverse",
         help_text="Carico fiscale patrimoniale annuo stimato: Imposta di Bollo (0,20% su dossier italiani) + IVAFE (0,20% su broker e conti esteri)."
     )
@@ -230,40 +245,50 @@ def _render_tab_zainetto_and_reform():
     st.markdown("#### ⏳ Stock Minusvalenze & Calendario di Decadenza Quinquennale")
     col_m1, col_m2 = st.columns([3, 2])
     with col_m1:
-        df_min = pd.DataFrame(fiscal["minusvalenze_schedule"])
-        fig_min = go.Figure()
-        fig_min.add_trace(go.Bar(
-            x=[f"Origine {r['anno_origine']} (Scad. {r['scadenza']})" for _, r in df_min.iterrows()],
-            y=df_min["importo"],
-            text=[f"€ {val:,.2f}" for val in df_min["importo"]],
-            textposition="auto",
-            hovertemplate="<b>%{x}</b><br>Minusvalenza: <b>€ %{y:,.2f}</b><extra></extra>",
-            marker_color=["#ef4444" if "Quest'Anno" in r["stato"] else "#f59e0b" for _, r in df_min.iterrows()]
-        ))
-        fig_min.update_layout(
-            title=dict(text="Distribuzione Temporale Minusvalenze Pregresse", font=dict(size=14, color="#ffffff")),
-            template="plotly_dark",
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
-            height=320,
-            margin=dict(l=10, r=10, t=40, b=10)
-        )
-        st.plotly_chart(fig_min, use_container_width=True, config={'displayModeBar': False})
+        min_sched = fiscal.get("minusvalenze_schedule") or []
+        if min_sched:
+            df_min = pd.DataFrame(min_sched)
+            fig_min = go.Figure()
+            fig_min.add_trace(go.Bar(
+                x=[f"Origine {r.get('anno_origine', '')} (Scad. {r.get('scadenza', '')})" for _, r in df_min.iterrows()],
+                y=df_min.get("importo", []),
+                text=[f"€ {val:,.2f}" for val in df_min.get("importo", [])],
+                textposition="auto",
+                hovertemplate="<b>%{x}</b><br>Minusvalenza: <b>€ %{y:,.2f}</b><extra></extra>",
+                marker_color=["#ef4444" if "Quest'Anno" in str(r.get("stato", "")) else "#f59e0b" for _, r in df_min.iterrows()]
+            ))
+            fig_min.update_layout(
+                title=dict(text="Distribuzione Temporale Minusvalenze Pregresse", font=dict(size=14, color="#ffffff")),
+                template="plotly_dark",
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                height=320,
+                margin=dict(l=10, r=10, t=40, b=10)
+            )
+            st.plotly_chart(fig_min, use_container_width=True, config={'displayModeBar': False})
+        else:
+            st.info("ℹ️ Nessuna minusvalenza pregressa registrata nel portafoglio fiscale.")
 
     with col_m2:
         st.markdown("##### ⏳ Dettaglio Scadenze e Urgenza")
-        for m in fiscal["minusvalenze_schedule"]:
-            color = "#ef4444" if "Quest'Anno" in m["stato"] else "#34d399"
-            bg = "rgba(239, 68, 68, 0.12)" if "Quest'Anno" in m["stato"] else "rgba(16, 185, 129, 0.10)"
-            st.markdown(f"""
-            <div style="background:{bg}; border-left: 4px solid {color}; padding: 10px 14px; border-radius: 6px; margin-bottom: 8px;">
-                <div style="display:flex; justify-content:space-between;">
-                    <b>Anno {m['anno_origine']} &rarr; Scadenza: {m['scadenza']}</b>
-                    <span style="color:{color}; font-weight:800;">€ {m['importo']:,.2f}</span>
+        min_sched = fiscal.get("minusvalenze_schedule") or []
+        if min_sched:
+            for m in min_sched:
+                importo_val = float(m.get("importo", 0.0) or 0.0)
+                is_urgent = "Quest'Anno" in str(m.get("stato", "")) or "Scadenza" in str(m.get("stato", ""))
+                color = "#ef4444" if is_urgent else "#34d399"
+                bg = "rgba(239, 68, 68, 0.12)" if is_urgent else "rgba(16, 185, 129, 0.10)"
+                st.markdown(f"""
+                <div style="background:{bg}; border-left: 4px solid {color}; padding: 10px 14px; border-radius: 6px; margin-bottom: 8px;">
+                    <div style="display:flex; justify-content:space-between;">
+                        <b>Anno {m.get('anno_origine', '-')} &rarr; Scadenza: {m.get('scadenza', '-')}</b>
+                        <span style="color:{color}; font-weight:800;">€ {importo_val:,.2f}</span>
+                    </div>
+                    <div style="font-size: 11.5px; color: #94a3b8;">Stato: {m.get('stato', 'N/D')} &bull; Risparmio potenziale: <b>€ {importo_val * 0.26:,.2f}</b></div>
                 </div>
-                <div style="font-size: 11.5px; color: #94a3b8;">Stato: {m['stato']} &bull; Risparmio potenziale: <b>€ {m['importo'] * 0.26:,.2f}</b></div>
-            </div>
-            """, unsafe_allow_html=True)
+                """, unsafe_allow_html=True)
+        else:
+            st.caption("Nessuna minusvalenza attiva.")
 
     st.write("")
     st.divider()
@@ -364,8 +389,9 @@ def _render_tab_quadro_rw():
     st.caption("Prospetto analitico delle consistenze estere, giacenze medie, picchi massimi, liquidazione IVAFE (2‰) e confronto comparativo con giurisdizioni fiscali globali.")
 
     # 1. Prospetto Quadro RW Intermediari Esteri
-    if fiscal["quadro_rw_rows"]:
-        df_rw = pd.DataFrame(fiscal["quadro_rw_rows"])
+    rw_rows = fiscal.get("quadro_rw_rows") or []
+    if rw_rows:
+        df_rw = pd.DataFrame(rw_rows)
         rw_cfg = {
             "rigo": st.column_config.TextColumn("Rigo RW", width="small"),
             "descrizione": st.column_config.TextColumn("Descrizione / Intermediario", width="large"),
@@ -393,31 +419,40 @@ def _render_tab_quadro_rw():
 
     # 2. Asset Location (Italia vs Estero) & Bollo IT vs IVAFE
     section("⚖️ Asset Location & Confronto Imposte Patrimoniali Ricorrenti")
-    tot_fisc_assets = fiscal["total_domestic_assets"] + fiscal["total_foreign_assets"]
+    tot_dom = float(fiscal.get("total_domestic_assets", 0.0) or 0.0)
+    tot_for = float(fiscal.get("total_foreign_assets", 0.0) or 0.0)
+    tot_fisc_assets = tot_dom + tot_for
+    tot_bollo = float(fiscal.get("total_bollo", 0.0) or 0.0)
+    tot_ivafe = float(fiscal.get("total_ivafe", 0.0) or 0.0)
+    tot_cost = float(fiscal.get("estimated_annual_fiscal_cost", tot_bollo + tot_ivafe) or 0.0)
+
     cs1, cs2 = st.columns([1.1, 1.2])
     with cs1:
-        fig_pie = go.Figure(data=[go.Pie(
-            labels=["Dossier Italia (Amministrato)", "Conti & Broker Estero (Dichiarativo)"],
-            values=[fiscal["total_domestic_assets"], fiscal["total_foreign_assets"]],
-            hole=0.60,
-            marker_colors=["#3b82f6", "#10b981"],
-            textinfo="percent",
-            textposition="inside"
-        )])
-        fig_pie.update_layout(
-            title=dict(text="Ripartizione Geografica del Patrimonio", font=dict(size=14, color="#ffffff")),
-            template="plotly_dark",
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
-            height=320,
-            margin=dict(l=10, r=10, t=40, b=30),
-            legend=dict(orientation="h", yanchor="top", y=-0.05, xanchor="center", x=0.5),
-            annotations=[dict(
-                text=f"<span style='font-size:11px; color:#94a3b8;'>TOTALE</span><br><b style='font-size:14px; color:#ffffff;'>€ {tot_fisc_assets:,.0f}</b>",
-                x=0.5, y=0.5, font_size=12, showarrow=False
-            )]
-        )
-        st.plotly_chart(fig_pie, use_container_width=True, config={'displayModeBar': False})
+        if tot_fisc_assets > 0:
+            fig_pie = go.Figure(data=[go.Pie(
+                labels=["Dossier Italia (Amministrato)", "Conti & Broker Estero (Dichiarativo)"],
+                values=[tot_dom, tot_for],
+                hole=0.60,
+                marker_colors=["#3b82f6", "#10b981"],
+                textinfo="percent",
+                textposition="inside"
+            )])
+            fig_pie.update_layout(
+                title=dict(text="Ripartizione Geografica del Patrimonio", font=dict(size=14, color="#ffffff")),
+                template="plotly_dark",
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                height=320,
+                margin=dict(l=10, r=10, t=40, b=30),
+                legend=dict(orientation="h", yanchor="top", y=-0.05, xanchor="center", x=0.5),
+                annotations=[dict(
+                    text=f"<span style='font-size:11px; color:#94a3b8;'>TOTALE</span><br><b style='font-size:14px; color:#ffffff;'>€ {tot_fisc_assets:,.0f}</b>",
+                    x=0.5, y=0.5, font_size=12, showarrow=False
+                )]
+            )
+            st.plotly_chart(fig_pie, use_container_width=True, config={'displayModeBar': False})
+        else:
+            st.info("ℹ️ Nessun asset finanziario censito per il calcolo della ripartizione.")
 
     with cs2:
         st.markdown(f"""
@@ -428,23 +463,23 @@ def _render_tab_quadro_rw():
             <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
                 <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
                     <td style="padding: 8px 0; color: #e2e8f0;">Dossier Italia (Regime Amministrato):</td>
-                    <td style="padding: 8px 0; font-weight: 700; text-align: right; color: #ffffff;">{fmt_eur(fiscal['total_domestic_assets'])}</td>
+                    <td style="padding: 8px 0; font-weight: 700; text-align: right; color: #ffffff;">{fmt_eur(tot_dom)}</td>
                 </tr>
                 <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
                     <td style="padding: 8px 0 8px 16px; color: #94a3b8; font-size: 12px;">• Imposta di Bollo IT (0,20%):</td>
-                    <td style="padding: 8px 0; font-weight: 700; text-align: right; color: #38bdf8;">{fmt_eur(fiscal['total_bollo'])}</td>
+                    <td style="padding: 8px 0; font-weight: 700; text-align: right; color: #38bdf8;">{fmt_eur(tot_bollo)}</td>
                 </tr>
                 <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
                     <td style="padding: 8px 0; color: #e2e8f0;">Dossier Estero (Regime Dichiarativo):</td>
-                    <td style="padding: 8px 0; font-weight: 700; text-align: right; color: #ffffff;">{fmt_eur(fiscal['total_foreign_assets'])}</td>
+                    <td style="padding: 8px 0; font-weight: 700; text-align: right; color: #ffffff;">{fmt_eur(tot_for)}</td>
                 </tr>
                 <tr style="border-bottom: 1px solid rgba(255,255,255,0.08);">
                     <td style="padding: 8px 0 8px 16px; color: #94a3b8; font-size: 12px;">• IVAFE Estero (0,20%):</td>
-                    <td style="padding: 8px 0; font-weight: 700; text-align: right; color: #34d399;">{fmt_eur(fiscal['total_ivafe'])}</td>
+                    <td style="padding: 8px 0; font-weight: 700; text-align: right; color: #34d399;">{fmt_eur(tot_ivafe)}</td>
                 </tr>
                 <tr style="font-weight: 800;">
                     <td style="padding: 10px 0; color: #f8fafc;">Totale Imposte Patrimoniali:</td>
-                    <td style="padding: 10px 0; text-align: right; color: #fbbf24; font-size: 15px;">{fmt_eur(fiscal['estimated_annual_fiscal_cost'])}</td>
+                    <td style="padding: 10px 0; text-align: right; color: #fbbf24; font-size: 15px;">{fmt_eur(tot_cost)}</td>
                 </tr>
             </table>
         </div>

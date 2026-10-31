@@ -555,6 +555,9 @@ def test_compute_fiscal_analytics(sqlite_engine):
     assert res["total_bollo"] == 34.20 # Conto italiano > 5000 euro
     assert res["total_minusvalenze"] > 0
     assert res["tax_shield_potential"] == round(res["total_minusvalenze"] * 0.26, 2)
+    assert res["total_active_losses"] == res["total_minusvalenze"]
+    assert res["total_tax_shield_eur"] == res["tax_shield_potential"]
+    assert "urgent_losses_amount" in res
     assert len(res["quadro_rw_rows"]) >= 1
 
 

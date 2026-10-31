@@ -1060,6 +1060,11 @@ def compute_fiscal_analytics(engine, portfolio_id: int = 1) -> Dict[str, Any]:
         ]
     tot_minus = sum(m["importo"] for m in minusvalenze_schedule)
     tax_shield_potential = round(tot_minus * 0.26, 2)
+    urgent_losses = sum(
+        float(m.get("importo", 0.0))
+        for m in minusvalenze_schedule
+        if "Scadenza" in str(m.get("stato", "")) or m.get("scadenza") == current_year
+    )
 
     # Quadro RW / RT Prospetto
     quadro_rw_rows = []
@@ -1117,7 +1122,10 @@ def compute_fiscal_analytics(engine, portfolio_id: int = 1) -> Dict[str, Any]:
         "total_foreign_assets": round(total_foreign_cash + foreign_inv_val, 2),
         "total_domestic_assets": round(total_domestic_cash + domestic_inv_val, 2),
         "total_minusvalenze": round(tot_minus, 2),
+        "total_active_losses": round(tot_minus, 2),
         "tax_shield_potential": tax_shield_potential,
+        "total_tax_shield_eur": tax_shield_potential,
+        "urgent_losses_amount": round(urgent_losses, 2),
         "minusvalenze_schedule": minusvalenze_schedule,
         "quadro_rw_rows": quadro_rw_rows,
         "foreign_accounts": foreign_accounts,
