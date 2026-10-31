@@ -29,16 +29,10 @@ runpy.run_path(str(_target), run_name="__main__")
 '''
     proxy_path.write_text(code, encoding="utf-8")
 
-# 2. Generate pages/0_Control_Room.py proxy
+# 2. Ensure pages/0_Control_Room.py is NOT present (avoids duplicate entry in Streamlit native navigation)
 ctrl_page_proxy = PAGES_DIR / "0_Control_Room.py"
-ctrl_page_code = '''"""ARGUS Page Proxy: 0_Control_Room.py"""
-import runpy
-from pathlib import Path
-
-_target = Path(__file__).resolve().parent.parent / "src" / "0_Control_Room.py"
-runpy.run_path(str(_target), run_name="__main__")
-'''
-ctrl_page_proxy.write_text(ctrl_page_code, encoding="utf-8")
+if ctrl_page_proxy.exists():
+    ctrl_page_proxy.unlink()
 
 # 3. Generate root 0_Control_Room.py proxy
 root_ctrl_proxy = ROOT_DIR / "0_Control_Room.py"
@@ -51,4 +45,4 @@ runpy.run_path(str(_target), run_name="__main__")
 '''
 root_ctrl_proxy.write_text(root_ctrl_code, encoding="utf-8")
 
-print(f"Successfully generated {len(src_pages)} page proxies in {PAGES_DIR} + root 0_Control_Room.py")
+print(f"Successfully generated {len(src_pages)} page proxies in {PAGES_DIR} (no duplicate 0_Control_Room in pages/) + root 0_Control_Room.py")

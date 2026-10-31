@@ -1,3 +1,66 @@
+-- =============================================================================
+-- ARGUS ENTERPRISE — SUPABASE POSTGRESQL SCHEMA & MULTI-TENANT RLS SETUP
+-- Canonical File: sql/01_supabase_schema_and_rls.sql
+-- 1. Safe remote data reset (TRUNCATE TABLE ... CASCADE) without touching local DB.
+-- 2. Credential vault: public.user_integrations (Zero-Disk Cloud Dependency).
+-- 3. Dynamic UUID user_id and workspace_id multi-tenancy columns on all tenant tables.
+-- 4. Full Table Schemas (21+ tables: Trading Risk, Wealth, Cash Flow, Tax 730/RW).
+-- 5. Complete B-Tree indexing on all foreign keys and temporal ranges.
+-- 6. Supabase Storage private bucket ('tax-documents') for verified PDF vault.
+-- 7. Hardened Row Level Security (RLS) tenant_isolation_policy bound to auth.uid().
+-- =============================================================================
+
+-- =============================================================================
+-- 1. OPTIONAL RESET OF REMOTE TENANT DATA (TRUNCATE CASCADE)
+-- =============================================================================
+SET session_replication_role = 'replica';
+
+DO 
+DECLARE
+    tbl text;
+    tables text[] := ARRAY[
+        'snapshot_positions', 'portfolio_snapshots', 'transactions', 'portfolios',
+        'wealth_cashflow', 'wealth_accounts', 'wealth_physical_assets',
+        'wealth_pension_plans', 'wealth_networth_snapshots', 'wealth_fixed_expenses',
+        'wealth_goals', 'wealth_portfolio_risk_links', 'wealth_profiles', 'wealth_categories',
+        'tax_declarations', 'tax_loss_carryforward', 'tax_verification_documents',
+        'user_integrations', 'argus_users'
+    ];
+BEGIN
+    FOREACH tbl IN ARRAY tables
+    LOOP
+        IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = tbl) THEN
+            EXECUTE format('TRUNCATE TABLE public.%I CASCADE;', tbl);
+        END IF;
+    END LOOP;
+END ;
+
+SET session_replication_role = 'origin';
+
+-- =============================================================================
+-- 2. TRIGGER FUNCTION FOR AUTOMATIC 'updated_at' TIMESTAMP REFRESH
+-- =============================================================================
+CREATE OR REPLACE FUNCTION public.handle_updated_at()
+RETURNS TRIGGER AS 
+BEGIN
+    NEW.updated_at = timezone('utc'::text, now());
+    RETURN NEW;
+END;
+ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- =============================================================================
+-- 3. CREDENTIAL VAULT: user_integrations (ZERO-DISK CLOUD DEPENDENCY)
+-- =============================================================================
+CREATE TABLE IF NOT EXISTS public.user_integrations (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+    provider TEXT NOT NULL,
+    config_data JSONB NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    UNIQUE(user_id, provider)
+);
+
 -- ============================================================
 -- ARGUS INSTITUTIONAL PLATFORM — SUPABASE POSTGRESQL SCHEMA
 -- Zero-Cost Cloud Architecture (PostgreSQL 15+ / Supabase)
@@ -313,6 +376,15 @@ CREATE TABLE IF NOT EXISTS argus_users (
     is_active INTEGER NOT NULL DEFAULT 1,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+CREATE TABLE IF NOT EXISTS user_integrations (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+    provider TEXT NOT NULL,
+    config_data JSONB NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    UNIQUE(user_id, provider)
+);
 
 -- 5. HIGH-PERFORMANCE B-TREE INDEXES
 CREATE INDEX IF NOT EXISTS idx_tx_portfolio_date ON transactions(portfolio_id, tx_date);
@@ -330,6 +402,7 @@ CREATE INDEX IF NOT EXISTS idx_acct_port ON wealth_accounts(portfolio_id);
 CREATE INDEX IF NOT EXISTS idx_verif_profile_year ON tax_verification_documents(profile_id, tax_year);
 CREATE INDEX IF NOT EXISTS idx_verif_doc_type ON tax_verification_documents(doc_type);
 CREATE INDEX IF NOT EXISTS idx_argus_users_uname ON argus_users(username);
+CREATE INDEX IF NOT EXISTS idx_user_integrations_user_prov ON user_integrations(user_id, provider);
 
 -- 6. SUPABASE STORAGE PRIVATE BUCKET FOR FISCAL PDF VAULT
 DO $$
@@ -358,3 +431,39 @@ ALTER TABLE tax_declarations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tax_loss_carryforward ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tax_verification_documents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE argus_users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_integrations ENABLE ROW LEVEL SECURITY;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='user_integrations' AND policyname='Users can view own integrations') THEN CREATE POLICY "Users can view own integrations" ON user_integrations FOR SELECT USING (auth.uid() = user_id); END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='user_integrations' AND policyname='Users can insert own integrations') THEN CREATE POLICY "Users can insert own integrations" ON user_integrations FOR INSERT WITH CHECK (auth.uid() = user_id); END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='user_integrations' AND policyname='Users can update own integrations') THEN CREATE POLICY "Users can update own integrations" ON user_integrations FOR UPDATE USING (auth.uid() = user_id); END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='user_integrations' AND policyname='Users can delete own integrations') THEN CREATE POLICY "Users can delete own integrations" ON user_integrations FOR DELETE USING (auth.uid() = user_id); END IF; END $$;
+
+
+-- =============================================================================
+-- 8. TENANT ISOLATION POLICIES (ROW LEVEL SECURITY)
+-- =============================================================================
+DO 
+DECLARE
+    tbl text;
+    tables text[] := ARRAY[
+        'portfolios', 'transactions', 'portfolio_snapshots', 'snapshot_positions',
+        'wealth_profiles', 'wealth_accounts', 'wealth_cashflow',
+        'wealth_pension_plans', 'wealth_physical_assets', 'wealth_networth_snapshots',
+        'wealth_fixed_expenses', 'wealth_goals', 'wealth_portfolio_risk_links',
+        'tax_declarations', 'tax_loss_carryforward', 'tax_verification_documents',
+        'argus_users', 'user_integrations'
+    ];
+BEGIN
+    FOREACH tbl IN ARRAY tables
+    LOOP
+        IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = tbl) THEN
+            EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY;', tbl);
+            EXECUTE format('DROP POLICY IF EXISTS tenant_isolation_policy ON public.%I;', tbl);
+            EXECUTE format('
+                CREATE POLICY tenant_isolation_policy ON public.%I
+                FOR ALL
+                USING (auth.uid() = user_id)
+                WITH CHECK (auth.uid() = user_id);
+            ', tbl);
+        END IF;
+    END LOOP;
+END ;

@@ -633,6 +633,17 @@ def get_supabase_config() -> Dict[str, Any]:
     }
 
 
+def is_supabase_engine(engine: Any) -> bool:
+    """Verifica se l'engine SQLAlchemy punta a un'istanza PostgreSQL / Supabase Cloud."""
+    if engine is None:
+        return False
+    try:
+        url_str = str(getattr(engine, "url", "")).lower()
+        return ("supabase" in url_str) or ("postgres" in url_str and "localhost" not in url_str and "127.0.0.1" not in url_str)
+    except Exception:
+        return False
+
+
 def is_supabase_configured() -> bool:
     """Restituisce True se un database PostgreSQL/Supabase è configurato."""
     return bool(get_supabase_config().get("is_configured"))
@@ -1652,6 +1663,7 @@ def migrate_local_to_supabase(
             is_demo = bool(
                 ss.get("is_sandbox")
                 or ss.get("is_demo")
+                or ss.get("is_demo_mode")
                 or ss.get("active_archetype_code")
                 or str(ss.get("portfolio_name", "")).startswith("DEMO_")
                 or str(ss.get("portfolio_name", "")).startswith("Archetipo:")
@@ -3108,9 +3120,9 @@ def render_supabase_cloud_panel(engine: Optional[Engine] = None) -> None:
 
     schema_sql = generate_supabase_schema_sql(include_rls=True, include_storage=True)
     st.download_button(
-        label="📜 Scarica Schema SQL Supabase (`supabase_schema.sql`)",
+        label="📜 Scarica Schema SQL Supabase (`01_supabase_schema_and_rls.sql`)",
         data=schema_sql.encode("utf-8"),
-        file_name="supabase_schema.sql",
+        file_name="01_supabase_schema_and_rls.sql",
         mime="text/sql",
         use_container_width=True,
         key="sb_dl_supabase_schema",

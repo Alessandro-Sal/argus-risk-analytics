@@ -23,6 +23,12 @@ from core.reporting.priips import (
     render_priips_kid_popover,
 )
 from core.reporting.quarterly import generate_white_label_quarterly_pdf_report
+from core.reporting.report_exporter import (
+    generate_cro_institutional_dossier_zip,
+    generate_excel_report,
+    generate_institutional_audit_dossier,
+    generate_pdf_factsheet,
+)
 
 __all__ = [
     "InstitutionalPalette",
@@ -45,4 +51,8 @@ __all__ = [
     "render_priips_kid_popover",
     "export_all",
     "save_snapshot_to_db",
+    "generate_cro_institutional_dossier_zip",
+    "generate_excel_report",
+    "generate_institutional_audit_dossier",
+    "generate_pdf_factsheet",
 ]

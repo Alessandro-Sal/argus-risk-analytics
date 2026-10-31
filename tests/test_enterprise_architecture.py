@@ -94,7 +94,7 @@ def test_session_manager_reexports():
 
 def test_supabase_reset_script_integrity():
     """Verifica che lo script SQL di reset contenga TRUNCATE CASCADE, RLS policy e user_integrations."""
-    sql_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "scripts", "supabase_reset_and_rls.sql")
+    sql_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "sql", "01_supabase_schema_and_rls.sql")
     assert os.path.exists(sql_path)
     
     with open(sql_path, "r", encoding="utf-8") as f:

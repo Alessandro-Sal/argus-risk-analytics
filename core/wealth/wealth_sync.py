@@ -1461,3 +1461,28 @@ def sync_expenses_tracker_async(
             return err_res
 
     return executor.submit(_worker)
+
+
+def sync_wealth_to_supabase(
+    sqlite_path: Optional[str] = None,
+    target_engine: Optional[Any] = None,
+    user_id: Optional[str] = None,
+    owner: Optional[str] = None,
+    **kwargs,
+) -> Dict[str, Any]:
+    """
+    Delega la sincronizzazione Cloud Wealth a core.supabase_cloud.migrate_local_to_supabase.
+    Garantisce:
+    - Hard-block per profili demo/archetipi (zero contaminazione su Supabase)
+    - Gestione unificata dei client, token JWT e connection pool
+    - Retry automatici con exponential backoff ed eventuale fallback offline
+    """
+    from core.supabase_cloud import migrate_local_to_supabase
+
+    return migrate_local_to_supabase(
+        sqlite_path=sqlite_path,
+        target_engine=target_engine,
+        user_id=user_id,
+        owner=owner,
+        **kwargs,
+    )

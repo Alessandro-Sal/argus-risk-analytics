@@ -964,9 +964,10 @@ argus-risk-analytics/
 │   └── sync_google_sheets.py    # Pipeline ETL Google Sheets con iniezione dati
 ├── notebooks/                   # Jupyter Notebooks di prototyping quantitativo
 │   └── test_pipeline.ipynb
-├── scripts/                     # Script di Build, Schema SQL, Reporting e Packaging
-│   ├── DB.sql                   # Schema DDL Data Warehouse MySQL 8.0 (Risk & Assets)
-│   ├── DB_wealth.sql            # Schema DDL Wealth Management MySQL 8.0
+├── sql/                         # Schemi SQL Canonici Unificati (PostgreSQL & SQLite)
+│   ├── 01_supabase_schema_and_rls.sql # Schema DDL Supabase/PostgreSQL 15+ & RLS Multi-Tenant
+│   └── 02_sqlite_local_schema.sql     # Schema DDL SQLite Locale & Seed Data (argus_local.db)
+├── scripts/                     # Script di Build, Ingegneria Dati e Packaging
 │   ├── build_desktop_app.py     # Automazione compilazione PyInstaller (.exe standalone)
 │   ├── create_desktop_shortcut.py # Generatore collegamento Desktop con icona (.lnk)
 │   ├── export_star_schema.py    # Generatore pacchetto ZIP Star Schema per Power BI & Looker Studio

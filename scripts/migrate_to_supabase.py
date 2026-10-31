@@ -55,7 +55,7 @@ def main() -> int:
     parser.add_argument(
         "--export-schema",
         default=None,
-        help="Salva solo lo schema SQL su file ed esce (es. sql/supabase_schema.sql)",
+        help="Salva solo lo schema SQL su file ed esce (es. sql/01_supabase_schema_and_rls.sql)",
     )
     parser.add_argument(
         "--user-id",
