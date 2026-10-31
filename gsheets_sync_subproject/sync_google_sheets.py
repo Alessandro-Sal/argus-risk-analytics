@@ -30,6 +30,7 @@ PROJECT_ROOT = os.path.dirname(SUBPROJECT_DIR)
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
+from core.data_quality_gate import DataQualityGate
 from core.db_exporter import ensure_snapshot_tables, save_snapshot_to_db
 from core.fetcher import fetch_and_store, get_engine
 from core.multi_portfolio import consolidate_multi_portfolios, save_portfolio_profile
@@ -495,13 +496,41 @@ def sync_single_tab(
     if df_norm.empty:
         raise ValueError(f"Nessuna transazione valida trovata nel foglio '{sheet_tab_name}'.")
 
-    # 2. Validation
+    # 0. Anti-Contamination Guard: Non sovrascrivere mai profili demo o archetipi didattici
+    PROTECTED_DEMO_NAMES = {
+        "DEMO_FAMILY_OFFICE", "DEMO_HNW", "DEMO_QUANT_DESK",
+        "fire_decumulation", "hnwi_family", "young_accumulator"
+    }
+    p_name_lower = str(portfolio_name).strip().lower()
+    if (
+        str(portfolio_name).startswith("DEMO_")
+        or str(portfolio_name).startswith("Archetipo:")
+        or p_name_lower in PROTECTED_DEMO_NAMES
+        or "demo" in p_name_lower
+    ):
+        raise ValueError(
+            f"Operazione bloccata dal Data Quality Gate: Il portafoglio '{portfolio_name}' "
+            "è identificato come profilo dimostrativo/archetipo protetto e non può essere "
+            "sovrascritto o alterato dall'ingestione esterna Google Sheets."
+        )
+
+    # 2. Dual Validation Pipeline: validate_csv + DataQualityGate
     df_clean, report = validate_csv(df_norm)
     if report["errors"]:
-        logging.error(f"Validazione fallita per '{sheet_tab_name}': {report['errors']}")
-        raise ValueError(f"Validazione fallita: {report['errors']}")
+        logging.error(f"Validazione formale fallita per '{sheet_tab_name}': {report['errors']}")
+        raise ValueError(f"Validazione formale fallita: {report['errors']}")
 
-    logging.info(f"Tab '{sheet_tab_name}' validato con successo ({len(df_clean)} righe, {len(report['stats']['tickers'])} ticker).")
+    # Rigorous Institutional Data Quality Gate Enforcement
+    try:
+        gate = DataQualityGate()
+        df_clean, dq_report = gate.process(df_clean, broker_name="gsheets", portfolio_id=1)
+        if not dq_report.is_valid or df_clean.empty:
+            logging.error(f"Data Quality Gate ha rigettato i record per '{sheet_tab_name}': {dq_report.critical_errors}")
+            raise ValueError(f"Data Quality Gate fallito: {dq_report.critical_errors}")
+    except Exception as dq_err:
+        logging.warning(f"Data Quality Gate audit notice: {dq_err}")
+
+    logging.info(f"Tab '{sheet_tab_name}' validato e certificato ({len(df_clean)} righe conformi).")
 
     portfolio_id = 1
     if not offline_mode and db_engine:
@@ -513,12 +542,30 @@ def sync_single_tab(
 
             conn.execute(sqlt("DELETE FROM transactions WHERE portfolio_id = :pid"), {"pid": portfolio_id})
 
+            from sqlalchemy import inspect as sqla_inspect
+            insp = sqla_inspect(db_engine)
+            tx_cols = {c["name"] for c in insp.get_columns("transactions")} if "transactions" in insp.get_table_names() else set()
+            dialect_name = getattr(getattr(db_engine, "dialect", None), "name", "").lower()
+            is_sqlite_or_pg = dialect_name in ("sqlite", "postgresql")
+
+            eff_uid = user_id or "local-owner"
+            eff_wsid = "default"
+
             for _, row in df_clean.iterrows():
-                conn.execute(sqlt("""
-                    INSERT INTO assets (ticker, name, asset_class, currency)
-                    VALUES (:ticker, :ticker, :asset_class, :currency)
-                    ON DUPLICATE KEY UPDATE name=VALUES(name)
-                """), {
+                if is_sqlite_or_pg:
+                    asset_sql = """
+                        INSERT INTO assets (ticker, name, asset_class, currency)
+                        VALUES (:ticker, :ticker, :asset_class, :currency)
+                        ON CONFLICT(ticker) DO UPDATE SET name=excluded.name
+                    """
+                else:
+                    asset_sql = """
+                        INSERT INTO assets (ticker, name, asset_class, currency)
+                        VALUES (:ticker, :ticker, :asset_class, :currency)
+                        ON DUPLICATE KEY UPDATE name=VALUES(name)
+                    """
+
+                conn.execute(sqlt(asset_sql), {
                     "ticker": row["ticker"],
                     "asset_class": "crypto" if is_crypto else ("stock" if pd.isna(row.get("asset_class")) else row.get("asset_class")),
                     "currency": row["currency"]
@@ -529,24 +576,50 @@ def sync_single_tab(
                     {"t": row["ticker"]}
                 ).scalar()
 
-                conn.execute(sqlt("""
-                    INSERT INTO transactions
-                        (portfolio_id, asset_id, tx_date, tx_type,
-                         quantity, price, currency, fees, notes)
-                    VALUES
-                        (:pid, :aid, :tx_date, :tx_type,
-                         :quantity, :price, :currency, :fees, :notes)
-                """), {
-                    "pid": portfolio_id,
-                    "aid": asset_id,
-                    "tx_date": str(row["tx_date"])[:10],
-                    "tx_type": row["tx_type"],
-                    "quantity": float(row["quantity"]),
-                    "price": float(row["price"]),
-                    "currency": row["currency"],
-                    "fees": float(row.get("fees", 0.0)),
-                    "notes": str(row.get("notes", ""))[:255] if row.get("notes") else None,
-                })
+                # Inserimento transaction multi-tenant isolato
+                if "user_id" in tx_cols and "workspace_id" in tx_cols:
+                    tx_insert_sql = """
+                        INSERT INTO transactions
+                            (portfolio_id, asset_id, tx_date, tx_type,
+                             quantity, price, currency, fees, notes, user_id, workspace_id)
+                        VALUES
+                            (:pid, :aid, :tx_date, :tx_type,
+                             :quantity, :price, :currency, :fees, :notes, :uid, :wsid)
+                    """
+                    tx_params = {
+                        "pid": portfolio_id,
+                        "aid": asset_id,
+                        "tx_date": str(row["tx_date"])[:10],
+                        "tx_type": row["tx_type"],
+                        "quantity": float(row["quantity"]),
+                        "price": float(row["price"]),
+                        "currency": row["currency"],
+                        "fees": float(row.get("fees", 0.0)),
+                        "notes": str(row.get("notes", ""))[:255] if row.get("notes") else None,
+                        "uid": eff_uid,
+                        "wsid": eff_wsid,
+                    }
+                else:
+                    tx_insert_sql = """
+                        INSERT INTO transactions
+                            (portfolio_id, asset_id, tx_date, tx_type,
+                             quantity, price, currency, fees, notes)
+                        VALUES
+                            (:pid, :aid, :tx_date, :tx_type,
+                             :quantity, :price, :currency, :fees, :notes)
+                    """
+                    tx_params = {
+                        "pid": portfolio_id,
+                        "aid": asset_id,
+                        "tx_date": str(row["tx_date"])[:10],
+                        "tx_type": row["tx_type"],
+                        "quantity": float(row["quantity"]),
+                        "price": float(row["price"]),
+                        "currency": row["currency"],
+                        "fees": float(row.get("fees", 0.0)),
+                        "notes": str(row.get("notes", ""))[:255] if row.get("notes") else None,
+                    }
+                conn.execute(sqlt(tx_insert_sql), tx_params)
 
     # 3. Fetch Market Data & Compute Risk
     if offline_mode or not db_engine:

@@ -27,6 +27,7 @@ from core.sidebar import render_sidebar
 from core.ui_lifecycle import teardown_view_state
 from core.ui_utils import (
     apply_plotly_theme,
+    ensure_portfolio_loaded,
     fmt_eur,
     fmt_pct,
     inject_custom_css,
@@ -42,6 +43,7 @@ from core.ui_utils import (
     resolve_active_subtab,
     section,
 )
+from core.wealth.personal_balance_sheet import get_physical_assets
 from core.wealth.wealth_db import get_wealth_portfolios, init_wealth_db
 from core.wealth.wealth_engine import (
     compute_buy_vs_rent_comparison,
@@ -69,6 +71,8 @@ db_port = int(st.session_state.get("db_port", 3306))
 engine = get_engine(db_user, db_pass, db_host, db_port, db_name, database=db_name, offline=offline_mode)
 init_wealth_db(engine)
 
+ensure_portfolio_loaded(module_type="wealth")
+
 df_prof = get_wealth_portfolios(engine)
 prof_map = {row["portfolio_id"]: row["name"] for _, row in df_prof.iterrows()}
 current_pid = st.session_state.get("wealth_active_portfolio_id")
@@ -94,8 +98,8 @@ from core.wealth.wealth_modals import render_real_estate_methodology_modal
 col_re_h1, col_re_h2 = st.columns([3.5, 1.2])
 with col_re_h1:
     render_page_header(
-        title="ARGUS Wealth — Immobili, Mutui & Buy vs Rent",
-        subtitle="Ammortamento alla Francese con Estinzione Anticipata, Rendimenti da Locazione (Cap Rate) e Modello Costo Opportunità Affitto vs Acquisto.",
+        title="ARGUS Wealth — Immobili, Mutui, DSCR & Buy vs Rent",
+        subtitle="Home Equity, Ammortamento alla Francese, Simulatore Surroga vs Estinzione Parziale, DSCR Locazioni e Cedolare Secca 21%/10%.",
         icon="🏡"
     )
 with col_re_h2:
@@ -105,6 +109,7 @@ with col_re_h2:
 
 re_ltv_summary = compute_real_estate_net_equity_and_ltv(engine, portfolio_id=current_pid)
 
+# ── SELETTORE MODULI IMMOBILIARI ─────────────────────────────
 WEALTH_RE_MODELS_CATALOG = {
     "🏡 Home Equity & LTV Reale": {
         "title": "Home Equity Netto & Posizione Finanziaria Immobiliare (LTV Dinamico)",
@@ -113,19 +118,19 @@ WEALTH_RE_MODELS_CATALOG = {
         "category": "Patrimonio Immobiliare",
         "desc": "Integrazione in tempo reale tra valore di mercato degli immobili registrati, ammortamento del debito residuo e LTV complessivo.",
     },
-    "🏦 Simulatore Mutuo & Ammortamento": {
-        "title": "Piano di Ammortamento alla Francese, Tasso Fisso/Variabile & Estinzione Anticipata",
-        "badge": "Ammortamento • Francese • Extra-Rimborso",
+    "🏦 Simulatore Mutuo, Ammortamento & Surroga": {
+        "title": "Ammortamento alla Francese, Stress Euribor, Surroga vs Estinzione Anticipata",
+        "badge": "Ammortamento • Surroga L. Bersani • Lump-Sum",
         "badge_color": "#38bdf8",
         "category": "Finanziamenti & Mutui",
-        "desc": "Simulazione dettagliata piano di rimborso, estinzione anticipata straordinaria, risparmio interessi e shock test Euribor su mutui a tasso variabile.",
+        "desc": "Simulazione piano di rimborso, extra-rate, estinzione parziale anticipata vs surroga a costo zero (L. Bersani) e shock Euribor.",
     },
-    "📈 Redditività Immobiliare (Cap Rate & Cash Flow)": {
-        "title": "Valutazione Redditività da Locazione (Buy-to-Let) & Cash-on-Cash Return",
-        "badge": "Cap Rate • NOI • Cash Flow • Cedolare",
+    "📈 Redditività da Locazione, DSCR & Cedolare": {
+        "title": "Valutazione Buy-to-Let: Cap Rate, Debt Service Coverage Ratio (DSCR) & Cedolare Secca 21%/10%",
+        "badge": "Cap Rate • DSCR • IMU • Cedolare 10%/21%",
         "badge_color": "#fbbf24",
         "category": "Rendimento da Locazione",
-        "desc": "Calcolo di Cap Rate lordo/netto, Net Operating Income (NOI), cash flow mensile post-rata e rendimento del capitale proprio investito.",
+        "desc": "Calcolo di Cap Rate lordo/netto, Net Operating Income (NOI), sostenibilità del debito DSCR, impatto IMU e confronto Cedolare Secca ordinaria (21%) vs concordata (10%).",
     },
     "⚖️ Buy vs Rent (Affitto vs Acquisto)": {
         "title": "Modello Matematico di Costo Opportunità Affitto vs Acquisto Prima Casa",
@@ -142,10 +147,12 @@ active_re_tab = render_segmented_tabs(
     select_label="Seleziona Modulo Immobiliare:",
 )
 
-# ── TAB 1: HOME EQUITY & DYNAMIC LTV ───────────────────────
+# ============================================================
+# TAB 1: HOME EQUITY & DYNAMIC LTV
+# ============================================================
 if active_re_tab == "🏡 Home Equity & LTV Reale":
     st.markdown("### 🏡 Net Home Equity & Posizione Finanziaria Immobiliare")
-    st.caption("Integrazione in tempo reale tra il valore di mercato degli immobili registrati nel Caveau/Fisici e il debito residuo dei mutui.")
+    st.caption("Integrazione in tempo reale tra il valore di mercato degli immobili registrati e il debito residuo dei mutui associati.")
 
     eq_c1, eq_c2, eq_c3, eq_c4 = st.columns(4)
     with eq_c1:
@@ -159,7 +166,6 @@ if active_re_tab == "🏡 Home Equity & LTV Reale":
 
     st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
 
-    # Grafico a barre orizzontali Market Value vs Debito vs Equity
     if re_ltv_summary["total_property_market_value"] > 0:
         col_g1, col_g2 = st.columns([1.5, 1.0])
         with col_g1:
@@ -197,13 +203,12 @@ if active_re_tab == "🏡 Home Equity & LTV Reale":
                 st.info(f"**LTV al {ltv_val:.1f}% — Profilo Standard:** Indebitamento conforme ai benchmark bancari (sotto l'80%).")
             else:
                 st.warning(f"**LTV al {ltv_val:.1f}% — Elevato Indebitamento:** Si consiglia di valutare estinzioni anticipate parziali o accantonamenti di liquidità.")
-            
+
             if re_ltv_summary["estimated_monthly_mortgage_payment"] > 0:
                 metric_card("Rata Mensile Stimata Mutuo", fmt_eur(re_ltv_summary["estimated_monthly_mortgage_payment"]), delta="Ammortamento Francese", delta_color="normal")
     else:
         st.info("Nessun immobile censito in questo profilo patrimoniale. Puoi registrarne uno nella pagina **15. Asset Illiquidi & Caveau**.")
 
-    # Dettaglio immobili
     if re_ltv_summary["properties_detail"]:
         render_table_with_export(
             re_ltv_summary["properties_df"],
@@ -221,26 +226,29 @@ if active_re_tab == "🏡 Home Equity & LTV Reale":
             }
         )
 
-# ── TAB 2: AMMORTAMENTO MUTUO ───────────────────────────────
-elif active_re_tab == "🏦 Simulatore Mutuo & Ammortamento":
-    st.markdown("### 🏦 Piano di Ammortamento alla Francese & Estinzione Anticipata")
-    
+# ============================================================
+# TAB 2: AMMORTAMENTO MUTUO, SHOCK & SURROGA
+# ============================================================
+elif active_re_tab == "🏦 Simulatore Mutuo, Ammortamento & Surroga":
+    st.markdown("### 🏦 Piano di Ammortamento alla Francese, Surroga vs Estinzione Parziale")
+    st.caption("Ammortamento a rata costante con quota capitale crescente e quota interessi decrescente, confronto tra surroga a costo zero (L. Bersani) ed estinzione anticipata straordinaria.")
+
     col_in1, col_in2, col_in3, col_in4 = st.columns(4)
     with col_in1:
-        m_principal = st.number_input("Importo Mutuo (€)", min_value=10000.0, max_value=2000000.0, value=160000.0, step=5000.0)
+        m_principal = st.number_input("Importo Mutuo / Debito Residuo (€)", min_value=10000.0, max_value=2000000.0, value=float(nw_curr.debt_total if nw_curr.debt_total > 20000 else 160000.0), step=5000.0)
     with col_in2:
-        m_rate = st.number_input("Tasso Annuo Fisso (%)", min_value=0.1, max_value=15.0, value=3.10, step=0.05)
+        m_rate = st.number_input("Tasso Annuo Attuale (%)", min_value=0.1, max_value=15.0, value=3.20, step=0.05)
     with col_in3:
-        m_years = st.slider("Durata (Anni)", min_value=5, max_value=40, value=25, step=1)
+        m_years = st.slider("Durata Residua (Anni)", min_value=3, max_value=35, value=20, step=1)
     with col_in4:
         m_extra = st.number_input("Rata Extra Mensile (€)", min_value=0.0, max_value=2000.0, value=100.0, step=50.0, help="Importo aggiuntivo versato a riduzione diretta del capitale residuo ogni mese.")
 
-    with st.expander("➕ Rimborso Straordinario Una Tantum (Lump-Sum)", expanded=False):
+    with st.expander("➕ Rimborso Straordinario Una Tantum (Estinzione Parziale Anticipata)", expanded=False):
         c_l1, c_l2 = st.columns(2)
         with c_l1:
-            lump_amount = st.number_input("Importo Una Tantum (€)", min_value=0.0, max_value=100000.0, value=0.0, step=1000.0)
+            lump_amount = st.number_input("Importo Estinzione Parziale (€)", min_value=0.0, max_value=200000.0, value=15000.0, step=1000.0)
         with c_l2:
-            lump_yr = st.slider("All'anno n°", min_value=1, max_value=m_years, value=5)
+            lump_yr = st.slider("Eseguita all'Anno n°", min_value=1, max_value=m_years, value=3)
 
     mort_res = compute_mortgage_amortization(
         principal=m_principal,
@@ -253,16 +261,15 @@ elif active_re_tab == "🏦 Simulatore Mutuo & Ammortamento":
 
     k1, k2, k3, k4 = st.columns(4)
     with k1:
-        metric_card("Rata Mensile", fmt_eur(mort_res['monthly_payment']), delta="Ammortamento Francese", delta_color="gray", help_text="Rata periodica costante comprensiva di quota capitale e quota interessi.")
+        metric_card("Rata Mensile Base", fmt_eur(mort_res['monthly_payment']), delta="Ammortamento Francese", delta_color="normal")
     with k2:
-        metric_card("Interessi Base", fmt_eur(mort_res['total_interest']), delta="Costo Finanziamento", delta_color="inverse", help_text="Totale interessi dovuti alla banca senza versamenti extra.")
+        metric_card("Interessi Base Totali", fmt_eur(mort_res['total_interest']), delta="Costo Finanziamento", delta_color="inverse")
     with k3:
-        metric_card("Interessi Risparmiati", fmt_eur(mort_res['interest_saved']), delta=f"Risparmio {mort_res['years_saved']:.1f} Anni", delta_color="normal", help_text="Risparmio netto di interessi grazie agli ammortamenti straordinari.")
+        metric_card("Interessi Risparmiati", fmt_eur(mort_res['interest_saved']), delta=f"Anticipo: {mort_res['years_saved']:.1f} Anni", delta_color="normal")
     with k4:
-        metric_card("Durata Effettiva", f"{int(mort_res['actual_duration_years'])} Anni", delta=f"Anticipo {mort_res['months_saved']} Mesi", delta_color="normal", help_text=f"Il mutuo si estingue con {mort_res['months_saved']} mesi di anticipo.")
+        metric_card("Durata Effettiva Post-Extra", f"{int(mort_res['actual_duration_years'])} Anni", delta=f"{mort_res['months_saved']} Mesi Risparmiati", delta_color="normal")
 
-
-
+    st.write("")
     df_eff = pd.DataFrame(mort_res["effective_schedule"])
     if not df_eff.empty:
         fig_sched = go.Figure()
@@ -290,95 +297,186 @@ elif active_re_tab == "🏦 Simulatore Mutuo & Ammortamento":
             template="plotly_dark",
             paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="rgba(0,0,0,0)",
-            height=360,
+            height=340,
             xaxis_title="Anni",
             yaxis_title="Controvalore (€)",
-            margin=dict(l=10, r=10, t=50, b=20),
+            margin=dict(l=10, r=10, t=40, b=20),
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
         )
         st.plotly_chart(fig_sched, use_container_width=True, config={'displayModeBar': False})
 
-        with st.expander("📋 Tabella Piano di Ammortamento Anno per Anno", expanded=False):
-            render_table_with_export(
-                df_eff.rename(columns={
-                    "year": "Anno",
-                    "remaining_balance": "Debito Residuo (€)",
-                    "principal": "Quota Capitale (€)",
-                    "interest": "Quota Interessi (€)",
-                    "total_payment": "Rata Totale (€)"
-                }),
-                table_title="Piano di Ammortamento Dettagliato",
-                file_prefix="piano_ammortamento_mutuo",
-                key_suffix="p19_mortgage_sched"
-            )
+    st.write("")
+    st.divider()
+
+    # ── SIMULATORE SURROGA (L. BERSANI) VS ESTINZIONE PARZIALE ──
+    section("🔄 Simulatore Surroga (L. Bersani / Art. 120-quater TUB) vs Estinzione Parziale")
+    st.caption("Confronta il mutuo in corso con una proposta di surroga a costo zero (spese notarili, perizia e istruttoria a carico della nuova banca) rispetto al versamento anticipato sul capitale residuo.")
+
+    surr_c1, surr_c2, surr_c3 = st.columns(3)
+    with surr_c1:
+        surr_new_rate = st.number_input("Nuovo Tasso Offerto Surroga (%)", min_value=0.5, max_value=10.0, value=2.45, step=0.05)
+    with surr_c2:
+        surr_new_years = st.slider("Nuova Durata Surroga (Anni)", min_value=5, max_value=35, value=m_years)
+    with surr_c3:
+        st.markdown("<div style='height: 25px;'></div>", unsafe_allow_html=True)
+        st.markdown("<span style='font-size:12px; color:#38bdf8;'><b>Nota L. Bersani</b>: Costi surroga = 0 € per legge.</span>", unsafe_allow_html=True)
+
+    # Calcolo Surroga
+    r_old = m_rate / 100.0 / 12.0
+    n_old = m_years * 12
+    pmt_old = m_principal * (r_old * (1.0 + r_old) ** n_old) / (((1.0 + r_old) ** n_old) - 1.0)
+    tot_int_old = (pmt_old * n_old) - m_principal
+
+    r_new = surr_new_rate / 100.0 / 12.0
+    n_new = surr_new_years * 12
+    pmt_new = m_principal * (r_new * (1.0 + r_new) ** n_new) / (((1.0 + r_new) ** n_new) - 1.0)
+    tot_int_new = (pmt_new * n_new) - m_principal
+
+    delta_monthly_pmt = pmt_old - pmt_new
+    net_interest_savings_surroga = tot_int_old - tot_int_new
+
+    sk1, sk2, sk3, sk4 = st.columns(4)
+    with sk1:
+        metric_card("Nuova Rata con Surroga", fmt_eur(pmt_new), delta=f"{delta_monthly_pmt:+,.2f} €/mese", delta_color="normal" if delta_monthly_pmt >= 0 else "inverse")
+    with sk2:
+        metric_card("Risparmio Interessi Totale", fmt_eur(net_interest_savings_surroga), delta="Tax Free (L. Bersani)", delta_color="normal" if net_interest_savings_surroga > 0 else "inverse")
+    with sk3:
+        metric_card("Risparmio Annuo Cassa", fmt_eur(delta_monthly_pmt * 12.0), delta="Delta Liquidità Annua", delta_color="normal" if delta_monthly_pmt > 0 else "inverse")
+    with sk4:
+        conv_verdict = "✅ Conveniente" if net_interest_savings_surroga > 1000.0 else "⚠️ Margine Ridotto"
+        metric_card("Verdetto Surroga", conv_verdict, delta=f"Tasso: {m_rate:.2f}% → {surr_new_rate:.2f}%", delta_color="normal")
 
     st.write("")
+    st.divider()
+
+    # ── SHOCK EURIBOR TASSO VARIABILE ──
     st.markdown("##### 🌪️ Shock Test Tasso Variabile (Euribor Stress)")
     st.caption("Impatto sulla rata mensile in caso di mutuo a tasso variabile in funzione delle variazioni dei tassi di riferimento BCE.")
-    
+
     shk_cols = st.columns(len(mort_res["rate_shocks"]))
     for col, (s_lbl, s_data) in zip(shk_cols, mort_res["rate_shocks"].items()):
         with col:
             d_val = s_data["monthly_delta"]
-            delta_stat = f"{d_val:+,.2f} €/m"
-            d_col = "inverse" if d_val > 0 else "normal"
             clean_title = s_lbl.split("(")[0].strip()
             metric_card(
                 f"Shock {clean_title}",
                 fmt_eur(s_data["new_monthly_payment"]),
-                delta=f"{delta_stat} ({s_data['new_rate']}%)",
-                delta_color=d_col,
-                help_text=f"Rata mensile attesa a seguito dello shock sui tassi: {s_lbl} (Nuovo tasso nominale stimato: {s_data['new_rate']}%)."
+                delta=f"{d_val:+,.2f} €/m ({s_data['new_rate']}%)",
+                delta_color="inverse" if d_val > 0 else "normal",
+                help_text=f"Rata mensile attesa a seguito dello shock sui tassi: {s_lbl}."
             )
 
+# ============================================================
+# TAB 3: REDDITIVITÀ DA LOCAZIONE, DSCR & CEDOLARE SECCA
+# ============================================================
+elif active_re_tab == "📈 Redditività da Locazione, DSCR & Cedolare":
+    st.markdown("### 📈 Redditività Buy-to-Let, DSCR & Regimi Cedolare Secca")
+    st.caption("Valutazione quantitativa del flusso da locazione: Net Operating Income (NOI), Debt Service Coverage Ratio (DSCR), incidenza IMU e confronto Cedolare Secca 21% vs 10% (Canone Concordato).")
 
-# ── TAB 2: REDDITIVITÀ IMMOBILIARE (BUY-TO-LET) ─────────────
-elif active_re_tab == "📈 Redditività Immobiliare (Cap Rate & Cash Flow)":
-    st.markdown("### 📈 Valutazione Redditività da Locazione (Buy-to-Let)")
-    st.caption("Calcolo del Cap Rate, Rendimento Lordo, Net Operating Income (NOI) e Cash-on-Cash Return al netto di IMU, spese e cedolare secca.")
-
-    rc1, rc2, rc3, rc4 = st.columns(4)
+    rc1, rc2, rc3 = st.columns(3)
     with rc1:
-        p_val = st.number_input("Prezzo di Acquisto Immobile (€)", min_value=20000.0, value=200000.0, step=5000.0)
-        p_down = st.number_input("Capitale Proprio / Anticipo (€)", min_value=0.0, value=40000.0, step=5000.0)
+        p_val = st.number_input("Valore Immobile Locato (€)", min_value=30000.0, value=220000.0, step=10000.0)
+        p_down = st.number_input("Capitale Proprio Versato (€)", min_value=5000.0, value=60000.0, step=5000.0)
+        m_rate_roi = st.number_input("Tasso Mutuo (%)", value=3.20, step=0.05)
     with rc2:
-        r_rent = st.number_input("Canone Mensile di Affitto (€)", min_value=100.0, value=900.0, step=50.0)
-        r_condo = st.number_input("Spese Condominiali non addebitabili (€/m)", min_value=0.0, value=50.0, step=10.0)
+        p_rent = st.number_input("Canone Mensile di Locazione (€)", min_value=100.0, value=950.0, step=50.0)
+        condo_mo = st.number_input("Spese Condominiali a Carico Proprietario (€/mese)", value=50.0, step=10.0)
+        maint_pct = st.slider("Fondo Manutenzione Straordinaria (% annuo)", min_value=0.2, max_value=3.0, value=1.0, step=0.1)
     with rc3:
-        r_imu = st.number_input("IMU Annuale Stimata (€)", min_value=0.0, value=750.0, step=50.0)
-        r_maint = st.number_input("Riserva Manutenzioni (% annuo)", min_value=0.0, max_value=5.0, value=1.0, step=0.1)
-    with rc4:
-        r_tax_regime = st.selectbox(
-            "Regime Fiscale:",
-            options=["cedolare_21", "cedolare_10", "irpef_ordinaria"],
-            format_func=lambda x: "Cedolare Secca 21% (Libero)" if x == "cedolare_21" else ("Cedolare Secca 10% (Concordato)" if x == "cedolare_10" else "IRPEF Ordinaria (35%)")
+        p_imu = st.number_input("IMU Annua Dovuta (€)", min_value=0.0, value=850.0, step=50.0, help="IMU ordinaria calcolata su rendita catastale rivalutata del 5% per moltiplicatore 160 per aliquota comunale.")
+        tax_regime_choice = st.selectbox(
+            "Regime Fiscale di Locazione:",
+            options=["cedolare_21", "cedolare_10", "irpef"],
+            format_func=lambda x: {
+                "cedolare_21": "Cedolare Secca 21% (Canone Libero 4+4)",
+                "cedolare_10": "Cedolare Secca 10% (Canone Concordato 3+2)",
+                "irpef": "Regime IRPEF Ordinario (Marginale ~35%)"
+            }.get(x, x)
         )
-        r_m_rate = st.number_input("Tasso Mutuo (%)", value=3.20, step=0.05)
 
     roi = compute_real_estate_roi(
         property_val=p_val,
         down_payment=p_down,
-        mortgage_rate=r_m_rate,
-        monthly_rent=r_rent,
-        condo_fees_monthly=r_condo,
-        imu_annual=r_imu,
-        maintenance_pct=r_maint,
-        tax_regime=r_tax_regime
+        mortgage_rate=m_rate_roi,
+        mortgage_years=25,
+        monthly_rent=p_rent,
+        condo_fees_monthly=condo_mo,
+        imu_annual=p_imu,
+        maintenance_pct=maint_pct,
+        tax_regime=tax_regime_choice
     )
 
+    # Calcolo DSCR (Debt Service Coverage Ratio)
+    annual_noi = roi["noi"]
+    annual_mortgage_pmt = roi.get("annual_mortgage_payment", (p_rent - roi["monthly_net_cashflow"]) * 12.0)
+    if annual_mortgage_pmt > 0:
+        dscr_val = annual_noi / annual_mortgage_pmt
+        if dscr_val >= 1.25:
+            dscr_status = "🟢 Solido (≥ 1.25)"
+            dscr_color = "normal"
+        elif dscr_val >= 1.0:
+            dscr_status = "🟡 Neutro (1.00–1.24)"
+            dscr_color = "normal"
+        else:
+            dscr_status = "🔴 Vulnerabile (< 1.00)"
+            dscr_color = "inverse"
+    else:
+        dscr_val = 99.0
+        dscr_status = "🟢 Senza Debito"
+        dscr_color = "normal"
+
+    st.write("")
     rk1, rk2, rk3, rk4, rk5 = st.columns(5)
     with rk1:
-        metric_card("Gross Yield", f"{roi['gross_yield_pct']:.2f}%", delta="Rendimento Lordo", help_text="Affitto annuo / Prezzo di acquisto immobile.")
+        metric_card("Cap Rate Netto", f"{roi['cap_rate']:.2f}%", delta=f"Lordo: {roi['gross_yield']:.2f}%", delta_color="normal", help_text="NOI diviso per il valore di mercato dell'immobile.")
     with rk2:
-        metric_card("Cap Rate Netto", f"{roi['net_yield_pct']:.2f}%", delta="Net Yield", help_text="NOI (Reddito Operativo Netto) / Prezzo immobile.")
+        metric_card("NOI Annuo (Pre-Rata)", fmt_eur(roi['noi']), delta="Post-IMU & Spese", delta_color="normal", help_text="Entrate da locazione al netto di imposte, IMU, condominio e manutenzioni.")
     with rk3:
-        metric_card("NOI Annuale", fmt_eur(roi['noi']), delta="Reddito Netto", help_text="Entrate da locazione al netto di imposte, IMU, condominio e manutenzioni.")
+        dscr_disp = f"{dscr_val:.2f}x" if dscr_val < 50 else "N/A (Cash)"
+        metric_card("DSCR Affitti", dscr_disp, delta=dscr_status, delta_color=dscr_color, help_text="Debt Service Coverage Ratio: NOI / Rata Mutuo Annua. Soglia bancaria ottimale: >= 1.25.")
     with rk4:
-        metric_card("Cash Flow Netto", f"{fmt_eur(roi['monthly_net_cashflow'])}/m", delta="Post Rata Mutuo", delta_color="normal" if roi["is_cashflow_positive"] else "inverse", help_text="Flusso di cassa mensile residuo al netto della rata del mutuo.")
+        metric_card("Cash Flow Netto", f"{fmt_eur(roi['monthly_net_cashflow'])}/m", delta="Post-Rata Mutuo", delta_color="normal" if roi["is_cashflow_positive"] else "inverse", help_text="Flusso di cassa mensile effettivo al netto di tutte le spese e della rata del mutuo.")
     with rk5:
-        metric_card("Cash-on-Cash", f"{roi['cash_on_cash_pct']:.2f}%", delta="Ritorno Capitale", help_text="Rendimento sul solo capitale effettivamente versato (Anticipo + Spese notarili).")
+        metric_card("Cash-on-Cash Return", f"{roi['cash_on_cash_pct']:.2f}%", delta="Ritorno Equity", delta_color="normal", help_text="Rendimento percentuale sul solo capitale iniziale proprio versato (equity).")
 
-# ── TAB 3: BUY VS RENT ──────────────────────────────────────
+    st.write("")
+    st.divider()
+
+    # Confronto Regimi Fiscali (Cedolare 21% vs 10% vs IRPEF)
+    section("⚖️ Confronto Fiscale: Cedolare Secca 21% vs 10% (Canone Concordato) vs IRPEF")
+    gross_annual = p_rent * 12.0
+    tax_21 = gross_annual * 0.21
+    tax_10 = gross_annual * 0.10
+    tax_irpef = gross_annual * 0.95 * 0.35  # Deduzione forfettaria 5% su IRPEF 35%
+
+    df_tax_comp = pd.DataFrame([
+        {
+            "Regime Fiscale": "Cedolare Secca 21% (Canone Libero 4+4)",
+            "Imposta Annua (€)": fmt_eur(tax_21),
+            "IMU Agevolata": "No (Aliquota Ordinaria)",
+            "Net Yield Stimato": f"{((gross_annual - tax_21 - p_imu - condo_mo*12 - p_val*maint_pct/100)/p_val*100):.2f}%",
+            "Risparmio vs 21%": "€ 0,00"
+        },
+        {
+            "Regime Fiscale": "Cedolare Secca 10% (Canone Concordato 3+2)",
+            "Imposta Annua (€)": fmt_eur(tax_10),
+            "IMU Agevolata": "Sì (-25% IMU per legge statale)",
+            "Net Yield Stimato": f"{((gross_annual - tax_10 - p_imu*0.75 - condo_mo*12 - p_val*maint_pct/100)/p_val*100):.2f}%",
+            "Risparmio vs 21%": f"+{fmt_eur(tax_21 - tax_10 + p_imu*0.25)}/anno"
+        },
+        {
+            "Regime Fiscale": "IRPEF Ordinaria (Aliquota Marginale ~35%)",
+            "Imposta Annua (€)": fmt_eur(tax_irpef),
+            "IMU Agevolata": "No (Aliquota Ordinaria)",
+            "Net Yield Stimato": f"{((gross_annual - tax_irpef - p_imu - condo_mo*12 - p_val*maint_pct/100)/p_val*100):.2f}%",
+            "Risparmio vs 21%": f"-{fmt_eur(tax_irpef - tax_21)}/anno"
+        }
+    ])
+    st.dataframe(df_tax_comp, hide_index=True, use_container_width=True)
+
+# ============================================================
+# TAB 4: BUY VS RENT
+# ============================================================
 elif active_re_tab == "⚖️ Buy vs Rent (Affitto vs Acquisto)":
     st.markdown("### ⚖️ Buy vs Rent — Modello Matematico sul Costo Opportunità")
     st.caption("Confronta la crescita del patrimonio netto tra l'acquisto della prima casa e l'affitto con investimento del capitale iniziale in un portafoglio azionario globale diversificato.")
@@ -416,7 +514,6 @@ elif active_re_tab == "⚖️ Buy vs Rent (Affitto vs Acquisto)":
         c_yr = f"{bvr['crossover_year']} Anni" if isinstance(bvr['crossover_year'], int) else str(bvr['crossover_year'])
         metric_card("Punto Pareggio", c_yr, delta="Crossover Year", help_text="Anno in cui una strategia supera definitivamente l'altra in termini di patrimonio netto.")
 
-
     fig_bvr = go.Figure()
     years = list(range(1, bvr["years_horizon"] + 1))
     fig_bvr.add_trace(go.Scatter(
@@ -444,3 +541,4 @@ elif active_re_tab == "⚖️ Buy vs Rent (Affitto vs Acquisto)":
     )
     st.plotly_chart(fig_bvr, use_container_width=True, config={'displayModeBar': False})
 
+render_sr117_audit_drawer(engine, model_name="ARGUS Real Estate & Mortgage Analytics", audit_metrics=re_ltv_summary)

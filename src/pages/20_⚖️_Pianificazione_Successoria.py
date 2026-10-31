@@ -55,6 +55,10 @@ from core.wealth import (
     get_wealth_portfolios,
     init_wealth_db,
 )
+from core.wealth.succession_optimizer import (
+    FamilyOfficeSuccessionOptimizer,
+    compute_family_succession_optimization,
+)
 
 st.set_page_config(page_title="Pianificazione Successoria | ARGUS Wealth", page_icon="⚖️", layout="wide")
 inject_custom_css()
@@ -413,6 +417,36 @@ elif active_estate_tab == "🧾 Calcolo Imposta & Franchigie":
     with t_col2:
         st.info(f"🏛️ **Imposte Ipotecarie e Catastali su Immobili**: Stimate in **€ {estate['mortgage_cadastral_tax']:,.2f}** ({'Fisse € 200+€ 200 Prima Casa' if first_home_applicable else 'Ordinarie 2% + 1%'}). Totale Tributi: **€ {estate['total_taxes_with_ipocatastali']:,.2f}**.")
 
+    st.write("")
+    section("📜 Normativa & Asset Esenti da Imposta di Successione (TUS D.Lgs. 346/1990)")
+    st.markdown("""
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; margin-top: 10px;">
+        <div style="background: rgba(22, 27, 34, 0.85); border: 1px solid rgba(255, 255, 255, 0.08); border-left: 4px solid #10b981; border-radius: 10px; padding: 14px 18px;">
+            <div style="color: #10b981; font-weight: 750; font-size: 13.5px; margin-bottom: 6px;">🏛️ Titoli di Stato Esenti (Art. 12 D.Lgs. 346/1990)</div>
+            <div style="font-size: 12px; color: #c9d1d9; line-height: 1.5;">
+                • <b>BTP, BOT, CCT</b> e tutti i titoli del debito pubblico italiano ed esteri UE/OCSE (White List) sono <u>completamente esclusi dall'attivo ereditario</u>.<br>
+                • Non concorrono alla base imponibile né al calcolo del superamento delle franchigie di legge.
+            </div>
+        </div>
+        <div style="background: rgba(22, 27, 34, 0.85); border: 1px solid rgba(255, 255, 255, 0.08); border-left: 4px solid #38bdf8; border-radius: 10px; padding: 14px 18px;">
+            <div style="color: #38bdf8; font-weight: 750; font-size: 13.5px; margin-bottom: 6px;">🛡️ Polizze Vita Caso Morte (Art. 1923 c.c. & Art. 12 TUS)</div>
+            <div style="font-size: 12px; color: #c9d1d9; line-height: 1.5;">
+                • I capitali corrisposti ai beneficiari designati sono <u>esenti da imposta di successione</u> (Art. 12 lett. c TUS).<br>
+                • <b>Impignorabili e Insequestrabili</b> (Art. 1923 c.c.) e liquidati immediatamente senza attendere lo sblocco dell'eredità.
+            </div>
+        </div>
+        <div style="background: rgba(22, 27, 34, 0.85); border: 1px solid rgba(255, 255, 255, 0.08); border-left: 4px solid #f59e0b; border-radius: 10px; padding: 14px 18px;">
+            <div style="color: #f59e0b; font-weight: 750; font-size: 13.5px; margin-bottom: 6px;">⚖️ Matrice Franchigie & Aliquote Ordinistiche</div>
+            <div style="font-size: 12px; color: #c9d1d9; line-height: 1.5;">
+                • <b>4%</b>: Coniuge e parenti in linea retta (Franchigia <b>€ 1.000.000</b> per ciascun erede).<br>
+                • <b>6%</b>: Fratelli e sorelle (Franchigia <b>€ 100.000</b>); altri parenti fino al 4° grado (senza franchigia).<br>
+                • <b>8%</b>: Altri soggetti ed estranei (nessuna franchigia).<br>
+                • <b>€ 1.500.000</b>: Franchigia speciale per eredi con disabilità grave riconosciuta ex L. 104/1992.
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
 
 # ── TAB 3: GENERATIONAL TRANSFER OPTIMIZER ──────────────────
 elif active_estate_tab == "🚀 Generational Transfer Optimizer (Ante vs Post)":
@@ -622,6 +656,34 @@ elif active_estate_tab == "🚀 Generational Transfer Optimizer (Ante vs Post)":
             mime="text/markdown",
             use_container_width=True
         )
+
+    st.write("")
+    st.divider()
+
+    # ── 5 ARCHITETTURE SUCCESSORIE ISTITUZIONALI A CONFRONTO ──
+    section("🏛️ Benchmark Comparativo: 5 Architetture Successorie HNWI (Family Office Optimizer)")
+    st.caption("Confronto multi-veicolo tra Regime Ordinario, Holding Familiare (PEX/Patto di Famiglia), Trust Fiduciario (AdE Circolare 34/E/2022), Polizze Vita Ramo I/III (PPLI) e Architettura Ibrida.")
+
+    estate_opt_res = compute_family_succession_optimization(
+        liquid_investments_eur=float(fin_val_cur + cash_val_cur),
+        operating_business_equity_eur=float(biz_val_cur),
+        real_estate_properties_eur=float(re_val_cur),
+        alternative_investments_eur=float(getattr(nw, "physical_assets", 0.0) or 50000.0),
+        num_children=num_children,
+        has_spouse=has_spouse,
+        annual_consumption_eur=float(estate.get("annual_expenses", 80000.0) or 80000.0)
+    )
+
+    rec_strat = estate_opt_res["recommended_strategy"]
+    st.success(f"🏆 **Strategia Istituzionale Raccomandata**: **{rec_strat['strategy_name']}** — {rec_strat['rationale']} (Asset Protection Score: **{rec_strat['asset_protection_score']}/100**).")
+
+    df_strat_summary = pd.DataFrame(estate_opt_res["summary_table"])
+    render_table_with_export(
+        df_strat_summary,
+        table_title="Matrice Comparativa delle 5 Architetture Successorie HNWI",
+        file_prefix="succession_architectures",
+        key_suffix="p20_succession_arch"
+    )
 
 
 elif active_estate_tab == "🛡️ Strumenti di Protezione Patrimoniale":

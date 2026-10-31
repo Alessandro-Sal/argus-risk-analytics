@@ -100,6 +100,12 @@ def main() -> int:
         )
         return 1
 
+        # Verifica di sicurezza anti-inquinamento: blocca migrazione di archetipi didattici o demo
+    BLOCKED_ARCHETYPES = {"fire_decumulation", "hnwi_family", "young_accumulator", "demo_family_office", "demo_hnw", "demo_quant_desk"}
+    if args.owner and str(args.owner).strip().lower() in BLOCKED_ARCHETYPES:
+        print(f"[BLOCCATO] Impossibile migrare il profilo '{args.owner}' verso Supabase: appartiene agli archetipi didattici protetti.")
+        return 1
+
     print("=" * 68)
     print("  ARGUS CLOUD MIGRATION — SQLITE LOCALE -> SUPABASE POSTGRESQL")
     print("=" * 68)

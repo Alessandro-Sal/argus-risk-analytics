@@ -22,6 +22,7 @@ importlib.reload(core.wealth.wealth_db)
 importlib.reload(core.wealth.wealth_engine)
 importlib.reload(core.wealth)
 
+from core.alm_ldi_engine import AlmLdiEngine, compute_alm_ldi_immunization
 from core.fetcher import get_engine
 from core.sidebar import render_sidebar
 from core.ui_utils import (
@@ -50,6 +51,8 @@ from core.ui_utils import (
     section,
 )
 from core.wealth.tax_history_engine import compute_fire_effective_tax_drag
+from core.wealth.tbs_monte_carlo import TBSLifecycleConfig, TBSMonteCarloEngine
+from core.wealth.total_wealth_reverse_stress import compute_total_wealth_reverse_stress
 from core.wealth.wealth_db import (
     delete_wealth_goal,
     get_cashflow_records,
@@ -133,6 +136,13 @@ WEALTH_FIRE_MODELS_CATALOG = {
         "badge_color": "#f97316",
         "category": "Indipendenza Finanziaria",
         "desc": "Calcolo del numero FIRE, Safe Withdrawal Rate (SWR), traiettorie di accumulo/decumulo e monitoraggio dei 4 archetipi di indipendenza.",
+    },
+    "🎲 Total Balance Sheet (TBS) Monte Carlo": {
+        "title": "Simulazione Stocastica a Ciclo di Vita (TBS-MC) & Solvibilità",
+        "badge": "Multi-Asset • Lifetime Ruin • Corridoio Spesa",
+        "badge_color": "#06b6d4",
+        "category": "Solvibilità a Ciclo di Vita",
+        "desc": "Simulazione integrata multi-asset (portafoglio titoli, stipendio/pensione, immobili e mutuo) a 90 anni con probabilità di rovina, punto di massima fragilità e corridoio di spesa sostenibile.",
     },
     "🌪️ Wealth Macro Stress Testing": {
         "title": "Macro Stress Testing Patrimoniale & Resilienza Globale",
@@ -455,6 +465,180 @@ elif active_fire_tab == "🌪️ Wealth Macro Stress Testing":
     apply_chart_theme(fig_stress_bar, portal_mode="wealth")
     st.plotly_chart(fig_stress_bar, use_container_width=True, config={'displayModeBar': False})
 
+    st.write("")
+    st.divider()
+
+    # ── 5. REVERSE STRESS TESTING PATRIMONIALE (SOLVENCY II / EBA) ──
+    section("🏛️ Reverse Stress Testing Patrimoniale (Framework EBA / Solvency II)")
+    st.caption("Calcolo dell'evento di stress multi-asset più verosimile (minima distanza di Mahalanobis) capace di portare il bilancio familiare al superamento della soglia critica di solvibilità.")
+
+    rst_c1, rst_c2 = st.columns([1.2, 2.8])
+    with rst_c1:
+        rst_target_type = st.selectbox("Soglia di Rovina / Target", ["solvency", "liquidity_ruin", "nominal_loss"], format_func=lambda x: {
+            "solvency": "Soglia Solvibilità Attivo/Passivo",
+            "liquidity_ruin": "Esaurimento Liquidità (Cassa <= 0)",
+            "nominal_loss": "Perdita Nominale di Capitale"
+        }.get(x, x))
+        rst_thresh = st.slider("Soglia Critica Solvibilità (Ratio)", min_value=0.20, max_value=0.90, value=0.60, step=0.05)
+    
+    bs_dict = {
+        "liquid_assets": float(nw_summary.liquid_cash + nw_summary.financial_investments),
+        "real_estate": float(nw_summary.real_estate_total),
+        "corporate_equity": float(getattr(nw_summary, 'corporate_equity_total', 0.0) or 0.0),
+        "illiquid_luxury": float(nw_summary.physical_assets),
+        "debt_liabilities": float(nw_summary.debt_total)
+    }
+
+    rst_res = compute_total_wealth_reverse_stress(bs_dict, target_type=rst_target_type, target_threshold=rst_thresh)
+
+    with rst_c2:
+        rk1, rk2, rk3, rk4 = st.columns(4)
+        with rk1:
+            metric_card("Distanza Mahalanobis", f"{rst_res['mahalanobis_distance']:.2f} σ", delta="Severità Shock", delta_color="normal")
+        with rk2:
+            metric_card("Probabilità Annua", f"{rst_res['implied_probability_pct']:.3f}%", delta=f"Periodo: ~{rst_res['return_period_years']} Anni", delta_color="normal")
+        with rk3:
+            metric_card("Fattore Più Vulnerabile", rst_res["most_vulnerable_factor"].replace("_", " ").title(), delta="Massima Esposizione", delta_color="inverse")
+        with rk4:
+            net_loss = rst_res["breakdown_loss"]["total_net_worth_loss_eur"]
+            metric_card("Perdita Net Worth", fmt_eur(net_loss), delta=f"{rst_res['breakdown_loss']['total_loss_pct']:.1f}% del Patrimonio", delta_color="inverse")
+
+    st.write("")
+    # Tabella Shock per Fattore
+    df_factors = pd.DataFrame([
+        {"Fattore di Rischio": k.replace("_", " ").title(), "Shock Ottimale (%)": f"{v:+.1f}%"}
+        for k, v in rst_res["factor_shocks"].items()
+    ])
+    df_pre_post = pd.DataFrame([
+        {
+            "Comparto Patrimoniale": k.replace("_", " ").title(),
+            "Valore Ante-Shock (€)": fmt_eur(rst_res["pre_stress_balance_sheet"][k]),
+            "Valore Post-Shock (€)": fmt_eur(rst_res["post_stress_balance_sheet"][k])
+        }
+        for k in rst_res["pre_stress_balance_sheet"]
+    ])
+    f_col1, f_col2 = st.columns(2)
+    with f_col1:
+        render_table_with_export(df_factors, table_title="Shock Multi-Fattoriale Più Probabile", file_prefix="rst_shocks", key_suffix="p17_rst_shocks")
+    with f_col2:
+        render_table_with_export(df_pre_post, table_title="Stato Patrimoniale Pre vs Post-Stress", file_prefix="rst_prepost", key_suffix="p17_rst_prepost")
+
+    st.write("")
+    st.divider()
+
+    # ── 6. ASSET-LIABILITY MANAGEMENT (ALM) & LDI IMMUNIZATION ──
+    section("🛡️ Asset-Liability Management (ALM) & Redington Immunization (1952)")
+    st.caption("Modellizzazione istituzionale delle passività familiari multi-decennali (spese, mutuo, inflazione) contro il patrimonio attivo con verifica dell'immunizzazione di Redington e copertura del tasso.")
+
+    alm_c1, alm_c2, alm_c3 = st.columns(3)
+    with alm_c1:
+        alm_disc_rate = st.slider("Tasso di Sconto Nominale (%)", min_value=1.5, max_value=6.0, value=3.5, step=0.25) / 100.0
+    with alm_c2:
+        alm_infl_rate = st.slider("Tasso di Inflazione Atteso (%)", min_value=1.0, max_value=5.0, value=2.0, step=0.25) / 100.0
+    with alm_c3:
+        alm_horizon = st.slider("Orizzonte Copertura ALM (Anni)", min_value=10, max_value=35, value=25, step=5)
+
+    annual_liab = float(fire_calc["annual_expense"])
+    sched = [
+        {"year": float(y), "nominal_cashflow_eur": annual_liab, "inflation_linked_share": 0.65}
+        for y in range(1, alm_horizon + 1, 3)
+    ]
+    tot_assets_alm = max(float(nw_summary.total_net_worth), 10000.0)
+    alm_eng = AlmLdiEngine(
+        asset_portfolio_eur=tot_assets_alm,
+        asset_modified_duration=6.5,
+        asset_convexity=58.0,
+        asset_annual_vol=0.12,
+        discount_rate=alm_disc_rate,
+        inflation_rate=alm_infl_rate,
+        liability_schedule=sched
+    )
+    alm_res = alm_eng.analyze_alm()
+
+    ak1, ak2, ak3, ak4 = st.columns(4)
+    with ak1:
+        metric_card("Funding Ratio (PV_A / PV_L)", f"{alm_res['funding_ratio_pct']:.1f}%", delta="Stato Solvibilità ALM", delta_color="normal" if alm_res['funding_ratio_pct'] >= 100 else "inverse")
+    with ak2:
+        metric_card("Surplus Attuariale", fmt_eur(alm_res["accounting_surplus_eur"]), delta=f"PV Passività: {fmt_eur(alm_res['pv_liabilities_eur'])}", delta_color="normal")
+    with ak3:
+        metric_card("1-Yr 99% Surplus-at-Risk", fmt_eur(alm_res["surplus_at_risk_99_eur"]), delta="SaR 99% Stress", delta_color="inverse")
+    with ak4:
+        red_status = "✅ Soddisfatta" if alm_res["redington_immunization_satisfied"] else "⚠️ Gap Durata/Convessità"
+        metric_card("Redington Immunization", red_status, delta=f"Gap Durata: {alm_res['duration_gap_years']:+.1f}y", delta_color="normal" if alm_res["redington_immunization_satisfied"] else "inverse")
+
+
+# ============================================================
+# TAB TBS: TOTAL BALANCE SHEET (TBS) LIFETIME MONTE CARLO
+# ============================================================
+elif active_fire_tab == "🎲 Total Balance Sheet (TBS) Monte Carlo":
+    st.markdown("### 🎲 Total Balance Sheet (TBS) Lifetime Monte Carlo Simulation")
+    st.caption("Simulazione stocastica su 2.000 cammini a ciclo di vita (fino a 90 anni). Integra simultaneamente portafoglio titoli, stipendio, shock lavorativi, pensione, immobili e mutuo con calcolo della probabilità di rovina.")
+
+    tb_c1, tb_c2, tb_c3, tb_c4 = st.columns(4)
+    with tb_c1:
+        tbs_cur_age = st.slider("Età Attuale (Anni)", 20, 65, 35, key="tbs_cur_age")
+        tbs_ret_age = st.slider("Età Pensionamento (Anni)", 50, 75, 67, key="tbs_ret_age")
+    with tb_c2:
+        tbs_inc = st.number_input("Reddito Netto Annuo (€)", min_value=0.0, value=float(cf_analytics.get("total_inflows_eur", 55000.0) or 55000.0), step=5000.0, key="tbs_inc")
+        tbs_exp = st.number_input("Spese di Sostentamento (€/a)", min_value=5000.0, value=float(round(fire_base["annual_expense"], 0)), step=2000.0, key="tbs_exp")
+    with tb_c3:
+        tbs_ret_pct = st.slider("Rendimento Reale Portafoglio (%)", 1.0, 8.0, 4.5, step=0.5, key="tbs_ret_pct") / 100.0
+        tbs_vol_pct = st.slider("Volatilità Portafoglio (%)", 5.0, 30.0, 15.0, step=1.0, key="tbs_vol_pct") / 100.0
+    with tb_c4:
+        tbs_re_val = st.number_input("Valore Immobili (€)", min_value=0.0, value=float(nw_summary.real_estate_total), step=10000.0, key="tbs_re_val")
+        tbs_debt_val = st.number_input("Debito Mutuo Residuo (€)", min_value=0.0, value=float(nw_summary.debt_total), step=10000.0, key="tbs_debt_val")
+
+    tbs_cfg = TBSLifecycleConfig(
+        current_age=tbs_cur_age,
+        retirement_age=tbs_ret_age,
+        terminal_age=90,
+        current_annual_net_income=tbs_inc,
+        annual_living_expenses=tbs_exp,
+        initial_liquid_wealth=float(nw_summary.liquid_cash + nw_summary.financial_investments),
+        liquid_wealth_real_return_mean=tbs_ret_pct,
+        liquid_wealth_volatility=tbs_vol_pct,
+        initial_real_estate_value=tbs_re_val,
+        initial_mortgage_debt=tbs_debt_val,
+        mortgage_years_remaining=15 if tbs_debt_val > 0 else 0,
+        num_simulations=2000,
+        random_seed=42
+    )
+
+    with atomic_computation("Simulazione Stocastica TBS a Ciclo di Vita (2.000 cammini)...", view_slot_key="tbs_mc_comp"):
+        tbs_res = TBSMonteCarloEngine(tbs_cfg).simulate_lifetime_solvency()
+
+    tk1, tk2, tk3, tk4 = st.columns(4)
+    with tk1:
+        ruin_pct = tbs_res["total_ruin_probability_pct"]
+        metric_card("Probabilità Rovina a 90a", f"{ruin_pct:.1f}%", delta="🟢 Sostenibile" if tbs_res["is_solvency_sustainable"] else "🔴 Rischio Fragilità", delta_color="normal" if tbs_res["is_solvency_sustainable"] else "inverse")
+    with tk2:
+        metric_card("Età Massima Fragilità", f"{tbs_res['point_of_maximum_fragility_age']} Anni", delta="Minimo Buffer Liquidità", delta_color="normal")
+    with tk3:
+        metric_card("Patrimonio Netto Mediano (P50)", fmt_eur(tbs_res["median_terminal_net_worth_eur"]), delta=f"Iniziale: {fmt_eur(tbs_res['initial_net_worth_eur'])}", delta_color="normal")
+    with tk4:
+        metric_card("Spesa Annua Consigliata", fmt_eur(tbs_res["recommended_annual_spending_eur"]), delta=f"Haircut Anti-Rovina: {fmt_eur(tbs_res['recommended_spending_cut_eur'])}" if tbs_res['spending_adjustment_needed'] else "Budget Pieno Coperto", delta_color="normal")
+
+    st.write("")
+    # Fan Chart TBS
+    tbs_df = tbs_res["timeline_df"]
+    fig_tbs = go.Figure()
+    fig_tbs.add_trace(go.Scatter(x=tbs_df["age"], y=tbs_df["net_worth_p90"], mode="lines", line=dict(width=0), showlegend=False, hoverinfo="skip"))
+    fig_tbs.add_trace(go.Scatter(x=tbs_df["age"], y=tbs_df["net_worth_p10"], mode="lines", line=dict(width=0), fill="tonexty", fillcolor="rgba(6, 182, 212, 0.12)", name="Intervallo P10–P90"))
+    fig_tbs.add_trace(go.Scatter(x=tbs_df["age"], y=tbs_df["net_worth_p75"], mode="lines", line=dict(width=0), showlegend=False, hoverinfo="skip"))
+    fig_tbs.add_trace(go.Scatter(x=tbs_df["age"], y=tbs_df["net_worth_p25"], mode="lines", line=dict(width=0), fill="tonexty", fillcolor="rgba(6, 182, 212, 0.25)", name="Intervallo P25–P75"))
+    fig_tbs.add_trace(go.Scatter(x=tbs_df["age"], y=tbs_df["net_worth_p50"], mode="lines+markers", line=dict(color="#06b6d4", width=3), name="Patrimonio Mediano (P50)"))
+    fig_tbs.add_trace(go.Scatter(x=tbs_df["age"], y=tbs_df["liquid_wealth_median"], mode="lines", line=dict(color="#38bdf8", width=2, dash="dot"), name="Liquidità Mediana"))
+
+    fig_tbs.update_layout(
+        title="Evoluzione Stocastica del Total Balance Sheet a Ciclo di Vita (TBS-MC)",
+        xaxis_title="Età Anagrafica (Anni)",
+        yaxis_title="Patrimonio (€)",
+        height=400,
+        margin=dict(t=35, l=15, r=15, b=20),
+        legend=dict(orientation="h", yanchor="top", y=-0.18, xanchor="center", x=0.5)
+    )
+    apply_chart_theme(fig_tbs, portal_mode="wealth")
+    st.plotly_chart(fig_tbs, use_container_width=True, config={'displayModeBar': False})
 
 # ============================================================
 # TAB 3: GOAL-BASED MULTI-TRAGUARDO & STOCHASTIC MONTE CARLO (SPI %)

@@ -305,13 +305,10 @@ NAV_MODULES_WEALTH = [
         "has_subtabs": True,
         "tab_key": "wealth_tax_active_tab",
         "subtabs": [
-            {"label": "🏛️ Storico 730", "target": "🏛️ Storico 730 & Riconciliazione"},
-            {"label": "📑 Monitoraggio RW", "target": "📑 Prospetto Quadro RW / RT"},
-            {"label": "🪦 Zainetto Minusvalenze", "target": "📉 Zainetto Fiscale & Scadenze"},
-            {"label": "🌾 Tax-Loss Harvesting", "target": "🌾 Tax-Loss Harvesting & Plusvalenze"},
-            {"label": "⚖️ Asset Location", "target": "⚖️ Ripartizione Italia vs Estero"},
-            {"label": "🛡️ Ottimizzazione", "target": "💡 Strategie di Efficienza Fiscale"},
-            {"label": "🌐 Cross-Border", "target": "🌍 Fiscalità Internazionale & Cross-Border"},
+            {"label": "💼 Zainetto & Riforma", "target": "💼 Zainetto Fiscale, Capital Gain & Riforma 2026"},
+            {"label": "🌍 Quadro RW & IVAFE", "target": "🌍 Simulatore Quadro RW / IVAFE & Conti Esteri"},
+            {"label": "₿ Fiscalità Cripto", "target": "₿ Fiscalità Crypto (L. 197/2022) & Soglie"},
+            {"label": "📑 Storico 730 & IRPEF", "target": "📑 Storico Dichiarazioni 730, IRPEF & Audit"},
         ],
     },
     {
@@ -323,8 +320,8 @@ NAV_MODULES_WEALTH = [
         "tab_key": "wealth_re_active_tab",
         "subtabs": [
             {"label": "🏡 Net Home Equity", "target": "🏡 Home Equity & LTV Reale"},
-            {"label": "📉 Piani Ammortamento", "target": "🏦 Simulatore Mutuo & Ammortamento"},
-            {"label": "📈 Rendita Locazioni", "target": "📈 Redditività Immobiliare (Cap Rate & Cash Flow)"},
+            {"label": "📉 Piani Ammortamento", "target": "🏦 Simulatore Mutuo, Ammortamento & Surroga"},
+            {"label": "📈 Rendita Locazioni", "target": "📈 Redditività da Locazione, DSCR & Cedolare"},
             {"label": "⚖️ Buy vs Rent", "target": "⚖️ Buy vs Rent (Affitto vs Acquisto)"},
         ],
     },

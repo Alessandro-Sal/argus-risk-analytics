@@ -22,7 +22,13 @@ importlib.reload(core.wealth.wealth_db)
 importlib.reload(core.wealth.wealth_engine)
 importlib.reload(core.wealth)
 
+from core.advisor import generate_quant_advisory_report
+from core.ai_analyst import (
+    generate_portfolio_narrative_memorandum,
+    query_argus_assistant,
+)
 from core.fetcher import get_engine
+from core.sec_rag_engine import query_sec_filings_rag
 from core.sidebar import render_sidebar
 from core.ui_lifecycle import teardown_view_state
 from core.ui_utils import (
@@ -876,105 +882,191 @@ elif active_copilot_tab == "📑 Executive Quarterly Review (NLG)":
 
 
 elif active_copilot_tab == "💬 Assistente Finanziario Diretto":
-    st.markdown("### 🧠 Neural Wealth Advisor & Conversational Action Memo")
-    st.caption("Consulente patrimoniale neurale connesso in tempo reale ai tuoi dati di bilancio. Esegue simulazioni 'What-If' istantanee e redige Action Memo esecutivi.")
+    st.markdown("### 🤖 ARGUS AI Intelligence: Neural Advisor, Quant Governance & SEC RAG")
+    st.caption("Consulente patrimoniale istituzionale multi-motore: simulazioni What-If, advisory quantitativo, memorandum narrativo e SEC Filings RAG.")
 
-    from core.wealth.neural_advisor_engine import NeuralWealthAdvisor
-
-    re_tot_val = float(getattr(nw, "real_estate_total", 0.0))
-    liab_tot_val = float(getattr(nw, "total_liabilities", 0.0))
-    re_eq_val = max(0.0, re_tot_val - liab_tot_val)
-
-    summary_ai_dict = {
-        "total_net_worth": float(getattr(nw, "total_net_worth", 0.0)),
-        "liquid_cash": float(getattr(nw, "liquid_cash", 0.0)),
-        "financial_investments": float(getattr(nw, "financial_investments", 0.0)),
-        "real_estate_total": re_tot_val,
-        "real_estate_equity": re_eq_val,
-        "physical_assets": float(getattr(nw, "physical_assets", 0.0)),
-        "pension_total": float(getattr(nw, "pension_total", 0.0)),
-        "total_liabilities": liab_tot_val,
-        "wealth_health_score": float(ai_diag.get("health_score", 85.0)),
-        "runway_months": float(getattr(nw, "runway_months", 6.0))
-    }
-
-    # Query Chips
-    col_chip1, col_chip2, col_chip3, col_chip4 = st.columns(4)
-    with col_chip1:
-        if st.button("⚖️ Ottimizza Zainetto Fiscale", use_container_width=True, key="chip_tax"):
-            st.session_state["neural_advisor_query_input"] = "ottimizza zainetto fiscale e minusvalenze"
-    with col_chip2:
-        if st.button("🏡 Simula Acquisto Immobile", use_container_width=True, key="chip_re"):
-            st.session_state["neural_advisor_query_input"] = "simula acquisto immobile con mutuo 80%"
-    with col_chip3:
-        if st.button("⌚ Estinzione Debito con Caveau", use_container_width=True, key="chip_phys"):
-            st.session_state["neural_advisor_query_input"] = "liquidazione orologi caveau per estinzione debito"
-    with col_chip4:
-        if st.button("🔥 Roadmap Verso il FIRE", use_container_width=True, key="chip_fire"):
-            st.session_state["neural_advisor_query_input"] = "pianifica indipendenza finanziaria e rendita FIRE"
-
-    user_query = st.text_input(
-        "💬 Chiedi al Neural Advisor o scrivi una simulazione personalizzata:",
-        value=st.session_state.get("neural_advisor_query_input", "Qual è lo stato di salute e la resilienza del mio patrimonio?"),
-        key="neural_advisor_text_box",
-        placeholder="es. Cosa succede se spendo 50.000€ per comprare casa? Oppure: come azzero le minusvalenze?"
+    sub_mode_ai = st.segmented_control(
+        "Seleziona Motore di Intelligence Finanziaria:",
+        options=[
+            "🧠 Neural Advisor (What-If & Action Memo)",
+            "📊 Quant Advisory & Narrative Memorandum",
+            "📑 SEC Filings RAG (10-K / 10-Q Fundamental Intelligence)"
+        ],
+        default="🧠 Neural Advisor (What-If & Action Memo)",
+        key="p21_sub_mode_ai"
     )
 
-    if user_query:
-        sim_res = NeuralWealthAdvisor.evaluate_scenario_query(user_query, summary_ai_dict)
+    profile_snapshot = {
+        "total_value": float(getattr(nw, "total_net_worth", 0.0)),
+        "portfolio_id": current_pid,
+        "portfolio_name": prof_title,
+        "liquid_cash": float(getattr(nw, "liquid_cash", 0.0)),
+        "financial_investments": float(getattr(nw, "financial_investments", 0.0)),
+        "real_estate": float(getattr(nw, "real_estate_total", 0.0)),
+        "debt": float(getattr(nw, "debt_total", 0.0)),
+        "runway_months": float(getattr(nw, "runway_months", 6.0)),
+        "cvar_95": float(getattr(nw, "cvar_95", 0.08) or 0.08),
+        "sharpe_ratio": float(getattr(nw, "sharpe", 1.2) or 1.2),
+        "max_drawdown": float(getattr(nw, "max_drawdown", -0.15) or -0.15),
+        "volatility": float(getattr(nw, "volatility", 0.12) or 0.12),
+    }
 
-        st.markdown(f"""
-        <div style="background: linear-gradient(135deg, rgba(22, 27, 34, 0.95) 0%, rgba(13, 17, 23, 0.98) 100%); border: 1px solid rgba(16, 185, 129, 0.3); border-left: 4px solid #10b981; border-radius: 12px; padding: 16px 20px; margin: 15px 0;">
-            <div style="font-size: 15px; font-weight: 800; color: #34d399; margin-bottom: 4px;">
-                🎯 {sim_res['title']}
-            </div>
-            <div style="font-size: 13px; color: #e2e8f0; line-height: 1.6;">
-                {sim_res['summary_text']}
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+    if sub_mode_ai == "📊 Quant Advisory & Narrative Memorandum":
+        st.markdown("#### 📊 Quantitative Advisory Report & Portfolio Narrative Memorandum")
+        st.caption("Diagnostica di portafoglio istituzionale e memorandum narrativo validato tramite ai_analyst.py e advisor.py.")
 
-        # KPI Proiettati
-        qk1, qk2, qk3 = st.columns(3)
-        with qk1:
-            delta_nw = sim_res["projected_nw"] - sim_res["pre_shock_nw"]
-            metric_card("Net Worth Proiettato", fmt_eur(sim_res["projected_nw"]), delta=f"Delta: {fmt_eur(delta_nw)}", delta_color="normal" if delta_nw >= 0 else "inverse")
-        with qk2:
-            delta_run = sim_res["projected_runway"] - float(nw.runway_months)
-            metric_card("Runway Proiettato", f"{sim_res['projected_runway']:.1f} Mesi", delta=f"Pre: {nw.runway_months:.1f} Mesi", delta_color="normal" if sim_res["projected_runway"] >= 6.0 else "inverse")
-        with qk3:
-            delta_h = sim_res["projected_health"] - float(ai_diag["health_score"])
-            metric_card("Health Score Proiettato", f"{sim_res['projected_health']:.0f} / 100", delta=f"Pre: {ai_diag['health_score']:.0f}/100", delta_color="normal" if delta_h >= 0 else "inverse")
+        q_btn_c1, q_btn_c2 = st.columns(2)
+        with q_btn_c1:
+            if st.button("📈 Genera Quantitative Advisory Report", type="primary", use_container_width=True, key="p21_btn_adv_rep"):
+                adv_out = generate_quant_advisory_report(profile_snapshot)
+                st.session_state["p21_res_adv"] = adv_out
 
-        st.markdown("##### 📌 Metriche & Parametri di Scenario")
-        col_m1, col_m2 = st.columns(2)
-        m_items = list(sim_res["key_metrics"].items())
-        mid_pt = (len(m_items) + 1) // 2
-        with col_m1:
-            for k, v in m_items[:mid_pt]:
-                st.markdown(f"- **{k}:** `{v}`")
-        with col_m2:
-            for k, v in m_items[mid_pt:]:
-                st.markdown(f"- **{k}:** `{v}`")
+        with q_btn_c2:
+            if st.button("📝 Genera Portfolio Narrative Memorandum", type="secondary", use_container_width=True, key="p21_btn_narr"):
+                narr_out = generate_portfolio_narrative_memorandum(profile_snapshot)
+                st.session_state["p21_res_narr"] = narr_out
 
-        st.markdown("##### 📋 Piano d'Azione Consigliato (Sequence of Execution)")
-        for act in sim_res["action_plan"]:
+        if "p21_res_adv" in st.session_state:
+            st.markdown("##### 📋 Esito Advisory Quantitativo")
+            st.json(st.session_state["p21_res_adv"])
+
+        if "p21_res_narr" in st.session_state:
+            st.markdown("##### 📜 Portfolio Narrative Memorandum")
+            nd = st.session_state["p21_res_narr"]
+            st.markdown(nd.get("memorandum_markdown", str(nd)) if isinstance(nd, dict) else str(nd))
+
+        st.write("")
+        st.divider()
+        st.markdown("##### 💬 Q&A Finanziario Diretto sul Profilo (query_argus_assistant)")
+        user_qa_q = st.text_input("Fai una domanda strategica sul tuo patrimonio/portafoglio:", value="Qual è il livello di rischio complessivo e come posso aumentare la resilienza macro?", key="p21_qa_input_box")
+        if user_qa_q and st.button("Invia Richiesta all'Analista AI", key="p21_btn_qa_exec"):
+            with st.spinner("Elaborazione risposta analitica..."):
+                ans_text = query_argus_assistant(user_qa_q, profile_snapshot)
+                st.markdown(f"""
+                <div style="background: rgba(22, 27, 34, 0.95); border: 1px solid rgba(56, 189, 248, 0.3); border-left: 4px solid #38bdf8; border-radius: 10px; padding: 14px 18px; margin-top: 10px;">
+                    <div style="font-size: 13px; color: #f0f6fc; line-height: 1.6;">{ans_text}</div>
+                </div>
+                """, unsafe_allow_html=True)
+
+    elif sub_mode_ai == "📑 SEC Filings RAG (10-K / 10-Q Fundamental Intelligence)":
+        st.markdown("#### 📑 SEC 10-K / 10-Q Filings Retrieval-Augmented Generation (RAG)")
+        st.caption("Motore di ricerca semantica vettoriale sui filing SEC ufficiali (Annual 10-K, Quarterly 10-Q) per i titoli azionari.")
+
+        rag_c1, rag_c2 = st.columns([1, 2])
+        with rag_c1:
+            rag_tk = st.text_input("Ticker Strumento:", value="AAPL", key="p21_rag_ticker_inp").upper()
+            rag_filter = st.selectbox("Sezione Filing:", ["Tutte le Sezioni", "Item 1A - Risk Factors", "Item 7 - MD&A", "Item 8 - Financial Statements"], key="p21_rag_sec_filter")
+        with rag_c2:
+            rag_q = st.text_input("Query di Ricerca Semantica:", value="What are the key geopolitical, supply chain and regulatory risks?", key="p21_rag_q_inp")
+
+        if st.button("🔍 Interroga SEC RAG Engine", type="primary", key="p21_btn_rag_exec"):
+            sec_f = None if "Tutte" in rag_filter else rag_filter.split(" - ")[0]
+            with st.spinner(f"Ricerca semantica su SEC filing per {rag_tk}..."):
+                rag_out = query_sec_filings_rag(rag_tk, rag_q, section_filter=sec_f)
+                st.success(f"✅ Ricerca completata per **{rag_tk}**")
+                st.markdown(rag_out.get("answer", rag_out.get("summary", "Nessuna sintesi disponibile.")))
+                if "citations" in rag_out and rag_out["citations"]:
+                    st.markdown("##### 📌 Citazioni & Riferimenti Ufficiali")
+                    for cit in rag_out["citations"]:
+                        st.markdown(f"- *{cit}*")
+
+    elif sub_mode_ai == "🧠 Neural Advisor (What-If & Action Memo)":
+        from core.wealth.neural_advisor_engine import NeuralWealthAdvisor
+
+        re_tot_val = float(getattr(nw, "real_estate_total", 0.0))
+        liab_tot_val = float(getattr(nw, "total_liabilities", 0.0))
+        re_eq_val = max(0.0, re_tot_val - liab_tot_val)
+
+        summary_ai_dict = {
+            "total_net_worth": float(getattr(nw, "total_net_worth", 0.0)),
+            "liquid_cash": float(getattr(nw, "liquid_cash", 0.0)),
+            "financial_investments": float(getattr(nw, "financial_investments", 0.0)),
+            "real_estate_total": re_tot_val,
+            "real_estate_equity": re_eq_val,
+            "physical_assets": float(getattr(nw, "physical_assets", 0.0)),
+            "pension_total": float(getattr(nw, "pension_total", 0.0)),
+            "total_liabilities": liab_tot_val,
+            "wealth_health_score": float(ai_diag.get("health_score", 85.0)),
+            "runway_months": float(getattr(nw, "runway_months", 6.0))
+        }
+
+        # Query Chips
+        col_chip1, col_chip2, col_chip3, col_chip4 = st.columns(4)
+        with col_chip1:
+            if st.button("⚖️ Ottimizza Zainetto Fiscale", use_container_width=True, key="chip_tax"):
+                st.session_state["neural_advisor_query_input"] = "ottimizza zainetto fiscale e minusvalenze"
+        with col_chip2:
+            if st.button("🏡 Simula Acquisto Immobile", use_container_width=True, key="chip_re"):
+                st.session_state["neural_advisor_query_input"] = "simula acquisto immobile con mutuo 80%"
+        with col_chip3:
+            if st.button("⌚ Estinzione Debito con Caveau", use_container_width=True, key="chip_phys"):
+                st.session_state["neural_advisor_query_input"] = "liquidazione orologi caveau per estinzione debito"
+        with col_chip4:
+            if st.button("🔥 Roadmap Verso il FIRE", use_container_width=True, key="chip_fire"):
+                st.session_state["neural_advisor_query_input"] = "pianifica indipendenza finanziaria e rendita FIRE"
+
+        user_query = st.text_input(
+            "💬 Chiedi al Neural Advisor o scrivi una simulazione personalizzata:",
+            value=st.session_state.get("neural_advisor_query_input", "Qual è lo stato di salute e la resilienza del mio patrimonio?"),
+            key="neural_advisor_text_box",
+            placeholder="es. Cosa succede se spendo 50.000€ per comprare casa? Oppure: come azzero le minusvalenze?"
+        )
+
+        if user_query:
+            sim_res = NeuralWealthAdvisor.evaluate_scenario_query(user_query, summary_ai_dict)
+
             st.markdown(f"""
-            <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-left: 3px solid #38bdf8; border-radius: 8px; padding: 10px 14px; margin-bottom: 8px; font-size: 12.5px; color: #cbd5e1;">
-                {act}
+            <div style="background: linear-gradient(135deg, rgba(22, 27, 34, 0.95) 0%, rgba(13, 17, 23, 0.98) 100%); border: 1px solid rgba(16, 185, 129, 0.3); border-left: 4px solid #10b981; border-radius: 12px; padding: 16px 20px; margin: 15px 0;">
+                <div style="font-size: 15px; font-weight: 800; color: #34d399; margin-bottom: 4px;">
+                    🎯 {sim_res['title']}
+                </div>
+                <div style="font-size: 13px; color: #e2e8f0; line-height: 1.6;">
+                    {sim_res['summary_text']}
+                </div>
             </div>
             """, unsafe_allow_html=True)
 
-        st.divider()
-        memo_content = NeuralWealthAdvisor.generate_executive_action_memo(summary_ai_dict, [sim_res], prof_name=prof_title)
-        st.download_button(
-            label="📥 Scarica Executive Action Memo (.MD)",
-            data=memo_content,
-            file_name=f"ARGUS_Action_Memo_{prof_title.replace(' ','_')}_{datetime.now().strftime('%Y%m%d')}.md",
-            mime="text/markdown",
-            use_container_width=True,
-            type="primary"
-        )
+            # KPI Proiettati
+            qk1, qk2, qk3 = st.columns(3)
+            with qk1:
+                delta_nw = sim_res["projected_nw"] - sim_res["pre_shock_nw"]
+                metric_card("Net Worth Proiettato", fmt_eur(sim_res["projected_nw"]), delta=f"Delta: {fmt_eur(delta_nw)}", delta_color="normal" if delta_nw >= 0 else "inverse")
+            with qk2:
+                delta_run = sim_res["projected_runway"] - float(nw.runway_months)
+                metric_card("Runway Proiettato", f"{sim_res['projected_runway']:.1f} Mesi", delta=f"Pre: {nw.runway_months:.1f} Mesi", delta_color="normal" if sim_res["projected_runway"] >= 6.0 else "inverse")
+            with qk3:
+                delta_h = sim_res["projected_health"] - float(ai_diag["health_score"])
+                metric_card("Health Score Proiettato", f"{sim_res['projected_health']:.0f} / 100", delta=f"Pre: {ai_diag['health_score']:.0f}/100", delta_color="normal" if delta_h >= 0 else "inverse")
+
+            st.markdown("##### 📌 Metriche & Parametri di Scenario")
+            col_m1, col_m2 = st.columns(2)
+            m_items = list(sim_res["key_metrics"].items())
+            mid_pt = (len(m_items) + 1) // 2
+            with col_m1:
+                for k, v in m_items[:mid_pt]:
+                    st.markdown(f"- **{k}:** `{v}`")
+            with col_m2:
+                for k, v in m_items[mid_pt:]:
+                    st.markdown(f"- **{k}:** `{v}`")
+
+            st.markdown("##### 📋 Piano d'Azione Consigliato (Sequence of Execution)")
+            for act in sim_res["action_plan"]:
+                st.markdown(f"""
+                <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-left: 3px solid #38bdf8; border-radius: 8px; padding: 10px 14px; margin-bottom: 8px; font-size: 12.5px; color: #cbd5e1;">
+                    {act}
+                </div>
+                """, unsafe_allow_html=True)
+
+            st.divider()
+            memo_content = NeuralWealthAdvisor.generate_executive_action_memo(summary_ai_dict, [sim_res], prof_name=prof_title)
+            st.download_button(
+                label="📥 Scarica Executive Action Memo (.MD)",
+                data=memo_content,
+                file_name=f"ARGUS_Action_Memo_{prof_title.replace(' ','_')}_{datetime.now().strftime('%Y%m%d')}.md",
+                mime="text/markdown",
+                use_container_width=True,
+                type="primary"
+            )
 
 elif active_copilot_tab == "🎙️ AI Voice Briefing & Audio Podcast":
     st.markdown("### 🎙️ AI Voice Executive Briefing & Wealth Audio Podcast")
