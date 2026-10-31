@@ -614,4 +614,14 @@ elif active_tax_tab == "₿ Fiscalità Crypto (L. 197/2022) & Soglie":
 elif active_tax_tab == "📑 Storico Dichiarazioni 730, IRPEF & Audit":
     _render_tab_history_730()
 
-render_sr117_audit_drawer(engine, model_name="ARGUS Unified Wealth Tax & RW Engine", audit_metrics=fiscal)
+render_sr117_audit_drawer(
+    engine_name="ARGUS Unified Wealth Tax & RW Engine",
+    latex_formulas=[
+        r"\text{TaxShield} = \min(\text{Minusvalenze}_{4Y}, \text{Plusvalenze}) \times 26\%",
+        r"\text{IVAFE} = \sum \text{Asset}_{\text{estero}} \times 0.20\% + \sum_{\text{Giacenza} > 5000} 34.20\,\text{€}",
+        r"\text{Bollo}_{\text{IT}} = \sum \text{Asset}_{\text{IT}} \times 0.20\% + \sum_{\text{Giacenza} > 5000} 34.20\,\text{€}",
+    ],
+    inputs_dict={"portfolio_id": current_pid},
+    outputs_dict=fiscal if isinstance(fiscal, dict) else {},
+    regulatory_refs=["Art. 67-68 TUIR", "L. 197/2022 (Crypto)", "Quadro RW / RT Agenzia Entrate", "Fed SR 11-7"],
+)

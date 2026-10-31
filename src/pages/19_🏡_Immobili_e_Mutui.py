@@ -541,4 +541,14 @@ elif active_re_tab == "⚖️ Buy vs Rent (Affitto vs Acquisto)":
     )
     st.plotly_chart(fig_bvr, use_container_width=True, config={'displayModeBar': False})
 
-render_sr117_audit_drawer(engine, model_name="ARGUS Real Estate & Mortgage Analytics", audit_metrics=re_ltv_summary)
+render_sr117_audit_drawer(
+    engine_name="ARGUS Real Estate & Mortgage Analytics",
+    latex_formulas=[
+        r"M = P \frac{r(1+r)^n}{(1+r)^n - 1}, \quad \text{LTV} = \frac{\text{Debito Residuo}}{\text{Valore Immobile}}",
+        r"\text{DSCR} = \frac{\text{Net Operating Income}}{\text{Annual Debt Service}}",
+        r"\text{Net Yield} = \frac{\text{Canone Netto (Cedolare/IRPEF - IMU)}}{\text{Prezzo Acquisto + Spese}}",
+    ],
+    inputs_dict={"portfolio_id": current_pid if "current_pid" in locals() else None},
+    outputs_dict=re_ltv_summary if "re_ltv_summary" in locals() and isinstance(re_ltv_summary, dict) else {},
+    regulatory_refs=["EBA/GL/2020/06 Loan Origination", "Art. 3 D.Lgs. 23/2011 (Cedolare)", "Fed SR 11-7"],
+)

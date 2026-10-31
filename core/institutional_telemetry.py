@@ -1692,9 +1692,9 @@ def build_bento_kpi_card_html(
 
 
 def build_sr117_audit_record(
-    engine_name: str,
-    model_version: str,
-    latex_formulas: list[str],
+    engine_name: Any = "ARGUS Quantitative Engine",
+    model_version: str = APP_VERSION,
+    latex_formulas: list[str] | None = None,
     inputs_dict: dict[str, Any] | None = None,
     outputs_dict: dict[str, Any] | None = None,
     compute_ms: float = 4.2,
@@ -1705,6 +1705,23 @@ def build_sr117_audit_record(
     **kwargs: Any,
 ) -> dict[str, Any]:
     """Build a deterministic Fed SR 11-7 / ECB TRIM Model Risk Management audit trail record."""
+    if not isinstance(engine_name, str) or "model_name" in kwargs:
+        resolved_engine_name = str(kwargs.get("model_name") or kwargs.get("name") or "ARGUS Quantitative Engine")
+    else:
+        resolved_engine_name = engine_name
+
+    if latex_formulas is None:
+        latex_formulas = kwargs.get("formulas") or []
+    elif isinstance(latex_formulas, str):
+        latex_formulas = [latex_formulas]
+    else:
+        latex_formulas = list(latex_formulas)
+
+    if outputs_dict is None:
+        outputs_dict = kwargs.get("audit_metrics") or kwargs.get("metrics") or kwargs.get("outputs") or {}
+    if inputs_dict is None:
+        inputs_dict = kwargs.get("inputs") or {}
+
     if regulatory_refs is not None:
         resolved_regulatory_refs = list(regulatory_refs)
     elif benchmark_supervisory:
@@ -1715,7 +1732,7 @@ def build_sr117_audit_record(
         resolved_regulatory_refs = ["Fed SR 11-7", "ECB TRIM", "BCBS-352"]
 
     payload: dict[str, Any] = {
-        "engine": engine_name,
+        "engine": resolved_engine_name,
         "version": model_version,
         "inputs": inputs_dict or {},
         "outputs": outputs_dict or {},
@@ -1728,13 +1745,15 @@ def build_sr117_audit_record(
     )
     sha256_hash = hashlib.sha256(canonical_payload.encode("utf-8")).hexdigest()
     return {
-        "engine_name": engine_name,
+        "engine_name": resolved_engine_name,
         "model_version": model_version,
         "sha256_audit_hash": sha256_hash,
         "compute_ms": round(float(compute_ms), 2),
         "timestamp_utc": datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ"),
         "regulatory_references": resolved_regulatory_refs,
         "latex_formulas": latex_formulas,
+        "inputs": inputs_dict or {},
+        "outputs": outputs_dict or {},
         "assumptions": assumptions or [],
         "risk_limits": risk_limits or [],
         "benchmark_supervisory": benchmark_supervisory,

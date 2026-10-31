@@ -837,4 +837,14 @@ pension_summary = {
     "pension_plans_count": int(len(df_plans)) if ("df_plans" in locals() and not df_plans.empty) else 0,
     "portfolio_id": current_pid if "current_pid" in locals() else None,
 }
-render_sr117_audit_drawer(engine, model_name="ARGUS Pension Planning & Human Capital Engine", audit_metrics=pension_summary)
+render_sr117_audit_drawer(
+    engine_name="ARGUS Pension Planning & Human Capital Engine",
+    latex_formulas=[
+        r"\text{Deducibilità} = \min(\text{Versamenti}, 5164.57\,\text{€}) \times \text{Aliquota}_{\text{Marginale IRPEF}}",
+        r"\text{Aliquota}_{\text{Finale}} = \max\left(9\%, 15\% - (N - 15) \times 0.30\%\right)",
+        r"\text{HumanCapital}_t = \sum_{k=t}^{T_{\text{ret}}} \frac{\mathbb{E}[Y_k]}{(1 + r + \text{hazard})^k}",
+    ],
+    inputs_dict={"portfolio_id": current_pid if "current_pid" in locals() else None},
+    outputs_dict=pension_summary if "pension_summary" in locals() and isinstance(pension_summary, dict) else {},
+    regulatory_refs=["D.Lgs. 252/2005", "COVIP Guidelines", "Bodie-Merton-Samuelson Lifecycle", "Fed SR 11-7"],
+)
