@@ -76,7 +76,9 @@ def create_secure_release_zip(version: str = ""):
         "argus-architecture.json",
         ".dockerignore",
         ".nojekyll",
-        ".gitkeep"
+        ".gitkeep",
+        "01_supabase_schema_and_rls.sql",
+        "02_sqlite_local_schema.sql"
     }
 
     files_to_zip = []
@@ -108,6 +110,18 @@ def create_secure_release_zip(version: str = ""):
             files_to_zip.append((full_path, rel_file_path))
             
     print(f"\n[INFO] Totale file validati per l'inclusione: {len(files_to_zip)}")
+
+    # Audit esplicito presenza core/workspace e schemi SQL canonici
+    workspace_files = [rp for _, rp in files_to_zip if rp.startswith("core/workspace/")]
+    sql_files = [rp for _, rp in files_to_zip if rp in ("sql/01_supabase_schema_and_rls.sql", "sql/02_sqlite_local_schema.sql")]
+    if not workspace_files:
+        print("[WARN] Sottopacchetto core/workspace/ non rilevato nel bundle release!")
+    else:
+        print(f"[OK] Rilevati {len(workspace_files)} moduli in core/workspace/ per la release.")
+    if len(sql_files) < 2:
+        print("[WARN] Schemi SQL canonici (sql/01_... e 02_...) non completi nel bundle release!")
+    else:
+        print("[OK] Schemi SQL canonici (01_supabase_schema_and_rls.sql e 02_sqlite_local_schema.sql) inclusi con successo.")
     
     # Controllo di sicurezza aggiuntivo sul contenuto
     sensitive_keywords = [

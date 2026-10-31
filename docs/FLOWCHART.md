@@ -46,11 +46,14 @@ flowchart TD
         DB_WEALTH[("Wealth DB (argus_wealth.db)\n(accounts, cash_flow, assets, mortgages, simulations)")]:::storage
         DUCK[("DuckDB OLAP Engine\n(In-Process SIMD & Parquet Storage)")]:::storage
         ONE_LEDGER[("🏛️ Universal One-Ledger\n(core/universal_ledger.py Double-Entry Fact\n& Zero-Copy PyArrow RecordBatches)")]:::storage
+        SQL_SCHEMAS[("🏛️ Schemi Canonici Unificati\n(sql/01_supabase_schema_and_rls.sql\n& sql/02_sqlite_local_schema.sql)")]:::storage
     end
 
     subgraph Layer4 ["🧠 4. ANALYTICS, WEALTH & QUANTITATIVE ENGINE"]
         direction TB
-        CTX{"🧱 core/workspace_context.py\n(Typed Contexts, Session Persistence & Flush)"}:::engine
+        CTX{"🧱 core/workspace/\n(context.py, manager.py, session.py, demo_seeder.py)"}:::engine
+        SUBPKGS{"📦 Sottopacchetti Specialistici\n(core/rebalancing/, core/execution/, core/regime/,\ncore/volatility/, core/temporal/)"}:::engine
+        WATCHDOG{"🚨 core/watchdog/ & Telemetria\n(unified_notification_center.py, risk_watchdog.py,\nwealth_watchdog.py, institutional_telemetry.py)"}:::engine
         RE{"⚙️ core/risk_engine.py\n(FIFO Basis, VaR Cornish-Fisher, Kupiec Test,\nLedoit-Wolf SLSQP, Black-Litterman, Carhart 4-Factor,\nMSCI Barra 5-Factor, Merton Jump-Diffusion,\nATR Chandelier Exits, 3D Stress Surface, Almgren-Chriss, Cholesky MC)"}:::engine
         BARRA{"🔬 core/msci_barra_risk_engine.py\n(MSCI Barra Factor Risk, Euler MCTR/PCTR = 100%,\nActive Tilts & Multi-Scenario Factor Stress)"}:::engine
         HUMAN_CAP{"🌐 core/wealth/human_capital_engine.py\n(Nelson-Siegel Human Capital, Quasi-Equity/Bond,\nTotal Balance Sheet VaR 95% & Runway)"}:::engine
@@ -76,8 +79,9 @@ flowchart TD
 
     subgraph Layer5 ["📊 5. PRESENTATION & INSTITUTIONAL REPORTING LAYER"]
         direction TB
-        APP("💻 Streamlit App / Control Room (22 Moduli Live: Pagine 0-21)\n& Design System Modulare components/ui_core/"):::frontend
+        APP("💻 Streamlit App / Control Room (Pagine 0-21: 22 Viste Istituzionali)\n& Design System Modulare components/ui_core/ (theme, sidebar, kpi_cards, dialogs)"):::frontend
         DESK("🖥️ Native Desktop App\n(desktop_launcher.py + WebView2)"):::frontend
+        REPORTING_PKG{"📄 core/reporting/\n(report_exporter.py, factsheet_builder.py, pdf_generator.py,\nboard_pack_exporter.py, html_exporter.py)"}:::script
         DESIGN_SYS{"📄 core/reporting_design_system.py & modular_factsheet_builder.py\n(Obsidian Sovereign PDF & Numbered Canvas)"}:::script
         EXCEL_EXP{"📊 core/excel_generator.py & excel_connector.py\n(ListObject Tables, Live Formulas & RTD)"}:::script
         STARZIP{"🗃️ scripts/export_star_schema.py\n(Power BI Star Schema ZIP Package)"}:::script

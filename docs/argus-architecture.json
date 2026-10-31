@@ -2,38 +2,59 @@
   "schema_version": 1,
   "diagram_type": "architecture",
   "meta": {
-    "title": "ARGUS — Quantitative Risk Analytics Platform",
-    "subtitle": "Institutional Portfolio Risk Intelligence, AI Narrative Analytics & Multi-Asset Data Warehouse",
+    "title": "ARGUS — Quantitative Risk & Wealth Intelligence Platform",
+    "subtitle": "Institutional Portfolio Risk Intelligence, Wealth Advisory & Multi-Tenant Data Warehouse",
     "output": "argus-architecture.html",
     "quality_profile": "showcase",
     "animation": "trace",
     "repository": {
       "url": "https://github.com/Alessandro-Sal/argus-risk-analytics",
-      "revision": "f272f3565a85f53450d998219acb472053571844"
+      "revision": "3e5a7c3"
     },
     "views": [
       {
         "id": "analyst-workflow",
         "label": "Analyst Interaction & Control Room",
-        "focus": ["analyst_ui", "control_room", "analytical_modules", "report_engine"],
-        "note": "Portfolio managers and analysts interact with ARGUS Control Room and 10 specialized analytical modules."
+        "focus": [
+          "analyst_ui",
+          "control_room",
+          "analytical_modules",
+          "report_engine"
+        ],
+        "note": "Portfolio managers and wealth advisors interact with ARGUS Control Room and 21 specialized analytical modules."
       },
       {
         "id": "ingestion-pipeline",
         "label": "Multi-Source Ingestion & Cache Shield",
-        "focus": ["csv_sources", "gsheets_api", "market_api", "validator", "data_fetcher", "cache_shield"],
+        "focus": [
+          "csv_sources",
+          "gsheets_api",
+          "market_api",
+          "validator",
+          "data_fetcher",
+          "cache_shield"
+        ],
         "note": "Ingests CSV, DeGiro transactions, and Google Sheets Live Sync, backed by multi-currency FX conversion and SQLite Cache Shield."
       },
       {
         "id": "quant-ai-core",
         "label": "Quantitative & AI Analytics Engine",
-        "focus": ["risk_engine", "adv_quant", "valuation_forensics", "llm_api"],
+        "focus": [
+          "risk_engine",
+          "adv_quant",
+          "valuation_forensics",
+          "llm_api"
+        ],
         "note": "Executes FIFO WACP accounting, VaR/CVaR Cornish-Fisher, Tail Copulas, Kelly Criterion, HRP, Beneish M-Score, and AI Narrative intelligence."
       },
       {
         "id": "dw-bi-reporting",
         "label": "Data Warehouse & Multi-Format Reports",
-        "focus": ["control_room", "dw_database", "report_engine"],
+        "focus": [
+          "control_room",
+          "dw_database",
+          "report_engine"
+        ],
         "note": "Persists Star Schema snapshots, multi-portfolio registrations and asset mappings in MySQL/SQLite, exporting PDF Factsheets, Excel and HTML."
       }
     ]
@@ -44,8 +65,14 @@
       "type": "external",
       "label": "Portfolio Analyst",
       "sublabel": "Desktop WebView2 / Web UI",
-      "pos": [40, 160],
-      "size": [160, 64]
+      "pos": [
+        40,
+        160
+      ],
+      "size": [
+        160,
+        64
+      ]
     },
     {
       "id": "control_room",
@@ -55,11 +82,23 @@
       "brand": "python",
       "tag": "v9.19.0 Core Hub",
       "sources": [
-        { "path": "src/0_Control_Room.py", "label": "Control Room Hub" },
-        { "path": "app.py", "label": "Application Entrypoint" }
+        {
+          "path": "src/0_Control_Room.py",
+          "label": "Control Room Hub"
+        },
+        {
+          "path": "app.py",
+          "label": "Application Entrypoint"
+        }
       ],
-      "pos": [330, 160],
-      "size": [180, 64]
+      "pos": [
+        330,
+        160
+      ],
+      "size": [
+        180,
+        64
+      ]
     },
     {
       "id": "analytical_modules",
@@ -69,12 +108,27 @@
       "brand": "python",
       "tag": "Streamlit 1.31+",
       "sources": [
-        { "path": "src/pages/1_📈_Dashboard_Generale.py", "label": "Executive Cockpit" },
-        { "path": "src/pages/2_🔴_Analisi_Rischio.py", "label": "Risk & VaR" },
-        { "path": "src/pages/3_🔬_Modelli_Quantitativi.py", "label": "Quant Frontier" }
+        {
+          "path": "src/pages/1_📈_Dashboard_Generale.py",
+          "label": "Executive Cockpit"
+        },
+        {
+          "path": "src/pages/2_🔴_Analisi_Rischio.py",
+          "label": "Risk & VaR"
+        },
+        {
+          "path": "src/pages/3_🔬_Modelli_Quantitativi.py",
+          "label": "Quant Frontier"
+        }
       ],
-      "pos": [630, 160],
-      "size": [190, 64]
+      "pos": [
+        630,
+        160
+      ],
+      "size": [
+        190,
+        64
+      ]
     },
     {
       "id": "risk_engine",
@@ -83,10 +137,19 @@
       "sublabel": "FIFO WACP, VaR & Markowitz",
       "tag": "Core Compute Engine",
       "sources": [
-        { "path": "core/risk_engine.py", "label": "FIFO & Risk Engine" }
+        {
+          "path": "core/risk_engine.py",
+          "label": "FIFO & Risk Engine"
+        }
       ],
-      "pos": [940, 160],
-      "size": [190, 64]
+      "pos": [
+        940,
+        160
+      ],
+      "size": [
+        190,
+        64
+      ]
     },
     {
       "id": "report_engine",
@@ -94,11 +157,23 @@
       "label": "Multi-Format Exporters",
       "sublabel": "PDF, Excel, HTML & Star ZIP",
       "sources": [
-        { "path": "core/report_exporter.py", "label": "Report Hub" },
-        { "path": "core/html_exporter.py", "label": "HTML Exporter" }
+        {
+          "path": "core/report_exporter.py",
+          "label": "Report Hub"
+        },
+        {
+          "path": "core/html_exporter.py",
+          "label": "HTML Exporter"
+        }
       ],
-      "pos": [1250, 160],
-      "size": [180, 64]
+      "pos": [
+        1250,
+        160
+      ],
+      "size": [
+        180,
+        64
+      ]
     },
     {
       "id": "csv_sources",
@@ -106,11 +181,23 @@
       "label": "Broker CSV & DeGiro",
       "sublabel": "Standard & DeGiro Export",
       "sources": [
-        { "path": "core/adapters/degiro.py", "label": "DeGiro Adapter" },
-        { "path": "docs/CSV_Format_Specification.md", "label": "CSV Spec" }
+        {
+          "path": "core/adapters/degiro.py",
+          "label": "DeGiro Adapter"
+        },
+        {
+          "path": "docs/CSV_Format_Specification.md",
+          "label": "CSV Spec"
+        }
       ],
-      "pos": [40, 390],
-      "size": [160, 64]
+      "pos": [
+        40,
+        390
+      ],
+      "size": [
+        160,
+        64
+      ]
     },
     {
       "id": "validator",
@@ -118,11 +205,23 @@
       "label": "Data Validator & Clean",
       "sublabel": "Pydantic & Ingestion Rules",
       "sources": [
-        { "path": "core/validator.py", "label": "Validator Pipeline" },
-        { "path": "core/schemas.py", "label": "Pydantic Contracts" }
+        {
+          "path": "core/validator.py",
+          "label": "Validator Pipeline"
+        },
+        {
+          "path": "core/schemas.py",
+          "label": "Pydantic Contracts"
+        }
       ],
-      "pos": [330, 390],
-      "size": [180, 64]
+      "pos": [
+        330,
+        390
+      ],
+      "size": [
+        180,
+        64
+      ]
     },
     {
       "id": "data_fetcher",
@@ -130,10 +229,19 @@
       "label": "Market Fetcher & FX",
       "sublabel": "Multi-Currency FX Engine",
       "sources": [
-        { "path": "core/fetcher.py", "label": "Historical Sync & FX" }
+        {
+          "path": "core/fetcher.py",
+          "label": "Historical Sync & FX"
+        }
       ],
-      "pos": [630, 390],
-      "size": [190, 64]
+      "pos": [
+        630,
+        390
+      ],
+      "size": [
+        190,
+        64
+      ]
     },
     {
       "id": "adv_quant",
@@ -141,11 +249,23 @@
       "label": "Advanced Quant & AI",
       "sublabel": "Tail Copula, Kelly & ERC",
       "sources": [
-        { "path": "core/advanced_quant.py", "label": "Tail Copula & Kelly" },
-        { "path": "core/ai_analyst.py", "label": "AI Narrative Intelligence" }
+        {
+          "path": "core/advanced_quant.py",
+          "label": "Tail Copula & Kelly"
+        },
+        {
+          "path": "core/ai_analyst.py",
+          "label": "AI Narrative Intelligence"
+        }
       ],
-      "pos": [940, 390],
-      "size": [190, 64]
+      "pos": [
+        940,
+        390
+      ],
+      "size": [
+        190,
+        64
+      ]
     },
     {
       "id": "dw_database",
@@ -155,11 +275,23 @@
       "brand": "mysql",
       "tag": "SQL Data Warehouse",
       "sources": [
-        { "path": "core/models.py", "label": "ORM Models" },
-        { "path": "core/db_exporter.py", "label": "DB Exporter" }
+        {
+          "path": "core/models.py",
+          "label": "ORM Models"
+        },
+        {
+          "path": "core/db_exporter.py",
+          "label": "DB Exporter"
+        }
       ],
-      "pos": [1250, 390],
-      "size": [180, 64]
+      "pos": [
+        1250,
+        390
+      ],
+      "size": [
+        180,
+        64
+      ]
     },
     {
       "id": "gsheets_api",
@@ -167,18 +299,33 @@
       "label": "Google Sheets Live",
       "sublabel": "Stocks & Crypto Sync",
       "sources": [
-        { "path": "gsheets_sync_subproject/sync_google_sheets.py", "label": "Google Sheets ETL" }
+        {
+          "path": "gsheets_sync_subproject/sync_google_sheets.py",
+          "label": "Google Sheets ETL"
+        }
       ],
-      "pos": [40, 620],
-      "size": [160, 64]
+      "pos": [
+        40,
+        620
+      ],
+      "size": [
+        160,
+        64
+      ]
     },
     {
       "id": "market_api",
       "type": "external",
       "label": "Yahoo Finance API",
       "sublabel": "Historical Prices & ISIN",
-      "pos": [330, 620],
-      "size": [180, 64]
+      "pos": [
+        330,
+        620
+      ],
+      "size": [
+        180,
+        64
+      ]
     },
     {
       "id": "cache_shield",
@@ -188,10 +335,19 @@
       "brand": "sqlite",
       "tag": "Rate-Limit Protection",
       "sources": [
-        { "path": "core/cache_shield.py", "label": "Cache Shield Engine" }
+        {
+          "path": "core/cache_shield.py",
+          "label": "Cache Shield Engine"
+        }
       ],
-      "pos": [630, 620],
-      "size": [190, 64]
+      "pos": [
+        630,
+        620
+      ],
+      "size": [
+        190,
+        64
+      ]
     },
     {
       "id": "valuation_forensics",
@@ -199,11 +355,23 @@
       "label": "Valuation & Forensics",
       "sublabel": "Beneish, Sloan & Altman Z",
       "sources": [
-        { "path": "core/forensic_accounting.py", "label": "Beneish & Sloan" },
-        { "path": "core/financial_analysis.py", "label": "Altman Z & DCF" }
+        {
+          "path": "core/forensic_accounting.py",
+          "label": "Beneish & Sloan"
+        },
+        {
+          "path": "core/financial_analysis.py",
+          "label": "Altman Z & DCF"
+        }
       ],
-      "pos": [940, 620],
-      "size": [190, 64]
+      "pos": [
+        940,
+        620
+      ],
+      "size": [
+        190,
+        64
+      ]
     },
     {
       "id": "llm_api",
@@ -211,8 +379,14 @@
       "label": "Gemini & OpenAI API",
       "sublabel": "LLM Narrative Intelligence",
       "brand": "google-gemini",
-      "pos": [1250, 620],
-      "size": [180, 64]
+      "pos": [
+        1250,
+        620
+      ],
+      "size": [
+        180,
+        64
+      ]
     }
   ],
   "boundaries": [
@@ -327,39 +501,42 @@
   "cards": [
     {
       "dot": "cyan",
-      "title": "Ingestion & Interface",
+      "title": "Ingestion & Interface (Pagine 0-21)",
       "items": [
-        "Control Room v9.19.0 with 22 analytical modules",
-        "Dual Google Sheets Live Sync (Stocks + Crypto)",
-        "Automated ISIN / Ticker Database Resolver & Multi-Currency FX Engine"
+        "Control Room & 21 Pagine Operative (Institutional Trading & Risk + Wealth Management)",
+        "Design System Modulare components/ui_core/ (theme, sidebar, kpi_cards, dialogs_and_drawers)",
+        "Dual Google Sheets Live Sync (Stocks + Crypto) con DataQualityGate & Deduplicazione SHA-256",
+        "Gestione Spazi di Lavoro Unificata (core.workspace: context, manager, session, demo_seeder)"
       ]
     },
     {
       "dot": "emerald",
       "title": "Quantitative & Risk Core",
       "items": [
-        "FIFO WACP deterministico & VaR/CVaR Cornish-Fisher",
-        "Tail Copulas (Clayton/Gumbel), Kelly Sizing & Equal Risk Contribution (ERC)",
-        "Live Rebalancing Sandbox con 5 preset quantitativi",
-        "Hierarchical Risk Parity (HRP) & Black-Scholes Delta-Hedging"
+        "FIFO WACP deterministico & VaR/CVaR Cornish-Fisher con Kupiec Test",
+        "Tail Copulas, Kelly Sizing, ERC & Hierarchical Risk Parity (HRP)",
+        "Sottopacchetti Specialistici: core.rebalancing, core.execution, core.regime, core.volatility, core.temporal",
+        "Simulatore FIRE Solvency (tbs_monte_carlo) & Previdenza Dinamica (glidepath_engine)"
       ]
     },
     {
       "dot": "rose",
-      "title": "AI & Forensic Intelligence",
+      "title": "AI, Fisco & Wealth Planning",
       "items": [
-        "AI Analyst dual-engine (Gemini / OpenAI / NLG Offline 100%)",
-        "Contabilità Forense Beneish M-Score (1999) & Sloan Accruals (1996)",
-        "Altman Z-Score, Scomposizione DuPont & DCF Monte Carlo"
+        "AI Copilot & Advisor multi-agente (core.ai_analyst, core.advisor, core.sec_rag_engine)",
+        "Fiscalità Avanzata: Zainetto Fiscale, Riforma 2026, Crypto (L. 197/2022) & Quadro RW/IVAFE",
+        "Storico 730 & Riconciliazione Documentale (core.wealth.tax_history_engine)",
+        "Pianificazione Successoria HNWI & Asset Protection (core.wealth.succession_optimizer)"
       ]
     },
     {
       "dot": "violet",
-      "title": "Storage, Caching & BI",
+      "title": "Storage, Watchdog & Reporting",
       "items": [
-        "Multi-Tier Cache Shield (LRU + SQLite 24h) anti-rate limit",
-        "MySQL 8.0 & SQLite Data Warehouse Star Schema",
-        "Esportazione Factsheet PDF, Excel Multi-Tab, HTML Standalone e Power BI ZIP"
+        "Schemi Canonici Unificati: sql/01_supabase_schema_and_rls.sql e sql/02_sqlite_local_schema.sql",
+        "Watchdog Istituzionale Unificato (core/watchdog/) & Telemetria Continua SR 11-7",
+        "Sottopacchetto core.reporting (report_exporter, factsheet_builder, pdf_generator)",
+        "Test Suite Estesa: 980 Test Automatizzati (100% Pass Rate)"
       ]
     }
   ]

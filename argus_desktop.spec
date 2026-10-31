@@ -28,6 +28,9 @@ datas = [
     (os.path.join(spec_dir, "docs"), "docs"),
     (os.path.join(spec_dir, "scripts"), "scripts"),
     (os.path.join(spec_dir, "data"), "data"),
+    (os.path.join(spec_dir, "sql"), "sql"),
+    (os.path.join(spec_dir, "sql", "01_supabase_schema_and_rls.sql"), "sql"),
+    (os.path.join(spec_dir, "sql", "02_sqlite_local_schema.sql"), "sql"),
     (os.path.join(spec_dir, "app.py"), "."),
 ]
 
@@ -56,6 +59,11 @@ hiddenimports = [
     "gzip",
     "shutil",
     "hashlib",
+    "core.workspace",
+    "core.workspace.context",
+    "core.workspace.manager",
+    "core.workspace.session",
+    "core.workspace.demo_seeder",
 ]
 hiddenimports += collect_submodules("streamlit")
 hiddenimports += collect_submodules("core")

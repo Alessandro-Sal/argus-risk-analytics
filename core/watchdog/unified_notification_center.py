@@ -13,7 +13,7 @@ import streamlit as st
 
 from core.risk_limits import check_risk_limits
 from core.sidebar import switch_to_page
-from core.wealth.wealth_watchdog import WealthWatchdog
+from core.watchdog.wealth_watchdog import WealthWatchdog
 
 
 @dataclass

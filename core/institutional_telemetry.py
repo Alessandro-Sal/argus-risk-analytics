@@ -13,7 +13,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 import numpy as np
@@ -1762,4 +1762,51 @@ def get_density_mode_css(mode: str = "COMPACT_DESK") -> str:
         </style>
         """
     )
+
+
+# ============================================================
+# WATCHDOG TELEMETRY EVENT JOURNAL
+# ============================================================
+_WATCHDOG_TELEMETRY_LOG: list[dict[str, Any]] = []
+
+
+def record_watchdog_telemetry_event(
+    event_id: str,
+    severity: str,
+    category: str,
+    title: str,
+    message: str,
+    source: str = "WEALTH",
+    impact_amount: float = 0.0,
+    suggested_action: str = "",
+    target_page: str = "",
+    metadata: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """
+    Registers an institutional watchdog alert or limit breach event into the telemetry audit log.
+    Thread-safe circular in-memory buffer preserving the latest 500 telemetry events.
+    """
+    entry = {
+        "event_id": str(event_id),
+        "source": str(source).upper(),
+        "severity": str(severity).upper(),
+        "category": str(category).upper(),
+        "title": str(title),
+        "message": str(message),
+        "impact_amount": float(impact_amount),
+        "suggested_action": str(suggested_action),
+        "target_page": str(target_page),
+        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+        "metadata": metadata or {},
+    }
+    _WATCHDOG_TELEMETRY_LOG.append(entry)
+    if len(_WATCHDOG_TELEMETRY_LOG) > 500:
+        _WATCHDOG_TELEMETRY_LOG.pop(0)
+    return entry
+
+
+def get_watchdog_telemetry_events(limit: int = 50) -> list[dict[str, Any]]:
+    """Returns the most recent watchdog telemetry events."""
+    return list(_WATCHDOG_TELEMETRY_LOG[-limit:])
+
 

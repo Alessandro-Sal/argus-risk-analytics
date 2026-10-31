@@ -77,6 +77,7 @@ nav:
   - BI & Architecture:
       - Design System (Obsidian Sovereign): DESIGN.md
       - Execution Flowchart: FLOWCHART.md
+      - Interactive Architecture Map: argus-architecture.html
       - Power BI Integration Guide: POWER_BI_GUIDE.md
       - Presentation Deck: PRESENTATION_SLIDES.md
       - Project Handoff (v10.0.0): PROJECT_HANDOFF.md

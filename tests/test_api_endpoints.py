@@ -245,3 +245,91 @@ def test_fiscal_reform_2026_endpoint(client):
     data = res.json()
     assert data["status"] == "success"
     assert "simulation" in data
+
+def test_quadro_rw_ivafe_endpoint(client):
+    res = client.post(
+        "/api/v1/tax/quadro-rw-ivafe",
+        json={
+            "foreign_financial_assets_eur": 150000.0,
+            "foreign_real_estate_eur": 300000.0,
+            "foreign_crypto_eur": 25000.0,
+            "days_held": 365,
+            "tax_year": 2025,
+        },
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "success"
+    assert data["ivafe_due_eur"] > 0
+    assert data["ivie_due_eur"] > 0
+    assert data["must_fill_quadro_rw"] is True
+
+
+def test_history_730_endpoint(client):
+    res = client.post(
+        "/api/v1/tax/history-730",
+        json={"portfolio_id": 1, "tax_year": 2024},
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] in ("success", "warning")
+    assert "declarations" in data
+
+
+def test_pension_glidepath_endpoint(client):
+    res = client.post(
+        "/api/v1/wealth/pension-glidepath",
+        json={
+            "current_age": 35,
+            "retirement_age": 67,
+            "current_pot_eur": 35000.0,
+            "monthly_contribution_eur": 450.0,
+            "target_retirement_pot_eur": 500000.0,
+            "n_sims": 100,
+        },
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert "glidepath" in data or "trajectories" in data or "goal" in data or "success_probability" in data
+
+
+def test_fire_simulation_endpoint(client):
+    res = client.post(
+        "/api/v1/wealth/fire-simulation",
+        json={
+            "net_worth_eur": 450000.0,
+            "annual_spending_eur": 24000.0,
+            "safe_withdrawal_rate_pct": 3.75,
+            "expected_return_pct": 6.5,
+            "inflation_pct": 2.0,
+            "horizon_years": 25,
+        },
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "success"
+    assert data["fire_number_regular_eur"] > 0
+    assert "fire_attained_pct" in data
+    assert "coast_fire_target_eur" in data
+
+
+def test_succession_plan_endpoint(client):
+    res = client.post(
+        "/api/v1/wealth/succession-plan",
+        json={
+            "family_members": [
+                {"name": "Coniuge", "relation": "coniuge", "age": 55},
+                {"name": "Figlio 1", "relation": "figlio", "age": 28},
+                {"name": "Figlio 2", "relation": "figlio", "age": 24},
+            ],
+            "real_estate_val": 800000.0,
+            "financial_val": 1200000.0,
+            "business_val": 500000.0,
+            "exempt_bonds_val": 200000.0,
+            "life_insurance_val": 150000.0,
+        },
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert "strategies" in data
+    assert "Regime Ordinario" in data["strategies"]

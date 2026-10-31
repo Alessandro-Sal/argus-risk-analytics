@@ -22,7 +22,7 @@
 Ingegnerizzata come piattaforma avanzata di Finanza Quantitativa, Wealth Intelligence e Risk Management, **ARGUS** — il cui nome si ispira al mito dell'osservatore dai cento occhi che vede tutto e non dorme mai — è un ecosistema completo per la diagnosi contabile, la profilazione del rischio, la pianificazione patrimoniale multi-generazionale e la protezione strategica di patrimoni d'investimento multi-asset (*Equity, ETF, Fixed Income, Crypto, Immobili, Illiquidi e Cash*).
 
 **Differenziatore Chiave**:
-A differenza dei benchmark basati su simulazioni sintetiche, **ARGUS** è stato validato empiricamente su un **dataset reale di oltre 400 operazioni finanziarie storiche** (2021–2026 dal progetto WealthApp) e testato con **970 test automatizzati (100% passed)** su 134 file di test. Il sistema garantisce una precisione deterministica centesimale nella gestione di scenari operativi complessi (contabilità FIFO, dividendi frazionati, cambi valuta EUR/USD/GBP/CHF, movimenti di cassa, deduplicazione deterministica SHA-256 e risoluzione ISIN-Ticker).
+A differenza dei benchmark basati su simulazioni sintetiche, **ARGUS** è stato validato empiricamente su un **dataset reale di oltre 400 operazioni finanziarie storiche** (2021–2026 dal progetto WealthApp) e testato con **980 test automatizzati (100% passed)** su 134 file di test. Il sistema garantisce una precisione deterministica centesimale nella gestione di scenari operativi complessi (contabilità FIFO, dividendi frazionati, cambi valuta EUR/USD/GBP/CHF, movimenti di cassa, deduplicazione deterministica SHA-256 e risoluzione ISIN-Ticker).
 
 ---
 
@@ -85,7 +85,28 @@ Presentation Layer (21 Moduli Streamlit / PyWebView):
 
 ## 3. Mappatura e Stato dei Moduli Core (`core/`)
 
-Tutti i moduli Python sorgente sono stati sviluppati, ottimizzati e verificati con la suite di test automatizzati (**970/970 PyTest PASSED - 100%**):
+Tutti i moduli Python sorgente sono stati sviluppati, ottimizzati e verificati con la suite di test automatizzati (**980/980 PyTest PASSED - 100%**):
+
+
+### `core/workspace/` — ✅ Unified Context, Session & Archetype Demo Seeder
+- **`context.py` (`WorkspaceContext`)**: Isolamento contestuale per workspace, tenuta degli stati di esecuzione e persistenza tipizzata.
+- **`manager.py` (`WorkspaceManager`)**: Switch dinamico tra workspace (*Trading & Risk*, *Wealth & Family Office*, *Unified View*) e gestione del ciclo di vita della sessione.
+- **`session.py` (`SessionStore`)**: Ripristino atomico e sanitizzazione dello stato di sessione Streamlit.
+- **`demo_seeder.py` (`UnifiedDemoSeeder`)**: Iniezione e reset atomico degli archetipi sintetici protetti (*fire_decumulation*, *hnwi_family*, *young_accumulator*) con blocco assoluto di sovrascrittura da broker reali.
+
+### `core/watchdog/` — ✅ Unified Watchdog & Proactive Institutional Telemetry
+- **`unified_notification_center.py`**: Centro notifiche unificato che aggrega in tempo reale violazioni RAF (Risk Appetite Framework), warning fiscali e shock macroeconomici.
+- **`risk_watchdog.py`**: Sentinella deterministica su limiti VaR 99%, concentrazione singola/settoriale e liquidità Basilea III.
+- **`wealth_watchdog.py`**: Diagnosi proattiva su minusvalenze in scadenza (TUIR art. 67), runway d'emergenza, leva LTV immobiliare, deducibilità fondo pensione e cash drag.
+- **`institutional_telemetry.py`**: Tracciamento circolare degli eventi sentinella e generazione di audit trail crittografici Fed SR 11-7 / BCBS-239.
+
+### `core/reporting/` — ✅ Institutional Report Exporters & Factsheet Builders
+- **`report_exporter.py`**: Orchestratore centrale per l'esportazione di dossier CRO istituzionali ZIP, factsheet PDF a 2/6 pagine e modelli What-If Excel.
+- **`factsheet_builder.py` & `pdf_generator.py`**: Generazione documentale vettoriale conforme a standard MiFID II.
+
+### `sql/` — ✅ Canonical Schemas & Multi-Tenancy Isolation
+- **`01_supabase_schema_and_rls.sql`**: Schema canonico unificato per Supabase PostgreSQL con Row Level Security (RLS), indici compositi e multi-tenancy su oltre 30 tabelle.
+- **`02_sqlite_local_schema.sql`**: Schema locale speculare per SQLite, assicurando assoluta parità tra deployment cloud e workstation desktop.
 
 ### `core/auth_manager.py` & `core/config_manager.py` — ✅ Enterprise Multi-Tenant Auth, Workstation 1-Click & Runtime Detection
 - **Runtime Environment Detection (`is_local_environment()`, `is_streamlit_cloud()`)**: Rilevamento deterministico di workstation locale vs deploy cloud (Streamlit Cloud, container non-local) con switch automatico delle politiche di sicurezza.
@@ -426,7 +447,7 @@ Tutti i moduli Python sorgente sono stati sviluppati, ottimizzati e verificati c
 
 ## 5. Suite di Test Automatizzati (PyTest)
 
-Tutti gli **970 test automatizzati passano con successo (100%)** distribuiti su 134 file di test (inclusi l'ottimizzatore Michaud Resampled Efficient Frontier `tests/test_michaud_and_api_expansion.py`, i controlli pre-trade MiFID II RTS 28 `tests/test_pretrade_compliance_and_scenarios.py`, i test di sincronizzazione bidirezionale della barra laterale e subtab `tests/test_sidebar_subtab_sync.py`, la suite del motore DuckDB OLAP `tests/test_wealth_olap.py`, la suite di loading states atomici `tests/test_loading_states.py`, il teardown lifecycle `tests/test_ui_lifecycle.py`, e gli indici compositi di database):
+Tutti gli **980 test automatizzati passano con successo (100%)** distribuiti su 134 file di test (inclusi l'ottimizzatore Michaud Resampled Efficient Frontier `tests/test_michaud_and_api_expansion.py`, i controlli pre-trade MiFID II RTS 28 `tests/test_pretrade_compliance_and_scenarios.py`, i test di sincronizzazione bidirezionale della barra laterale e subtab `tests/test_sidebar_subtab_sync.py`, la suite del motore DuckDB OLAP `tests/test_wealth_olap.py`, la suite di loading states atomici `tests/test_loading_states.py`, il teardown lifecycle `tests/test_ui_lifecycle.py`, e gli indici compositi di database):
 
 ```bash
 py -m pytest

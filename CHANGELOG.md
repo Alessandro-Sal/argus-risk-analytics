@@ -57,7 +57,20 @@ ender_omni_command_bar) con proporzioni d\'intestazione [1.2, 3.8] e pillole inf
   - *Verifica Fiscale TUIR*: Rigorosa separazione contabile tra Redditi di Capitale (ETF UCITS, dividendi) e Redditi Diversi (azioni, ETC, certificates), gestione dello zainetto fiscale quadriennale (+4$) e quadro RW/IVAFE/IVIE.
   - *Test Suite Globale Espansa a 970 Test (100% Pass Rate)*: Validazione completa con 970 test automatizzati superati senza errori.
 
-- **Test Suite PyTest Espansa a 970 Test (100% Pass Rate)**:
+- **Consolidamento Schemi SQL Canonici Unificati (`sql/`)**:
+  - Unificazione dei file SQL dispersi nei 2 soli schemi canonici: `sql/01_supabase_schema_and_rls.sql` (PostgreSQL Supabase con RLS, multi-tenancy e indici) e `sql/02_sqlite_local_schema.sql` (schema speculare per SQLite locale).
+- **Riorganizzazione Modulare Core (`core/workspace/`, `core/reporting/`, `core/watchdog/`)**:
+  - Creazione del sottopacchetto `core/workspace/` (`context.py`, `manager.py`, `session.py`, `demo_seeder.py`) con protezione assoluta da sovrascrittura degli archetipi sintetici.
+  - Creazione di `core/reporting/report_exporter.py` con shim di retrocompatibilità trasparente.
+  - Unificazione sentinella in `core/watchdog/` (`wealth_watchdog.py`, `risk_watchdog.py`, `unified_notification_center.py`) con registrazione telemetrica proattiva su `core/institutional_telemetry.py`.
+- **Espansione Service Layer e Nuovi Endpoint REST API (`core/services/`, `api/main.py`)**:
+  - `TaxService` & `WealthService`: esposizione headless di Previdenza (`glidepath_engine`), FIRE (`tbs_monte_carlo`), Quadro RW / IVAFE (`cross_border_tax_engine`), Storico 730 (`tax_history_engine`) e Successione HNWI (`succession_optimizer`).
+  - 5 nuovi endpoint REST operativi in `api/main.py` con test di integrazione (`tests/test_api_endpoints.py`, 17 test superati).
+- **Potenziamento Completo Pagine Wealth (`src/pages/16..21`)**:
+  - Connessione completa ai motori istituzionali di Previdenza (16), FIRE (17), Fiscalità unificata in 4 tab lazy-loaded (18), Immobili e Mutui (19), Successione (20), AI Copilot (21).
+- **Allineamento Packaging e Desktop Standalone (`argus_desktop.spec`, `scripts/package_release.py`)**:
+  - Inclusione esplicita di `core.workspace` e degli schemi `sql/01_...` e `sql/02_...` nel bundle PyInstaller e audit di sicurezza release certificato.
+- **Test Suite Globale Espansa a 980 Test (100% Pass Rate)**:
   - Aggiunta la suite `tests/test_supabase_cloud.py` per la verifica end-to-end dell'isolamento multi-utente, dell'autenticazione PBKDF2-SHA256 e della persistenza ibrida.
 
 ---

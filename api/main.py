@@ -999,6 +999,51 @@ class FiscalReform2026Request(BaseModel):
     accumulated_losses_eur: float = Field(20000.0, ge=0.0, description="Prior tax losses in zainetto fiscale")
 
 
+class QuadroRWIvafeRequest(BaseModel):
+    """Payload for Quadro RW, IVAFE and IVIE calculation."""
+    foreign_financial_assets_eur: float = Field(default=0.0, ge=0.0, description="Foreign financial assets value in EUR")
+    foreign_real_estate_eur: float = Field(default=0.0, ge=0.0, description="Foreign real estate properties value in EUR")
+    foreign_crypto_eur: float = Field(default=0.0, ge=0.0, description="Foreign crypto-assets value in EUR")
+    days_held: int = Field(default=365, ge=1, le=366, description="Days of possession during the tax year")
+    tax_year: int = Field(default=2025, description="Tax year")
+
+
+class TaxDeclarationsHistoryRequest(BaseModel):
+    """Payload for retrieving historical tax declarations."""
+    portfolio_id: Optional[int] = Field(default=None, description="Portfolio ID")
+    tax_year: Optional[int] = Field(default=None, description="Tax year filter")
+
+
+class PensionGlidepathRequest(BaseModel):
+    """Payload for dynamic pension glide path and de-risking trajectory simulation."""
+    current_age: int = Field(default=35, ge=18, le=80, description="Current age of worker")
+    retirement_age: int = Field(default=67, ge=50, le=85, description="Planned retirement age")
+    current_pot_eur: float = Field(default=30000.0, ge=0.0, description="Current accumulated pension capital")
+    monthly_contribution_eur: float = Field(default=400.0, ge=0.0, description="Monthly voluntary contribution")
+    target_retirement_pot_eur: float = Field(default=500000.0, ge=1000.0, description="Target retirement wealth")
+    n_sims: int = Field(default=500, ge=10, le=5000, description="Number of Monte Carlo simulations")
+
+
+class FireSimulationRequest(BaseModel):
+    """Payload for Financial Independence, Retire Early (FIRE) simulation."""
+    net_worth_eur: float = Field(..., ge=0.0, description="Current consolidated net worth in EUR")
+    annual_spending_eur: float = Field(..., ge=100.0, description="Target annual living expenses in EUR")
+    safe_withdrawal_rate_pct: float = Field(default=4.0, ge=0.5, le=15.0, description="Safe Withdrawal Rate percentage")
+    expected_return_pct: float = Field(default=6.0, description="Expected portfolio annual nominal return percentage")
+    inflation_pct: float = Field(default=2.0, description="Expected inflation rate percentage")
+    horizon_years: int = Field(default=30, ge=1, le=60, description="Projection horizon in years")
+
+
+class SuccessionPlanRequest(BaseModel):
+    """Payload for institutional estate and succession planning."""
+    family_members: List[Dict[str, Any]] = Field(default_factory=list, description="List of family heirs and relatives")
+    real_estate_val: float = Field(default=0.0, ge=0.0, description="Total market value of real estate properties")
+    financial_val: float = Field(default=0.0, ge=0.0, description="Total market value of financial investment portfolio")
+    business_val: float = Field(default=0.0, ge=0.0, description="Value of family business equity")
+    exempt_bonds_val: float = Field(default=0.0, ge=0.0, description="Exempt government bonds (Art. 12 D.Lgs. 346/1990)")
+    life_insurance_val: float = Field(default=0.0, ge=0.0, description="Life insurance policies (Art. 1923 c.c.)")
+
+
 # ============================================================
 # FastAPI Application Factory
 # ============================================================
@@ -2500,6 +2545,84 @@ def create_app() -> FastAPI:
             }
         except Exception as exc:
             logger.error("Fiscal reform 2026 simulation failed: %s", exc, exc_info=True)
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.post("/api/v1/tax/quadro-rw-ivafe", tags=["Tax Optimization & Regulatory"])
+    def run_quadro_rw_ivafe(req: QuadroRWIvafeRequest) -> Dict[str, Any]:
+        """Calculates Quadro RW monitoring, IVAFE and IVIE wealth tax liabilities."""
+        try:
+            return TaxService.compute_quadro_rw_ivafe(
+                foreign_financial_assets_eur=req.foreign_financial_assets_eur,
+                foreign_real_estate_eur=req.foreign_real_estate_eur,
+                foreign_crypto_eur=req.foreign_crypto_eur,
+                days_held=req.days_held,
+                tax_year=req.tax_year,
+            )
+        except Exception as exc:
+            logger.error("Quadro RW / IVAFE computation failed: %s", exc, exc_info=True)
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.post("/api/v1/tax/history-730", tags=["Tax Optimization & Regulatory"])
+    def run_history_730(req: TaxDeclarationsHistoryRequest) -> Dict[str, Any]:
+        """Retrieves historical tax declarations and reconciliation reports."""
+        try:
+            from core.fetcher import get_engine
+            engine = get_engine()
+            return TaxService.get_tax_declarations_history(
+                db_engine=engine,
+                portfolio_id=req.portfolio_id,
+                tax_year=req.tax_year,
+            )
+        except Exception as exc:
+            logger.error("Tax declarations history retrieval failed: %s", exc, exc_info=True)
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.post("/api/v1/wealth/pension-glidepath", tags=["Wealth Management"])
+    def run_pension_glidepath(req: PensionGlidepathRequest) -> Dict[str, Any]:
+        """Simulates pension wealth trajectory and lifecycle glidepath de-risking."""
+        try:
+            return WealthService.simulate_pension_glidepath(
+                current_age=req.current_age,
+                retirement_age=req.retirement_age,
+                current_pot_eur=req.current_pot_eur,
+                monthly_contribution_eur=req.monthly_contribution_eur,
+                target_retirement_pot_eur=req.target_retirement_pot_eur,
+                n_sims=req.n_sims,
+            )
+        except Exception as exc:
+            logger.error("Pension glidepath simulation failed: %s", exc, exc_info=True)
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.post("/api/v1/wealth/fire-simulation", tags=["Wealth Management"])
+    def run_fire_simulation(req: FireSimulationRequest) -> Dict[str, Any]:
+        """Simulates FIRE benchmarks (Lean, Regular, Fat, Coast) and solvency horizons."""
+        try:
+            return WealthService.simulate_fire_projection(
+                net_worth_eur=req.net_worth_eur,
+                annual_spending_eur=req.annual_spending_eur,
+                safe_withdrawal_rate_pct=req.safe_withdrawal_rate_pct,
+                expected_return_pct=req.expected_return_pct,
+                inflation_pct=req.inflation_pct,
+                horizon_years=req.horizon_years,
+            )
+        except Exception as exc:
+            logger.error("FIRE simulation failed: %s", exc, exc_info=True)
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.post("/api/v1/wealth/succession-plan", tags=["Wealth Management"])
+    def run_succession_plan(req: SuccessionPlanRequest) -> Dict[str, Any]:
+        """Optimizes family succession and inheritance tax across 5 HNWI legal structures."""
+        try:
+            return WealthService.optimize_estate_succession(
+                family_members=req.family_members,
+                real_estate_val=req.real_estate_val,
+                financial_val=req.financial_val,
+                business_val=req.business_val,
+                exempt_bonds_val=req.exempt_bonds_val,
+                life_insurance_val=req.life_insurance_val,
+            )
+        except Exception as exc:
+            logger.error("Succession optimization failed: %s", exc, exc_info=True)
             raise HTTPException(status_code=500, detail=str(exc))
 
     @app.get("/api/v1/reporting/cro-institutional-dossier", tags=["Institutional UX & Telemetry"])
