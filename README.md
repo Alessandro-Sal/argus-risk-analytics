@@ -7,7 +7,7 @@
 [![Latest Release](https://img.shields.io/github/v/release/Alessandro-Sal/argus-risk-analytics?color=blue&label=version)](https://github.com/Alessandro-Sal/argus-risk-analytics/releases/latest)
 [![Python Version](https://img.shields.io/badge/python-3.11%20%7C%203.12-green.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-purple.svg)](LICENSE.md)
-[![Test Suite](https://img.shields.io/badge/PyTest-959%2F959%20PASSED%20(100%25)-brightgreen)](tests/)
+[![Test Suite](https://img.shields.io/badge/PyTest-970%2F970%20PASSED%20(100%25)-brightgreen)](tests/)
 [![Documentation: MkDocs](https://img.shields.io/badge/docs-Material%20for%20MkDocs-blue.svg)](https://alessandro-sal.github.io/argus-risk-analytics/)
 [![REST API: FastAPI](https://img.shields.io/badge/REST%20API-FastAPI%20%7C%20OpenAPI-009688.svg)](http://localhost:8000/docs)
 [![Code Style: Ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
@@ -25,6 +25,26 @@ ARGUS v10.0.0 segna il passaggio epocale a una piattaforma **Cloud-Native Multi-
 - **Audit di Sicurezza & Packaging Certificato (`scripts/package_release.py`, `SECURITY.md`)**: Scanner preventivo automatizzato che garantisce l'assenza totale di database personali, backup compressi, cache o credenziali nel repository Git e nell'archivio di rilascio `dist/ARGUS_v10.0.0.zip`.
 
 ---
+
+---
+
+## 🎨 Institutional Modular UI/UX Architecture (components/ui_core/), Zero-Flicker Theme Engine & 5-Subsystem Audit Hardening (v10.0.0)
+
+ARGUS v10.0.0 consolida l\'esperienza front-end istituzionale attraverso una rifondazione architetturale del presentation layer e la blindatura di 5 sottosistemi critici:
+- **Rifondazione Modulare del Front-End (components/ui_core/)**: Smantellamento del monolite ui_utils.py in moduli dedicati a singola responsabilità (	heme.py, sidebar.py, kpi_cards.py, charts.py, 	ables.py, modals.py, 
+avigation.py, loading_states.py), preservando retrocompatibilità totale (zero breaking changes) tramite proxy stubs trasparenti in core/ui_utils.py e core/sidebar.py.
+- **Zero-Flicker Theme Engine & Ciclo di Vita Streamlit (	heme.py & ctx.cursors)**: Eliminazione sistematica di flickering visivi e perdita di CSS durante la riconciliazione virtual DOM nei rerun interattivi, agganciando la guardia di iniezione al dizionario ctx.cursors di Streamlit (ScriptRunContext.reset()) per garantire persistenza continua del foglio di stile e azzeramento del FOUC (Flash of Unstyled Content).
+- **Barra dei Comandi Monoriga Responsiva (
+ender_command_bar, 
+ender_wealth_command_bar, 
+ender_omni_command_bar)**: Riprogettazione con proporzioni [1.2, 3.8], cluster di pillole informative orizzontali (💱 EUR, 📊 SPY, 🏷️ 50/30/20, 🟢 LIVE DB) con stili inline completi (display: inline-flex !important, white-space: nowrap !important) e Quick Command Palette universale accessibile tramite shortcut da tastiera nativa Ctrl+K.
+- **Selettore Ambiente & Workspace Standardizzato a Schede Full-Width**: 3 pulsanti card monolitici per il passaggio immediato tra *Institutional Trading & Risk*, *Wealth & Family Office* e *Unified View*, accompagnati dalla rimozione dei badge ridondanti sotto il logo nella sidebar per massimizzare l\'ergonomia verticale.
+- **Audit e Blindatura dei 5 Sottosistemi Critici**:
+  1. *Navigazione e Mappatura*: Verifica e certificazione di tutti i 22 moduli operativi (src/0_Control_Room.py e src/pages/1_ fino a 21_), risolvendo qualsiasi link orfano.
+  2. *Broker Ingestion Idempotency*: Generazione di fingerprint crittografici deterministici SHA-256 (	x_hash) su tutte le transazioni importate da broker esterni, impedendo duplicazioni accidentali all\'interno del ledger e del database patrimoniale.
+  3. *Trasparenza Real Data vs Mock/Benchmark*: Badge visivi espliciti nei motori quantitativi istituzionali per distinguere tra calcoli condotti sul portafoglio reale dell\'utente e simulazioni di benchmark/dati sintetici.
+  4. *Regole Fiscali Italiane*: Distinzione rigorosa tra Redditi di Capitale e Redditi Diversi, monitoraggio dello zainetto fiscale quadriennale (+4$) e adempimenti per Cripto 2026 e Quadro RW/IVAFE/IVIE.
+  5. *Test Suite Globale a 970 Test (100% Pass Rate)*: Piena conformità e collaudo con 970 test automatizzati superati senza errori.
 
 ## 🏛️ Architettura Operativa Ibrida: Locale Offline vs Cloud Online
 
@@ -704,11 +724,21 @@ argus-risk-analytics/
 ├── api/                         # Headless FastAPI Microservice (REST OpenAPI & WebSocket Gateway)
 │   ├── __init__.py
 │   └── main.py                  # API Hub v9.19.0: 40+ Endpoint Istituzionali (SIMM, XVA, FRTB, Heston, Solvency II)
-├── components/                  # Modali Istituzionali @st.dialog, Command Palette (Ctrl+K) & Splash Screen
+├── components/                  # Modali Istituzionali @st.dialog, Command Palette (Ctrl+K), Splash & UI Core
 │   ├── __init__.py
 │   ├── action_drawers.py        # Institutional Drawers (Pre-Trade Blotter, TUIR Lot Inspector, Euler Risk)
 │   ├── command_palette.py       # Bloomberg-Style Command Palette (Ctrl+K) & Switcher Multi-Modulo
-│   └── splash.py                # Bootloader Splash Screen, Animated Vector Logo & Diagnostics
+│   ├── splash.py                # Bootloader Splash Screen, Animated Vector Logo & Diagnostics
+│   └── ui_core/                 # Enterprise Modular Design System & Theme Engine (v10.0.0)
+│       ├── __init__.py
+│       ├── charts.py            # High-Contrast Dark Plotly Templates & Chart Framework
+│       ├── kpi_cards.py         # Institutional Metric Cards, Delta Gauges & Status Indicators
+│       ├── loading_states.py    # Zero-Shift Skeleton Loaders & Debouncing Execution Locks
+│       ├── modals.py            # Standardized 5-Block Educational & Diagnostic Modals (@st.dialog)
+│       ├── navigation.py        # Single-Line Command Bar, Telemetry Ribbon & Breadcrumbs
+│       ├── sidebar.py           # Multi-Context Navigation Tree, Workspace Switcher & Profile Drawer
+│       ├── tables.py            # High-Density Data Tables, Monospace Numeric Formatting & Striping
+│       └── theme.py             # Zero-Flicker Unified CSS Engine & Runtime Theme Resolution
 ├── config/                      # Configurazione e mapping ISIN-Ticker
 │   └── config.json
 ├── core/                        # Engine quantitativo, calcoli di rischio e moduli istituzionali
@@ -919,7 +949,7 @@ argus-risk-analytics/
 │   ├── FLOWCHART.md             # Diagramma di Flusso ETL a 5 Livelli
 │   ├── POWER_BI_GUIDE.md        # Guida all'integrazione del Data Warehouse Star Schema in Microsoft Power BI
 │   ├── PRESENTATION_SLIDES.md   # Presentazione esecutiva e slide deck del progetto
-│   ├── PROJECT_HANDOFF.md       # Documento di Consegna & Handoff Tecnico (v9.19.0)
+│   ├── PROJECT_HANDOFF.md       # Documento di Consegna & Handoff Tecnico (v10.0.0)
 │   ├── architecture-map.html    # Mappa architetturale interattiva a nodi
 │   ├── argus-architecture.html  # Diagramma Architetturale HTML Standalone v9.19.0
 │   ├── argus-architecture.json  # Specifica Architetturale JSON IR v9.19.0

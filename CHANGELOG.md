@@ -34,7 +34,30 @@ Questa major release (`v10.0.0`) trasforma ARGUS in una piattaforma **Cloud-Nati
 - **Audit di Sicurezza, Pulizia Dati Sensibili & Packaging Release v10.0.0 (`scripts/package_release.py`, `.gitignore`, `SECURITY.md`)**:
   - Hardening dello script `scripts/package_release.py` con esclusione tassativa di backup compressi (`*.db.gz`), cache (`data/cache`), pickle (`*.pkl`), transazioni personali (`Transactions.csv`), `.streamlit/secrets.toml` e verifica automatica di assenza di keyword sensibili.
   - Generazione dell'archivio pulito `dist/ARGUS_v10.0.0.zip` e inclusione degli archetipi sintetici `data/archetypes/` nel repository.
-- **Test Suite PyTest Espansa a 888 Test (100% Pass Rate)**:
+- **Rifondazione Modulare del Front-End (components/ui_core/)**:
+  - Smantellamento del monolite core/ui_utils.py e core/sidebar.py in un package modulare a responsabilità singola: 	heme.py, sidebar.py, kpi_cards.py, charts.py, 	ables.py, modals.py, 
+avigation.py, loading_states.py.
+  - Mantenimento di proxy stubs trasparenti in core/ui_utils.py e core/sidebar.py per garantire il 100% di retrocompatibilità sulle importazioni storiche.
+- **Zero-Flicker Theme Engine & Ciclo di Vita Streamlit (	heme.py & ctx.cursors)**:
+  - Risoluzione del problema di stripping del CSS durante la riconciliazione virtual DOM di Streamlit nei rerun interattivi, agganciando la guardia di iniezione a ctx.cursors (ScriptRunContext.reset()).
+  - Garanzia di iniezione esatta una sola volta per rerun, eliminando qualsiasi FOUC (Flash of Unstyled Content) o collasso visivo.
+- **Barra dei Comandi Monoriga Responsiva & Quick Command Palette (Ctrl+K)**:
+  - Riprogettazione delle command bar (
+ender_command_bar, 
+ender_wealth_command_bar, 
+ender_omni_command_bar) con proporzioni d\'intestazione [1.2, 3.8] e pillole informative orizzontali (💱 EUR, 📊 SPY, 🏷️ 50/30/20, 🟢 LIVE DB) con stili inline completi (display: inline-flex !important, white-space: nowrap !important).
+  - Accesso universale alla Quick Command Palette tramite combinazione rapida da tastiera Ctrl+K.
+- **Selettore Ambiente & Workspace Istituzionale Standardizzato**:
+  - Implementazione di 3 pulsanti card full-width ad ampiezza uniforme per il passaggio istantaneo tra *Institutional Trading & Risk*, *Wealth & Family Office* e *Unified View*.
+  - Rimozione dei badge di stato ridondanti (LIVE REAL DATA e CLOUD SYNCED) sotto il logo della sidebar per massimizzare la pulizia visiva.
+- **Audit e Blindatura dei 5 Sottosistemi Critici**:
+  - *Navigazione e Mappatura*: Verifica e certificazione di tutti i 22 moduli operativi (src/0_Control_Room.py e src/pages/1_ fino a 21_), azzerando riferimenti a pagine eliminate o rotte.
+  - *Broker Adapters & Anti-Duplicazione*: Fingerprinting deterministico SHA-256 su tutte le transazioni importate da broker (Directa, DeGiro, Fineco, IBKR, Trade Republic, Scalable, eToro, Revolut) per garantire assoluta idempotenza nei caricamenti multipli, con risoluzione automatica ISIN su borse europee e tassi ufficiali BCE.
+  - *Real Data vs Mock/Benchmark Transparency*: Inserimento di badge visivi espliciti nei motori quantitativi istituzionali per distinguere tra calcoli condotti sul portafoglio reale dell\'utente e simulazioni di benchmark/dati sintetici.
+  - *Verifica Fiscale TUIR*: Rigorosa separazione contabile tra Redditi di Capitale (ETF UCITS, dividendi) e Redditi Diversi (azioni, ETC, certificates), gestione dello zainetto fiscale quadriennale (+4$) e quadro RW/IVAFE/IVIE.
+  - *Test Suite Globale Espansa a 970 Test (100% Pass Rate)*: Validazione completa con 970 test automatizzati superati senza errori.
+
+- **Test Suite PyTest Espansa a 970 Test (100% Pass Rate)**:
   - Aggiunta la suite `tests/test_supabase_cloud.py` per la verifica end-to-end dell'isolamento multi-utente, dell'autenticazione PBKDF2-SHA256 e della persistenza ibrida.
 
 ---

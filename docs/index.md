@@ -177,6 +177,25 @@ Deterministic runtime environment detection (`is_local_environment()` vs `is_str
 
 ---
 
+### 45. Modular Institutional UI/UX Architecture (components/ui_core/), Zero-Flicker Theme Engine & 5-Subsystem Audit Hardening
+The front-end presentation layer of ARGUS has been restructured into an enterprise modular design system:
+- **components/ui_core/ Package**: Transitioned from the monolithic core/ui_utils.py and core/sidebar.py into decoupled, single-responsibility modules (	heme.py, sidebar.py, kpi_cards.py, charts.py, 	ables.py, modals.py, 
+avigation.py, loading_states.py), preserving transparent backward compatibility via proxy stubs.
+- **Zero-Flicker CSS Lifecycle Management**: Grounded the CSS de-duplication guard in ctx.cursors (ScriptRunContext.reset()), guaranteeing that the custom dark theme style sheet is emitted exactly once per script rerun without getting stripped or unmounted during Streamlit virtual DOM reconciliation.
+- **Single-Line Institutional Command Bar**: Responsive header bars (
+ender_command_bar, 
+ender_wealth_command_bar, 
+ender_omni_command_bar) with inline flex pill clusters (💱 EUR, 📊 SPY, 🏷️ 50/30/20, 🟢 LIVE DB) and quick-access Spotlight Ctrl+K palette.
+- **Full-Width Workspace Mode Selectors**: Three institutional selection cards for seamless switching between *Institutional Trading & Risk*, *Wealth & Family Office*, and *Unified View*.
+- **5-Subsystem Verification & Audit**:
+  1. *Navigation Integrity*: Comprehensive routing verification across all 22 active pages (Pages 0–21), eliminating dead links and orphan engines.
+  2. *Broker Ingestion Idempotency*: SHA-256 natural key fingerprinting preventing duplicated trade records across repeated uploads.
+  3. *Real vs. Simulated Data Transparency*: Explicit institutional badges in quantitative engines distinguishing between empirical portfolio computations and synthetic/benchmark simulations.
+  4. *Italian Fiscal Regime Compliance*: Complete TUIR compliance separating *Redditi di Capitale* (UCITS ETF capital gains, dividends) from *Redditi Diversi* (stocks, ETC, certificates), 2026 crypto-tax guidelines, and automated Quadro RW/IVAFE/IVIE filing tables.
+  5. *Holistic Balance Sheet Stress Transmission*: Direct bridge connecting mobile market positions with long-term personal balance sheets (mortgages, real estate, human capital).
+
+---
+
 ## Quick Navigation
 
 - [🚀 Quickstart in 5 Lines](getting-started/quickstart.md) — From raw CSV returns to optimal HRP allocation.

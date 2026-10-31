@@ -355,6 +355,38 @@ La major release **v9.0.0** introduce un'evoluzione radicale dell'esperienza ute
 * **Bento Grid Monolith & Fused CTAs**: Schede portale monolitiche a raggio continuo con azzeramento del gap verso i pulsanti d'azione (Oro Ambrato per Risk Desk, Verde Smeraldo per Wealth Suite), arricchite da matrici a 4 righe di metriche operative per ciascun dominio.
 * **Auto-Expanding Sidebar Gateway**: Apertura automatica immediata della sidebar con trigger JavaScript multi-fase non appena l'utente effettua l'ingresso in uno dei due portali.
 
+---
 
+## 16. Modular UI/UX Architecture (components/ui_core/), Zero-Flicker Theme Engine & High-Density Ergonomics (v10.0.0)
 
+La major release **v10.0.0** introduce una rifondazione architetturale dell\'intero layer di presentazione di ARGUS:
 
+### 16.1 Smantellamento del Monolite UI & Modularizzazione components/ui_core/
+Il monolite storico core/ui_utils.py (oltre 7.800 righe) è stato scorporato e riorganizzato nel package modulare components/ui_core/:
+* **	heme.py**: Gestione centralizzata dei token cromatici (Midnight Obsidian, Cyberpunk Neon, Emerald Wealth) e iniezione del foglio di stile CSS globale.
+* **sidebar.py**: Navigazione contestuale ad albero per tutti i 22 moduli, routing dinamico per ambiente, selettore profilo patrimoniale e controlli motore.
+* **kpi_cards.py**: Card metriche istituzionali con delta percentuali, badge semaforici e icone vettoriali pure-code.
+* **charts.py**: Template Plotly sincronizzati con il tema scuro ad alto contrasto e layout coerente.
+* **	ables.py**: Visualizzazione tabelle dati ad alta densità con formattazione numerica e allineamento contabile.
+* **modals.py**: Modali informativi standardizzati a 5 blocchi (📌 Cos\'è, 📐 Formula, 🎯 Benchmark, ⚙️ Codice, ⚠️ Limiti) conformi a @st.dialog.
+* **
+avigation.py**: Barra dei comandi universale (
+ender_command_bar, 
+ender_wealth_command_bar, 
+ender_omni_command_bar), telemetry ribbon e breadcrumb.
+* **loading_states.py**: Skeleton loaders atomici per prevenire layout shifts (CLS) durante calcoli quantitativi intensivi.
+* **Retrocompatibilità Trasparente**: I file core/ui_utils.py e core/sidebar.py sono mantenuti come proxy stubs (import * con __getattr__), garantendo zero breaking changes per le importazioni esistenti.
+
+### 16.2 Zero-Flicker CSS Lifecycle & Gestione di ScriptRunContext
+Nelle versioni precedenti, il meccanismo anti-flickering basato su flag di session_state o attributi statici impediva la ri-emissione del tag <style> nei rerun successivi al caricamento iniziale. Durante la riconciliazione del virtual DOM di Streamlit, il tag <style> veniva rimosso, causando la perdita temporanea degli stili e il collasso verticale dei componenti (FOUC).
+* **Soluzione Architetturale via ctx.cursors**: In components/ui_core/theme.py, la guardia anti-duplicazione è agganciata a ctx.cursors (ScriptRunContext.reset()), un dizionario che Streamlit azzera nativamente ad ogni singolo rerun.
+* **Risultato**: Il CSS viene iniettato esattamente una volta per rerun, garantendo persistenza continua degli stili nel DOM e zero sfarfallio al click di bottoni, slider o cambi di pagina.
+
+### 16.3 Single-Line Command Bar & Responsive Action Dock
+* **Cluster Pillole Orizzontale Rigoroso**: Le pillole informative (💱 EUR, 📊 SPY, 🏷️ 50/30/20, 🟢 LIVE DB) utilizzano un layout orizzontale protetto con display: inline-flex !important, lex-wrap: nowrap !important e lex-shrink: 0 !important.
+* **Proporzioni Dinamiche di Colonna**: Riorganizzazione della griglia d\'intestazione con allocazione [1.2, 3.8] tra titolo e area azioni, eliminando qualsiasi sovrapposizione o rottura su più righe.
+* **Ctrl+K Quick Command Palette & Spotlight**: Pulsante dedicato e shortcut da tastiera nativa per la ricerca istantanea di pagine, ticker e comandi operativi.
+
+### 16.4 Selettore Ambiente & Pulizia Visiva della Sidebar
+* **Card Istituzionali Full-Width**: Sostituzione di controlli segmentati eterogenei con 3 pulsanti monolitici ad ampiezza uniforme per il cambio rapido di workspace (*Institutional Trading & Risk*, *Wealth & Family Office*, *Unified View*).
+* **Rimozione dei Badge Ridondanti**: Eliminati i badge statici sotto il logo nella barra laterale per ottimizzare l\'ergonomia verticale e concentrare l\'attenzione sui controlli di navigazione attivi.

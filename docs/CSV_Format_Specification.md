@@ -128,3 +128,19 @@ py scripts/generate_realistic_portfolio.py --archetype young_accumulator --years
 - **Allineamento al Calendario di Borsa**: Tutte le transazioni mobiliari avvengono rigorosamente nei giorni di borsa aperta (lunedì-venerdì, con rollover automatico in caso di festività).
 - **Ammortamento Francese Esatto**: Le rate del mutuo rispettano la formula ad ammortamento progressivo a rata costante ($PMT$).
 - **Conformità Schema al 100%**: Il CSV generato può essere caricato in qualsiasi momento nella Control Room o elaborato dal `DataQualityGate` con zero errori di validazione.
+
+---
+
+## 5. Idempotenza di Ingestione, Fingerprinting Transazioni SHA-256 & Risoluzione ISIN/Valuta
+
+### 5.1 Deduplicazione Deterministica (Idempotenza di Caricamento)
+Per prevenire doppi conteggi, saldi gonfiati o anomalie nel calcolo del prezzo medio di carico (WACP), il modulo core/data_quality_gate.py genera per ciascuna riga importata un **fingerprint crittografico SHA-256** derivato dai campi canonici:
+
+\text{tx\_hash} = \text{SHA-256}(tx\_date \parallel ticker \parallel tx\_type \parallel quantity \parallel price \parallel currency)
+
+- **Idempotenza a livello Ledger**: L\'importazione ripetuta dello stesso file CSV, anche a distanza di mesi o da sessioni differenti, non produce alcuna duplicazione: i record aventi medesimo hash vengono scartati con stato DUPLICATE_IGNORED.
+- **Idempotenza Wealth DB**: Il medesimo controllo è applicato ai movimenti di cassa in core/wealth/wealth_db.py e core/wealth/universal_bank_parser.py, isolando e preservando l\'integrità dei saldi bancari.
+
+### 5.2 Risoluzione Automatica ISIN e Valuta Europea
+- **Risoluzione Multi-Market**: Tramite core/adapters/isin_resolver.py e core/metadata_resolver.py, gli ISIN europei (IT..., DE..., FR..., IE..., LU...) vengono automaticamente indirizzati verso la borsa di riferimento primaria (.MI per Borsa Italiana, .DE / .F per XETRA/Francoforte, .PA per Euronext Parigi) con valuta nativa corretta (EUR).
+- **Conversione FX Istituzionale BCE**: Le transazioni regolate in valuta estera (USD, GBP, CHF) vengono convertite verso la valuta di conto del portafoglio applicando la serie storica ufficiale dei cambi di riferimento pubblicata giornalmente dalla Banca Centrale Europea (core/i18n/fx_engine.py), eliminando disallineamenti di cambio nel calcolo del Cost Basis.

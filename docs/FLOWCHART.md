@@ -76,7 +76,7 @@ flowchart TD
 
     subgraph Layer5 ["📊 5. PRESENTATION & INSTITUTIONAL REPORTING LAYER"]
         direction TB
-        APP("💻 Streamlit App / Control Room (21 Moduli Live)"):::frontend
+        APP("💻 Streamlit App / Control Room (22 Moduli Live: Pagine 0-21)\n& Design System Modulare components/ui_core/"):::frontend
         DESK("🖥️ Native Desktop App\n(desktop_launcher.py + WebView2)"):::frontend
         DESIGN_SYS{"📄 core/reporting_design_system.py & modular_factsheet_builder.py\n(Obsidian Sovereign PDF & Numbered Canvas)"}:::script
         EXCEL_EXP{"📊 core/excel_generator.py & excel_connector.py\n(ListObject Tables, Live Formulas & RTD)"}:::script
@@ -152,7 +152,7 @@ flowchart TD
 - **`core/ai_analyst.py`, `core/sec_rag_engine.py` & `core/voice_advisor_engine.py`**: Narrative intelligence istituzionale con guardrails normativi MiFID II / Art. 21 TUF, validatore di grounding numerico, RAG semantico 10-K a finestra scorrevole con fusione RRF ed executive audio podcast a due voci.
 
 ### 5. Presentation & Institutional Reporting Layer
-- **Streamlit App & Desktop Launcher (`desktop_launcher.py` & `app.py`)**: Dashboard a 21 moduli analitici interattivi (Risk & Wealth Intelligence) fruibile via browser o come **Applicazione Desktop Nativa Windows** (`pywebview` + Edge WebView2) con l'icona dell'**Occhio di Argus**.
+- **Streamlit App & Desktop Launcher (`desktop_launcher.py` & `app.py`)**: Dashboard a 22 moduli analitici interattivi (Pagine 0-21: Trading & Risk Desk e Wealth & Family Office) supportata dall'architettura modulare `components/ui_core/` con motore zero-flicker e fruibile via browser o come **Applicazione Desktop Nativa Windows** (`pywebview` + Edge WebView2) con l'icona dell'**Occhio di Argus**.
 - **Institutional Reporting Design System (`core/reporting_design_system.py` & `core/modular_factsheet_builder.py`)**: Generazione PDF vettoriale in-memory con palette *Obsidian Sovereign*, canvas a due passaggi `InstitutionalNumberedCanvas` con numerazione "Pagina X di Y" e grafici donut vettoriali privi di memory leak.
 - **Excel Interactive Models (`core/excel_generator.py` & `core/excel_connector.py`)**: Esportazione di cartelle di lavoro Excel arricchite con tabelle native `ListObject`, formule vive (`SUM`, `XIRR`) e protezione anti-formula injection CWE-1236.
 - **Power BI Integration (`scripts/export_star_schema.py`)**: Esportazione pacchetto ZIP Star Schema (`dim_assets.csv`, `fact_positions.csv`, `fact_portfolio_summary.csv`).

@@ -49,6 +49,10 @@ ARGUS implementa un'architettura difensiva a più livelli (*Defense-in-Depth*) c
 - **Bypass Locale Confinato**: La modalità di accesso diretto senza password per il titolare (`login_local_owner`) è strettamente limitata all'esecuzione locale su workstation (`is_local_environment()`). Non è esportabile né attivabile in alcun modo su istanze Streamlit Cloud o container accessibili pubblicamente.
 - **Transizione Protetta a Supabase Cloud**: Una sessione locale opera con identificativo fittizio `local-owner` e senza token crittografico remoto. Qualora l'utente locale decida di switchare il motore relazionale su **Supabase Cloud (PostgreSQL)** tramite la barra laterale (`Tab 3: Database & Rete`), il sistema intercetta la richiesta (`is_supabase_cloud_authenticated()`) e blocca la connessione, richiedendo obbligatoriamente l'autenticazione con credenziali reali Supabase (GoTrue) per generare un token JWT verificato e garantire che i dati cloud non siano esposti a utenti fisicamente presenti sulla macchina locale privi di autorizzazione.
 
+### 8. Idempotenza di Ingestione & Fingerprinting Transazioni SHA-256 (Anti-Duplicazione)
+- **Deterministic Transaction Hashing**: Ogni operazione finanziaria importata da broker esterni (Directa, DeGiro, Fineco, IBKR, Trade Republic, Scalable, eToro, Revolut) o da estratti conto bancari viene associata a un hash univoco deterministico SHA-256 basato sulla quintupla naturale (tx_date, ticker, tx_type, quantity, price, currency).
+- **Prevenzione Duplicazioni Contabili**: Ingestioni multiple o accidentali del medesimo estratto conto o report transazioni non creano mai duplicati all\'interno dell\'Universal Ledger contabile o delle tabelle del database patrimoniale (wealth_cashflow, wealth_accounts), garantendo la rigorosa idempotenza delle operazioni contabili e fiscali.
+
 ---
 
 ## Segnalazione di Vulnerabilità (Responsible Disclosure)
