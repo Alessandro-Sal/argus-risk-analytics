@@ -104,8 +104,21 @@ with c3:
     metric_card("Plusvalenza Latente", fmt_eur(unrealized_gain), delta=f"{gain_pct:+.1f}% Rivalutazione", delta_color="normal" if unrealized_gain >= 0 else "inverse")
 with c4:
     watches_cnt = len(df_assets[df_assets["asset_category"] == "luxury_watches"]) if not df_assets.empty else 0
-    cnt_label = f"{watches_cnt} Pezzo" if watches_cnt == 1 else f"{watches_cnt} Pezzi"
-    metric_card("Orologi in Collezione", cnt_label, delta="Orologeria di Lusso", delta_color="normal")
+    metals_cnt = len(df_assets[df_assets["asset_category"] == "precious_metals"]) if not df_assets.empty else 0
+    other_cnt = len(df_assets) - watches_cnt - metals_cnt if not df_assets.empty else 0
+    total_cnt = len(df_assets) if not df_assets.empty else 0
+
+    parts = []
+    if watches_cnt > 0:
+        parts.append(f"{watches_cnt} {'Orologio' if watches_cnt == 1 else 'Orologi'}")
+    if metals_cnt > 0:
+        parts.append(f"{metals_cnt} {'Oro/Metallo' if metals_cnt == 1 else 'Metalli Preziosi'}")
+    if other_cnt > 0:
+        parts.append(f"{other_cnt} {'Altro' if other_cnt == 1 else 'Altri'}")
+
+    delta_comp = " • ".join(parts) if parts else "Nessun Asset Censito"
+    cnt_label = f"{total_cnt} {'Pezzo' if total_cnt == 1 else 'Pezzi'}"
+    metric_card("Asset nel Caveau", cnt_label, delta=delta_comp, delta_color="normal")
 
 st.divider()
 
@@ -149,6 +162,7 @@ active_illiquid_tab = render_segmented_tabs(
 
 # ── 1. COLLEZIONE OROLOGI & CAVEAU ─────────────────────────
 if active_illiquid_tab == "👑 Collezione Orologi & Caveau":
+    # ── 1.A OROLOGI DI LUSSO ──────────────────────────────
     section("👑 Collezione Orologi di Lusso")
 
     df_watches = df_assets[df_assets["asset_category"] == "luxury_watches"] if not df_assets.empty else pd.DataFrame()
@@ -181,7 +195,7 @@ if active_illiquid_tab == "👑 Collezione Orologi & Caveau":
 
             st.markdown(
                 f"""
-            <div style="background:rgba(22,27,34,0.85); border:1px solid rgba(255,255,255,0.08); border-left:4px solid #6366f1; border-radius:10px; padding:16px 20px; margin-bottom:14px;">
+            <div style="background:rgba(22,27,34,0.85); border:1px solid rgba(255,255,255,0.08); border-left:4px solid #6366f1; border-radius:10px; padding:16px 20px; margin-bottom:14px; box-shadow: 0 4px 14px rgba(0,0,0,0.25);">
                 <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
                     <div>
                         <div style="font-size:17px; font-weight:700; color:#ffffff; margin-bottom:6px;">⌚ {w['name']}</div>
@@ -206,6 +220,69 @@ if active_illiquid_tab == "👑 Collezione Orologi & Caveau":
             )
     else:
         st.info("Nessun orologio registrato. Aggiungi il tuo primo segnatempo dal modulo nella sezione 'Immobili & Altri Asset Fisici'.")
+
+    # ── 1.B METALLI PREZIOSI & ORO FISICO NEL CAVEAU ──────────────
+    df_metals = df_assets[df_assets["asset_category"] == "precious_metals"] if not df_assets.empty else pd.DataFrame()
+    if not df_metals.empty:
+        st.write("")
+        section("🥇 Caveau Metalli Preziosi & Oro Fisico")
+        st.caption("Lingotti, monete d'oro (Krugerrand, Sterline), gioielli e metalli nobili da investimento custoditi in cassaforte o caveau bancario.")
+
+        for _, m in df_metals.iterrows():
+            metal_name = str(m.get("name") or "Metallo Prezioso").strip()
+            material = str(m.get("brand_or_location") or "Oro").strip()
+            specs = str(m.get("model_or_specs") or "").strip()
+            ref_or_seal = str(m.get("reference_number") or "").strip()
+            cond = str(m.get("condition_grade") or "Custodito nel Caveau").strip()
+            acq_date = str(m.get("acquisition_date") or "").strip()
+            if acq_date in ["None", "NaT", "nan"]:
+                acq_date = ""
+
+            m_cost = float(m.get("purchase_price", 0.0) or 0.0)
+            m_val = float(m.get("current_market_value", 0.0) or 0.0)
+            m_pnl = m_val - m_cost
+            m_pnl_pct = (m_pnl / m_cost * 100.0) if m_cost > 0 else (100.0 if m_val > 0 else 0.0)
+
+            pnl_color = "#10b981" if m_pnl >= 0 else "#f85149"
+            pnl_sign = "+" if m_pnl >= 0 else ""
+
+            badges_html = f'<span style="background:rgba(245,158,11,0.15); border:1px solid rgba(245,158,11,0.35); padding:3px 8px; border-radius:4px; font-size:11px; font-weight:700; color:#fbbf24; margin-right:6px;">🥇 {material}</span>'
+            if specs:
+                badges_html += f'<span style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); padding:3px 8px; border-radius:4px; font-size:11px; color:#e2e8f0; margin-right:6px;">⚖️ {specs}</span>'
+            if ref_or_seal and ref_or_seal.lower() not in ["none", "n/d", "nan", ""]:
+                badges_html += f'<span style="background:rgba(56,189,248,0.15); border:1px solid rgba(56,189,248,0.3); padding:3px 8px; border-radius:4px; font-size:11px; color:#38bdf8; margin-right:6px;">🔒 Sigillo/Cert: {ref_or_seal}</span>'
+            badges_html += f'<span style="background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.3); padding:3px 8px; border-radius:4px; font-size:11px; color:#34d399; margin-right:6px;">🛡️ {cond}</span>'
+            if acq_date:
+                badges_html += f'<span style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); padding:3px 8px; border-radius:4px; font-size:11px; color:#8b949e;">📅 {acq_date}</span>'
+
+            cost_display = fmt_eur(m_cost) if m_cost > 0 else "€ 0,00 (Donazione / Oro)"
+            gain_label = f"{pnl_sign}{m_pnl_pct:.1f}%" if m_cost > 0 else "+100.0% (Oro)"
+
+            st.markdown(
+                f"""
+            <div style="background:rgba(22,27,34,0.85); border:1px solid rgba(245,158,11,0.25); border-left:4px solid #f59e0b; border-radius:10px; padding:16px 20px; margin-bottom:14px; box-shadow: 0 4px 14px rgba(0,0,0,0.25);">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                    <div>
+                        <div style="font-size:17px; font-weight:700; color:#fbbf24; margin-bottom:6px;">🥇 {metal_name}</div>
+                        <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center;">{badges_html}</div>
+                    </div>
+                    <div style="display:flex; gap:24px; align-items:center;">
+                        <div style="text-align:right;">
+                            <div style="font-size:11px; font-weight:600; color:#8b949e; text-transform:uppercase; letter-spacing:0.5px;">Valutazione di Mercato</div>
+                            <div style="font-size:19px; font-weight:700; color:#ffffff;">{fmt_eur(m_val)}</div>
+                            <div style="font-size:11px; color:#8b949e;">Acquisto: <span style="color:#c9d1d9;">{cost_display}</span></div>
+                        </div>
+                        <div style="text-align:right; min-width:110px;">
+                            <div style="font-size:11px; font-weight:600; color:#8b949e; text-transform:uppercase; letter-spacing:0.5px;">Plusvalenza Latente</div>
+                            <div style="font-size:19px; font-weight:700; color:{pnl_color};">{pnl_sign}{fmt_eur(m_pnl)}</div>
+                            <div style="font-size:11px; font-weight:600; color:{pnl_color};">{gain_label}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            """,
+                unsafe_allow_html=True,
+            )
 
 # ── 2. IMMOBILI & ALTRI ASSET FISICI ───────────────────────
 elif active_illiquid_tab == "🏠 Immobili & Altri Asset Fisici":
@@ -426,3 +503,21 @@ elif active_illiquid_tab == "🏛️ Private Debt & Direct Lending":
         """,
             unsafe_allow_html=True,
         )
+
+# ── SR 11-7 AUDIT TRAIL & MODEL VALIDATION ─────────────────
+render_sr117_audit_drawer(
+    engine_name="ARGUS Physical Assets, Caveau & Private Markets Engine",
+    latex_formulas=[
+        r"V_{\text{Caveau}} = \sum_{i \in \text{Watches}} P_i^{\text{mkt}} + \sum_{j \in \text{Metals}} (\text{Weight}_j \times \text{Spot}_j) + \sum_{k \in \text{Tangibles}} V_k",
+        r"\Delta_{\text{latente}} = V_{\text{Caveau}} - \sum C_{\text{acquisto}}, \quad \text{MOIC} = \frac{\text{DPI} + \text{RVPI}}{\text{Paid-In Capital}}",
+    ],
+    inputs_dict={"portfolio_id": current_pid, "assets_count": len(df_assets) if not df_assets.empty else 0},
+    outputs_dict={
+        "total_market_value_eur": total_market_val,
+        "total_cost_eur": total_cost,
+        "unrealized_gain_eur": unrealized_gain,
+        "luxury_watches_count": len(df_assets[df_assets["asset_category"] == "luxury_watches"]) if not df_assets.empty else 0,
+        "precious_metals_count": len(df_assets[df_assets["asset_category"] == "precious_metals"]) if not df_assets.empty else 0,
+    },
+    regulatory_refs=["Fed SR 11-7", "IVSC International Valuation Standards", "Basel Committee BCBS-352", "IAS 40 / IFRS 13"],
+)
