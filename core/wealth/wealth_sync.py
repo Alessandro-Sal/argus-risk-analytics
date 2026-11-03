@@ -770,7 +770,7 @@ def _sync_pension_sheet(engine: Engine, spreadsheet: Any, portfolio_id: int = 1)
     df_curr_pens = get_pension_plans(engine, portfolio_id=portfolio_id)
     existing_plan_id = None
     if not df_curr_pens.empty:
-        matches = df_curr_pens[df_curr_pens["plan_name"].str.contains("Fondo Pensione", case=False, na=False)]
+        matches = df_curr_pens[df_curr_pens["plan_name"].str.contains("Fondo Pensione|Credem", case=False, na=False)]
         if not matches.empty:
             existing_plan_id = int(matches.iloc[0]["plan_id"])
 
@@ -779,8 +779,8 @@ def _sync_pension_sheet(engine: Engine, spreadsheet: Any, portfolio_id: int = 1)
         {
             "plan_id": existing_plan_id,
             "portfolio_id": portfolio_id,
-            "plan_name": "Fondo Pensione Integrativo (GSheets)",
-            "provider": "Fondo Aperto / PIP",
+            "plan_name": "Credemvita Previdenza",
+            "provider": "Credemvita S.p.A.",
             "plan_type": "fondo_pensione_aperto",
             "accumulated_value": accumulated_val,
             "monthly_employee_contrib": round(avg_monthly, 2),
@@ -788,7 +788,7 @@ def _sync_pension_sheet(engine: Engine, spreadsheet: Any, portfolio_id: int = 1)
             "tax_deductible_annual": round(tot_annual_contrib, 2),
             "expected_retirement_age": 67,
             "currency": "EUR",
-            "investment_line": "Azionario / Crescita",
+            "investment_line": "Credemvita Azionario / Crescita",
             "notes": f"Sincronizzato da foglio Pension (Anni: {history_str})",
             "yearly_data_json": json.dumps(yearly_data),
         },
@@ -1045,7 +1045,7 @@ def _sync_net_worth_oggi_tab(engine: Engine, spreadsheet: Any, portfolio_id: int
                 df_curr_pens = get_pension_plans(engine, portfolio_id=portfolio_id)
                 existing_plan_id = None
                 if not df_curr_pens.empty:
-                    matches = df_curr_pens[df_curr_pens["plan_name"] == "Fondo Pensione Integrativo (GSheets)"]
+                    matches = df_curr_pens[df_curr_pens["plan_name"].str.contains("Fondo Pensione|Credem", case=False, na=False)]
                     if not matches.empty:
                         existing_plan_id = int(matches.iloc[0]["plan_id"])
 
@@ -1054,11 +1054,12 @@ def _sync_net_worth_oggi_tab(engine: Engine, spreadsheet: Any, portfolio_id: int
                     {
                         "plan_id": existing_plan_id,
                         "portfolio_id": portfolio_id,
-                        "plan_name": "Fondo Pensione Integrativo (GSheets)",
-                        "provider": "Fondo Aperto / PIP",
+                        "plan_name": "Credemvita Previdenza",
+                        "provider": "Credemvita S.p.A.",
                         "plan_type": "fondo_pensione_aperto",
                         "accumulated_value": pension_val,
                         "currency": "EUR",
+                        "investment_line": "Credemvita Azionario / Crescita",
                         "notes": "Sincronizzato da Net Worth OGGI",
                     },
                 )

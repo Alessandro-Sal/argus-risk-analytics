@@ -275,18 +275,39 @@ if active_pension_tab == "📋 Piani Attivi & Scudo Fiscale":
 
                     if hist_rows:
                         st.markdown(
-                            f"###### 📊 Cronistoria Versamenti & Ottimizzazione Fiscale ({hist_rows[0]['_year']} - {hist_rows[-1]['_year']})"
+                            f"###### 📊 Cronistoria Versamenti & Ottimizzazione Fiscale Credemvita ({hist_rows[0]['_year']} - {hist_rows[-1]['_year']})"
                         )
                         df_h = pd.DataFrame(hist_rows)
-                        st.dataframe(
-                            df_h[[
+
+                        # Arricchimento colonne se presenti dati del comparto fondo
+                        display_cols = [
+                            "Esercizio",
+                            "Versamenti Annui (€)",
+                            "Cumulato Versato (€)",
+                            "Deducibilità Fiscale (€)",
+                            "Risparmio IRPEF 43% (€)",
+                            "Plafond Residuo (€)",
+                        ]
+                        has_fondo_data = any(yr_info.get("tot_fondo") is not None for yr_info in yd.values() if isinstance(yr_info, dict))
+                        if has_fondo_data:
+                            for r_item in hist_rows:
+                                yr_d = yd.get(str(r_item["_year"]), {})
+                                r_item["Valore Fondo (€)"] = fmt_eur(yr_d.get("tot_fondo")) if yr_d.get("tot_fondo") is not None else "N/D"
+                                r_item["Gain/Loss Fondo (€)"] = f"{'+' if (yr_d.get('gain_loss') or 0)>=0 else ''}{fmt_eur(yr_d.get('gain_loss'))}" if yr_d.get("gain_loss") is not None else "N/D"
+                            df_h = pd.DataFrame(hist_rows)
+                            display_cols = [
                                 "Esercizio",
                                 "Versamenti Annui (€)",
                                 "Cumulato Versato (€)",
+                                "Valore Fondo (€)",
+                                "Gain/Loss Fondo (€)",
                                 "Deducibilità Fiscale (€)",
                                 "Risparmio IRPEF 43% (€)",
                                 "Plafond Residuo (€)",
-                            ]],
+                            ]
+
+                        st.dataframe(
+                            df_h[display_cols],
                             use_container_width=True,
                             hide_index=True,
                         )
@@ -316,7 +337,7 @@ if active_pension_tab == "📋 Piani Attivi & Scudo Fiscale":
                             )
                         )
                         fig_prev.update_layout(
-                            height=280,
+                            height=290,
                             margin=dict(l=30, r=30, t=30, b=20),
                             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
                             yaxis=dict(title="Versamento Annuo (€)"),
@@ -324,6 +345,44 @@ if active_pension_tab == "📋 Piani Attivi & Scudo Fiscale":
                         )
                         apply_plotly_theme(fig_prev)
                         st.plotly_chart(fig_prev, use_container_width=True)
+
+                        # ── SIMULATORE VERSAMENTO VOLONTARIO DI FINE ANNO CREDEMVITA ──
+                        st.write("")
+                        st.markdown("###### 💡 Simulatore Versamento Volontario di Fine Anno (Massimizzazione Deducibilità)")
+                        st.caption("Calcola il rimborso IRPEF immediato in dichiarazione 730 versando un contributo volontario aggiuntivo a Credemvita prima del 31 dicembre.")
+
+                        sim_col1, sim_col2 = st.columns([2, 1.2])
+                        with sim_col1:
+                            extra_contrib = st.slider(
+                                f"Versamento Volontario Aggiuntivo entro il 31/12/{datetime.now().year} (€):",
+                                min_value=0.0,
+                                max_value=float(rem_cap),
+                                value=float(min(1500.0, rem_cap)),
+                                step=100.0,
+                                format="€ %.2f",
+                                key="slider_credem_extra_contrib",
+                            )
+                            irpef_bracket = st.selectbox(
+                                "Tua Aliquota Marginale IRPEF:",
+                                options=[(0.43, "43% (Redditi > € 50.000)"), (0.35, "35% (Redditi € 28.000 - 50.000)"), (0.23, "23% (Redditi fino a € 28.000)")],
+                                format_func=lambda x: x[1],
+                                key="select_credem_irpef_rate",
+                            )
+                        with sim_col2:
+                            extra_tax_shield = extra_contrib * irpef_bracket[0]
+                            effective_cost = extra_contrib - extra_tax_shield
+                            new_rem_cap = max(0.0, rem_cap - extra_contrib)
+                            st.markdown(
+                                f'''
+                                <div style="background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.25); border-radius:8px; padding:12px 16px;">
+                                    <div style="font-size:11px; color:#94a3b8; text-transform:uppercase;">Rimborso IRPEF nel 730</div>
+                                    <div style="font-size:22px; font-weight:800; color:#34d399;">+{fmt_eur(extra_tax_shield)}</div>
+                                    <div style="font-size:11px; color:#c9d1d9; margin-top:4px;">Costo reale a tuo carico: <b style="color:#ffffff;">{fmt_eur(effective_cost)}</b></div>
+                                    <div style="font-size:10.5px; color:#8b949e; margin-top:4px;">Plafond residuo post-versamento: <b style="color:#fbbf24;">{fmt_eur(new_rem_cap)}</b></div>
+                                </div>
+                                ''',
+                                unsafe_allow_html=True,
+                            )
                 except Exception:
                     pass
     else:
