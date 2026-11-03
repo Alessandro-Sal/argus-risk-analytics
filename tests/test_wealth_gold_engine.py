@@ -200,3 +200,40 @@ def test_compute_gold_portfolio_historical_trajectory():
     # Final value should be close to 15g * current 18K spot
     final_val = float(traj["Total_Gold_Value_EUR"].iloc[-1])
     assert 1000.0 < final_val < 1600.0
+
+
+def test_bullion_coin_evaluation():
+    from core.wealth.gold_engine import BULLION_COIN_CATALOG, evaluate_bullion_coin
+
+    assert "sovereign_full" in BULLION_COIN_CATALOG
+    assert "krugerrand_1oz" in BULLION_COIN_CATALOG
+
+    sov = evaluate_bullion_coin("sovereign_full", quantity=2, live_spot_24k_eur_g=100.0)
+    assert sov["quantity"] == 2
+    assert sov["fine_gold_total_g"] == 7.322 * 2
+    # 7.322g * 100 = 732.20€ melt value unit + 3.8% premium = ~760€ unit
+    assert sov["market_price_unit_eur"] > 732.20
+    assert sov["total_market_price_eur"] == round(sov["market_price_unit_eur"] * 2, 2)
+
+
+def test_gold_sale_tax_simulator_with_document():
+    from core.wealth.gold_engine import compute_gold_sale_tax_impact
+
+    # Acquisto a 2.000€, Vendita a 3.000€ con fattura
+    res = compute_gold_sale_tax_impact(sale_price_eur=3000.0, purchase_price_eur=2000.0, has_purchase_document=True)
+    assert res["taxable_base_eur"] == 1000.0
+    assert res["tax_due_eur"] == 260.0  # 26% di 1.000€
+    assert res["net_proceeds_eur"] == 2740.0
+    assert res["effective_tax_pct"] == round(260.0 / 3000.0 * 100, 2)
+
+
+def test_gold_sale_tax_simulator_without_document_2024_reform():
+    from core.wealth.gold_engine import compute_gold_sale_tax_impact
+
+    # Vendita a 10.000€ senza documenti (L. Bilancio 2024: 26% su 100% incasso)
+    res = compute_gold_sale_tax_impact(sale_price_eur=10000.0, has_purchase_document=False)
+    assert res["taxable_base_eur"] == 10000.0
+    assert res["tax_due_eur"] == 2600.0  # 26% di 10.000€
+    assert res["net_proceeds_eur"] == 7400.0
+    assert res["effective_tax_pct"] == 26.0
+    assert res["delta_vs_pre_2024_eur"] == 2600.0 - 650.0  # +1.950€ rispetto al vecchio forfettario 25%

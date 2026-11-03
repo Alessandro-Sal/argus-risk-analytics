@@ -20,13 +20,28 @@ if TYPE_CHECKING:
         StatutoryShareItem,
         SuccessionSharesResult,
     )
+    from core.wealth.cash_yield_optimizer import (
+        BENCHMARKS,
+        compute_cash_yield_optimization,
+    )
+    from core.wealth.universal_broker_importer import (
+        BROKER_SIGNATURES,
+        detect_broker_and_format,
+        ingest_broker_transactions,
+        parse_universal_broker_file,
+        render_universal_broker_importer_tab,
+    )
     from core.wealth.gold_engine import (
         BASELINE_SPOT_18K_EUR_G,
         BASELINE_SPOT_24K_EUR_G,
+        BULLION_COIN_CATALOG,
         CARAT_PURITY_MAP,
         TROY_OUNCE_TO_GRAMS,
         compute_gold_portfolio_historical_trajectory,
+        compute_gold_sale_tax_impact,
+        evaluate_bullion_coin,
         evaluate_metal_asset_dynamically,
+        get_bullion_coin_info,
         get_gold_historical_series,
         get_gold_spot_on_date,
         get_live_gold_spot_rates,
@@ -189,13 +204,20 @@ _LAZY_EXPORTS: dict[str, str] = {
     "ProtectionVehicleAnalysis": "core.wealth.asset_protection_engine",
     "StatutoryShareItem": "core.wealth.asset_protection_engine",
     "SuccessionSharesResult": "core.wealth.asset_protection_engine",
+    # cash_yield_optimizer
+    "BENCHMARKS": "core.wealth.cash_yield_optimizer",
+    "compute_cash_yield_optimization": "core.wealth.cash_yield_optimizer",
     # gold_engine
     "BASELINE_SPOT_18K_EUR_G": "core.wealth.gold_engine",
     "BASELINE_SPOT_24K_EUR_G": "core.wealth.gold_engine",
+    "BULLION_COIN_CATALOG": "core.wealth.gold_engine",
     "CARAT_PURITY_MAP": "core.wealth.gold_engine",
     "TROY_OUNCE_TO_GRAMS": "core.wealth.gold_engine",
     "compute_gold_portfolio_historical_trajectory": "core.wealth.gold_engine",
+    "compute_gold_sale_tax_impact": "core.wealth.gold_engine",
+    "evaluate_bullion_coin": "core.wealth.gold_engine",
     "evaluate_metal_asset_dynamically": "core.wealth.gold_engine",
+    "get_bullion_coin_info": "core.wealth.gold_engine",
     "get_gold_historical_series": "core.wealth.gold_engine",
     "get_gold_spot_on_date": "core.wealth.gold_engine",
     "get_live_gold_spot_rates": "core.wealth.gold_engine",
@@ -284,6 +306,12 @@ _LAZY_EXPORTS: dict[str, str] = {
     "simulate_pension_projection": "core.wealth.wealth_engine",
     # wealth_exporter
     "export_wealth_master_excel_workbook": "core.wealth.wealth_exporter",
+    # universal_broker_importer
+    "BROKER_SIGNATURES": "core.wealth.universal_broker_importer",
+    "detect_broker_and_format": "core.wealth.universal_broker_importer",
+    "ingest_broker_transactions": "core.wealth.universal_broker_importer",
+    "parse_universal_broker_file": "core.wealth.universal_broker_importer",
+    "render_universal_broker_importer_tab": "core.wealth.universal_broker_importer",
     # wealth_importer
     "auto_categorize_transactions": "core.wealth.wealth_importer",
     "bulk_import_statement": "core.wealth.wealth_importer",

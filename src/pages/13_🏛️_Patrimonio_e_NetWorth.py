@@ -117,6 +117,12 @@ def _load_cached_temporal_suite(_engine, portfolio_id: int, timeframe_months: in
 
 
 @st.cache_data(ttl=300, show_spinner=False)
+def _get_cached_master_fo_pitchbook_pdf(_engine, pid: int, client_name: str = "Family Office Master", db_key: str = "") -> bytes:
+    from core.reporting.master_pitchbook_pdf import generate_master_family_office_pitchbook_pdf
+    return generate_master_family_office_pitchbook_pdf(_engine, portfolio_id=pid, client_name=client_name)
+
+
+@st.cache_data(ttl=300, show_spinner=False)
 def _get_cached_pitchbook_pdf(_engine, pid: int, db_key: str = "") -> bytes:
     return generate_advisory_pitchbook_pdf(_engine, portfolio_id=pid)
 
@@ -555,21 +561,32 @@ if active_nw_tab == "📊 Bilancio & Allocazione":
 
     from core.wealth.wealth_modals import render_wealth_methodology_modal
 
-    ts_c1, ts_c2, ts_c3, ts_c4, ts_c5 = st.columns([1.3, 1.1, 0.8, 0.8, 1.1])
+    ts_c0, ts_c1, ts_c2, ts_c3, ts_c4, ts_c5 = st.columns([1.4, 1.2, 1.0, 0.7, 0.7, 1.0])
+    with ts_c0:
+        st.download_button(
+            label="🏆 Master Pitchbook (A4)",
+            data=lambda: _get_cached_master_fo_pitchbook_pdf(engine, current_pid, client_name=prof_title, db_key=db_key),
+            file_name=f"argus_family_office_pitchbook_{prof_slug}_{date_slug}.pdf",
+            mime="application/pdf",
+            use_container_width=True,
+            type="primary",
+            key="dl_fo_pitchbook_pdf_btn_tab1",
+            on_click="ignore",
+        )
     with ts_c1:
         st.download_button(
-            label="📥 Scarica Pitchbook PDF",
+            label="📥 Advisory Pitchbook",
             data=lambda: _get_cached_pitchbook_pdf(engine, current_pid, db_key=db_key),
             file_name=f"argus_advisory_pitchbook_{prof_slug}_{date_slug}.pdf",
             mime="application/pdf",
             use_container_width=True,
-            type="primary",
             key="dl_pitchbook_pdf_btn_tab1",
             on_click="ignore",
         )
     with ts_c2:
         st.download_button(
             label="📑 Tear-Sheet Sintetica",
+
             data=lambda: _get_cached_tear_sheet_pdf(engine, current_pid, db_key=db_key),
             file_name=f"argus_tear_sheet_{prof_slug}_{date_slug}.pdf",
             mime="application/pdf",

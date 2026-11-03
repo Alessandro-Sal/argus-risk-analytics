@@ -11,6 +11,7 @@ from core.reporting.design_system import (
 from core.reporting.excel import generate_excel_in_memory
 from core.reporting.factsheet import FactsheetExportConfig, ModularFactsheetBuilder
 from core.reporting.html import generate_interactive_html_report
+from core.reporting.master_pitchbook_pdf import generate_master_family_office_pitchbook_pdf
 from core.reporting.pdf import (
     generate_executive_pdf_report,
     generate_institutional_portfolio_factsheet_pdf,
@@ -37,6 +38,7 @@ __all__ = [
     "create_vector_donut_chart",
     "generate_executive_pdf_report",
     "generate_institutional_portfolio_factsheet_pdf",
+    "generate_master_family_office_pitchbook_pdf",
     "generate_regulatory_stress_testing_dossier_pdf",
     "generate_white_label_quarterly_pdf_report",
     "generate_excel_in_memory",

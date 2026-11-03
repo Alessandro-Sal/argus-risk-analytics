@@ -514,3 +514,238 @@ def compute_gold_portfolio_historical_trajectory(
 
     res_df = pd.DataFrame(traj_records).set_index("Date")
     return res_df
+
+
+# ============================================================
+# BULLION COIN CATALOG & NUMISMATIC SPREAD TRACKER
+# ============================================================
+BULLION_COIN_CATALOG: Dict[str, Dict[str, Any]] = {
+    "sovereign_full": {
+        "name": "Sterlina d'Oro (Full Sovereign)",
+        "country": "Regno Unito (Royal Mint)",
+        "gross_weight_g": 7.988,
+        "fineness": 0.9167,  # 22K (916.7/1000)
+        "fine_gold_g": 7.322,
+        "default_premium_pct": 3.8,  # Tipico premio bullion/numismatico di mercato
+        "diameter_mm": 22.05,
+        "icon": "🇬🇧",
+    },
+    "sovereign_half": {
+        "name": "Mezza Sterlina d'Oro (Half Sovereign)",
+        "country": "Regno Unito (Royal Mint)",
+        "gross_weight_g": 3.994,
+        "fineness": 0.9167,
+        "fine_gold_g": 3.661,
+        "default_premium_pct": 5.2,
+        "diameter_mm": 19.30,
+        "icon": "🇬🇧",
+    },
+    "krugerrand_1oz": {
+        "name": "Krugerrand (1 oz)",
+        "country": "Sudafrica (Rand Refinery)",
+        "gross_weight_g": 33.930,
+        "fineness": 0.9167,  # 22K (lega con rame resistente)
+        "fine_gold_g": 31.1035,  # Esattamente 1 oncia troy di oro puro
+        "default_premium_pct": 2.5,
+        "diameter_mm": 32.77,
+        "icon": "🇿🇦",
+    },
+    "maple_leaf_1oz": {
+        "name": "Maple Leaf (1 oz)",
+        "country": "Canada (Royal Canadian Mint)",
+        "gross_weight_g": 31.1035,
+        "fineness": 0.9999,  # 24K (999.9/1000 oro puro 'four nines')
+        "fine_gold_g": 31.1035,
+        "default_premium_pct": 2.8,
+        "diameter_mm": 30.00,
+        "icon": "🇨🇦",
+    },
+    "philharmonic_1oz": {
+        "name": "Filarmonica di Vienna (1 oz)",
+        "country": "Austria (Münze Österreich)",
+        "gross_weight_g": 31.1035,
+        "fineness": 0.9999,  # 24K
+        "fine_gold_g": 31.1035,
+        "default_premium_pct": 2.6,
+        "diameter_mm": 37.00,
+        "icon": "🇦🇹",
+    },
+    "marengo_italiano": {
+        "name": "Marengo Italiano (20 Lire)",
+        "country": "Italia (Regno d'Italia)",
+        "gross_weight_g": 6.4516,
+        "fineness": 0.9000,  # 21.6K (900/1000)
+        "fine_gold_g": 5.8064,
+        "default_premium_pct": 5.5,
+        "diameter_mm": 21.00,
+        "icon": "🇮🇹",
+    },
+    "ducato_austriaco": {
+        "name": "Ducato Austriaco (Singolo)",
+        "country": "Austria (Münze Österreich)",
+        "gross_weight_g": 3.4909,
+        "fineness": 0.9860,  # 23.6K (986/1000 altissimo titolo)
+        "fine_gold_g": 3.4420,
+        "default_premium_pct": 6.0,
+        "diameter_mm": 20.00,
+        "icon": "🇦🇹",
+    },
+    "bar_100g": {
+        "name": "Lingotto Oro 100g (Good Delivery)",
+        "country": "LBMA Accredited Refiner (Argor/Valcambi)",
+        "gross_weight_g": 100.0,
+        "fineness": 0.9999,  # 24K
+        "fine_gold_g": 100.0,
+        "default_premium_pct": 1.2,
+        "diameter_mm": 0.0,
+        "icon": "🥇",
+    },
+    "bar_50g": {
+        "name": "Lingotto Oro 50g (Good Delivery)",
+        "country": "LBMA Accredited Refiner",
+        "gross_weight_g": 50.0,
+        "fineness": 0.9999,
+        "fine_gold_g": 50.0,
+        "default_premium_pct": 1.5,
+        "diameter_mm": 0.0,
+        "icon": "🥇",
+    },
+    "bar_10g": {
+        "name": "Lingotto Oro 10g (Good Delivery)",
+        "country": "LBMA Accredited Refiner",
+        "gross_weight_g": 10.0,
+        "fineness": 0.9999,
+        "fine_gold_g": 10.0,
+        "default_premium_pct": 2.5,
+        "diameter_mm": 0.0,
+        "icon": "🥇",
+    },
+}
+
+
+def get_bullion_coin_info(coin_key_or_name: str) -> Optional[Dict[str, Any]]:
+    """Cerca e restituisce le specifiche della moneta bullion specificata."""
+    query = str(coin_key_or_name).strip().lower()
+    if query in BULLION_COIN_CATALOG:
+        return BULLION_COIN_CATALOG[query]
+
+    for key, c in BULLION_COIN_CATALOG.items():
+        if query in key or query in c["name"].lower():
+            return c
+    return None
+
+
+def evaluate_bullion_coin(
+    coin_key: str,
+    quantity: int = 1,
+    custom_premium_pct: Optional[float] = None,
+    live_spot_24k_eur_g: Optional[float] = None,
+) -> Dict[str, Any]:
+    """
+    Calcola la quotazione di mercato di una moneta bullion da investimento
+    in base al peso di oro puro (fine gold) e al premio numismatico di mercato.
+    """
+    if coin_key not in BULLION_COIN_CATALOG:
+        coin_key = "sovereign_full"
+
+    coin = BULLION_COIN_CATALOG[coin_key]
+    qty = max(1, int(quantity))
+    prem_pct = float(custom_premium_pct if custom_premium_pct is not None else coin["default_premium_pct"])
+
+    if live_spot_24k_eur_g is None:
+        rates = get_live_gold_spot_rates()
+        spot_24k = float(rates.get("gold_eur_per_gram_24k", BASELINE_SPOT_24K_EUR_G))
+    else:
+        spot_24k = float(live_spot_24k_eur_g)
+
+    melt_value_unit = round(coin["fine_gold_g"] * spot_24k, 2)
+    premium_val_unit = round(melt_value_unit * (prem_pct / 100.0), 2)
+    market_price_unit = round(melt_value_unit + premium_val_unit, 2)
+
+    total_fine_gold_g = round(coin["fine_gold_g"] * qty, 3)
+    total_melt_value = round(melt_value_unit * qty, 2)
+    total_market_price = round(market_price_unit * qty, 2)
+
+    return {
+        "coin_key": coin_key,
+        "coin_name": coin["name"],
+        "country": coin["country"],
+        "icon": coin["icon"],
+        "quantity": qty,
+        "gross_weight_total_g": round(coin["gross_weight_g"] * qty, 3),
+        "fine_gold_total_g": total_fine_gold_g,
+        "fineness": coin["fineness"],
+        "spot_24k_eur_g": spot_24k,
+        "melt_value_unit_eur": melt_value_unit,
+        "premium_pct": prem_pct,
+        "premium_val_unit_eur": premium_val_unit,
+        "market_price_unit_eur": market_price_unit,
+        "total_melt_value_eur": total_melt_value,
+        "total_market_price_eur": total_market_price,
+    }
+
+
+def compute_gold_sale_tax_impact(
+    sale_price_eur: float,
+    purchase_price_eur: Optional[float] = None,
+    has_purchase_document: bool = True,
+) -> Dict[str, Any]:
+    """
+    Simula la fiscalità sulla cessione di oro da investimento in Italia (Legge 7/2000,
+    art. 67 c. 1 lett. c-ter del TUIR e riforma della Legge di Bilancio 2024 L. 213/2023).
+
+    Novità normativa Legge di Bilancio 2024:
+    - CON DOCUMENTAZIONE: Plusvalenza = Corrispettivo - Costo d'acquisto documentato. Imposta 26%.
+      Se Minusvalenza: genera minusvalenza compensabile nei 4 anni successivi in Quadro RT.
+    - SENZA DOCUMENTAZIONE (pre-2024): Si applicava il forfettario 25% imponibile (imposta effettiva 6.5%).
+    - SENZA DOCUMENTAZIONE (post-2024): L'imposta sostitutiva del 26% si applica sull'INTERO corrispettivo
+      di vendita (100% dell'incasso), con un prelievo fiscale effettivo del 26.0% sul totale!
+    """
+    sale_val = max(0.0, float(sale_price_eur))
+    cost_val = float(purchase_price_eur or 0.0) if has_purchase_document else 0.0
+
+    if has_purchase_document:
+        unrealized_pnl = sale_val - cost_val
+        taxable_base = max(0.0, unrealized_pnl)
+        is_loss = unrealized_pnl < 0
+        tax_rate = 0.26
+        tax_due = round(taxable_base * tax_rate, 2)
+        net_proceeds = round(sale_val - tax_due, 2)
+        effective_tax_pct = round((tax_due / sale_val * 100.0), 2) if sale_val > 0 else 0.0
+        tax_loss_generated = round(abs(unrealized_pnl), 2) if is_loss else 0.0
+        regime_notes = (
+            "Regime Ordinario con Fattura/Documento: Imposta del 26% applicata unicamente sulla plusvalenza reale. "
+            + ("Genera minusvalenza compensabile in dichiarazione dei redditi (Quadro RT)." if is_loss else "")
+        )
+    else:
+        # Riforma L. 213/2023: 26% sull'intero corrispettivo incassato!
+        taxable_base = sale_val
+        tax_rate = 0.26
+        tax_due = round(taxable_base * tax_rate, 2)
+        net_proceeds = round(sale_val - tax_due, 2)
+        effective_tax_pct = 26.00
+        tax_loss_generated = 0.0
+        regime_notes = (
+            "⚠️ Regime Senza Documentazione (Riforma Legge di Bilancio 2024 - Legge 213/2023): "
+            "È stata abrogata la deduzione forfettaria del 75%. L'imposta sostitutiva del 26% si applica "
+            "ora sull'INTERO corrispettivo di vendita lordo (100% dell'incasso). "
+            "💡 Consiglio ARGUS: Per importi rilevanti è consigliabile predisporre una perizia giurata di stima "
+            "con affrancamento per rideterminare il costo fiscale d'acquisto ed evitare la tassazione sull'intero incasso."
+        )
+
+    # Confronto con la vecchia normativa pre-2024
+    pre_2024_tax_due = round(sale_val * 0.25 * 0.26, 2)  # 6.5% sul lordo
+    delta_vs_old_law = round(tax_due - pre_2024_tax_due, 2) if not has_purchase_document else 0.0
+
+    return {
+        "sale_price_eur": sale_val,
+        "purchase_price_eur": cost_val,
+        "has_purchase_document": has_purchase_document,
+        "taxable_base_eur": taxable_base,
+        "tax_due_eur": tax_due,
+        "net_proceeds_eur": net_proceeds,
+        "effective_tax_pct": effective_tax_pct,
+        "tax_loss_generated_eur": tax_loss_generated,
+        "delta_vs_pre_2024_eur": delta_vs_old_law,
+        "regime_notes": regime_notes,
+    }

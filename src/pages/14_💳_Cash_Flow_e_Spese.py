@@ -46,6 +46,7 @@ from core.ui_utils import (
     resolve_active_subtab,
     section,
 )
+from core.wealth import compute_cash_yield_optimization
 from core.wealth.wealth_db import (
     bulk_insert_cashflow_tx,
     get_cashflow_records,
@@ -383,6 +384,13 @@ st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
 
 # ── SELETTORE MODULI CASH FLOW STILE BLOOMBERG TERMINAL ─────────
 WEALTH_CF_MODELS_CATALOG = {
+    "💶 Cash Yield Optimizer & BOT/XEON": {
+        "title": "Cash Yield Optimizer, Costo Opportunità & Radar BOT vs XEON",
+        "badge": "Yield Optimizer • BOT 12M • XEON • Costo Opportunità",
+        "badge_color": "#10b981",
+        "category": "Ottimizzazione Liquidità",
+        "desc": "Analisi dei conti a tasso zero, quantificazione del costo opportunità rispetto a BCE/€STR e piano operativo di allocazione su BOT 12M ed ETF monetari.",
+    },
     "🌊 Sankey & Flussi": {
         "title": "Diagramma di Flusso Sankey & Ripartizione della Cassa",
         "badge": "Sankey • Entrate vs Uscite • Nodi",
@@ -1546,3 +1554,129 @@ elif active_cf_tab == "📜 Libro Mastro & Inserimento":
     else:
         st.info("Nessuna transazione presente nel libro mastro per i filtri selezionati.")
 
+
+
+# ── 10. CASH YIELD OPTIMIZER & COSTO OPPORTUNITÀ ────────────
+elif active_cf_tab == "💶 Cash Yield Optimizer & BOT/XEON":
+    section("💶 Cash Yield Optimizer & Liquidità Remunerata")
+    st.caption("Analisi dei conti correnti a tasso zero, calcolo del costo opportunità annuo rispetto ai tassi ufficiali BCE / €STR e simulatore di allocazione tra Cassa Operativa, ETF Monetari e BOT a 12 Mesi.")
+
+    cyo_c1, cyo_c2 = st.columns([3, 1])
+    with cyo_c1:
+        st.write("")
+    with cyo_c2:
+        sel_em_months = st.slider("Mesi Cuscinetto Emergenza:", min_value=3, max_value=12, value=6, step=1, key="slider_cyo_em_months")
+
+    res_cyo = compute_cash_yield_optimization(engine, portfolio_id=current_pid, emergency_months=sel_em_months)
+
+    tot_cash = res_cyo["total_liquid_cash_eur"]
+    m_exp = res_cyo["monthly_expenses_eur"]
+    runway = res_cyo["runway_months"]
+    cur_earn = res_cyo["current_annual_interest_eur"]
+    opt_earn = res_cyo["optimized_annual_interest_eur"]
+    opp_cost = res_cyo["annual_opportunity_cost_eur"]
+    loss_5y = res_cyo["five_year_projected_loss_eur"]
+
+    # ── TOP KPI ROW ─────────────────────────────────────────
+    k1, k2, k3, k4 = st.columns(4)
+    with k1:
+        metric_card("Liquidità Totale di Cassa", fmt_eur(tot_cash), delta=f"Runway: {runway:.1f} Mesi a € {m_exp:,.0f}/m", delta_color="normal")
+    with k2:
+        metric_card("Interessi Netti Attuali", fmt_eur(cur_earn), delta="Rendimento Stimato Conti a Vista", delta_color="inverse" if cur_earn < 50 else "normal")
+    with k3:
+        metric_card("Rendimento Netto Ottimizzato", fmt_eur(opt_earn), delta=f"+{fmt_eur(opp_cost)} / anno aggiuntivi", delta_color="normal")
+    with k4:
+        metric_card("Costo Opportunità Annuo", fmt_eur(opp_cost), delta=f"Perdita 5 Anni: {fmt_eur(loss_5y)}", delta_color="inverse")
+
+    if opp_cost > 100.0:
+        st.error(
+            f"⚠️ **Attenzione al Costo Opportunità:** Mantenere la liquidità inerte sui conti correnti bancari non remunerati ti costa "
+            f"circa **{fmt_eur(opp_cost)} all'anno** (proiezione a 5 anni: **{fmt_eur(loss_5y)}** di capitale netto perso). "
+            f"Grazie all'aliquota fiscale agevolata al 12,5% sui Titoli di Stato (BOT) e alla liquidità giornaliera degli ETF monetari (XEON), "
+            f"puoi mettere a rendimento il capitale senza vincoli rischiosi."
+        )
+
+    st.write("")
+    # ── TABELLA DEI TRE SECCHI DELLA LIQUIDITÀ ───────────────
+    st.markdown("##### 🏛️ Piano Operativo di Ripartizione nei Tre Secchi")
+    st.caption("Strutturazione metodologica della cassa per massimizzare il rendimento netto preservando la liquidità immediata per le spese.")
+
+    df_rec = pd.DataFrame(res_cyo["recommendations"])
+    display_rec = df_rec.copy()
+    display_rec["Importo Consigliato (€)"] = display_rec["amount_eur"].apply(lambda v: fmt_eur(v))
+    display_rec["Quota (%)"] = display_rec["share_pct"].apply(lambda v: f"{v:.1f}%")
+
+    render_table_with_export(
+        display_rec[["tranche", "Importo Consigliato (€)", "Quota (%)", "instrument", "gross_yield", "net_yield", "tax_regime", "liquidity_term", "action"]].rename(columns={
+            "tranche": "Secchio di Liquidità",
+            "instrument": "Strumento Finanziario",
+            "gross_yield": "Rendimento Lordo",
+            "net_yield": "Rendimento Netto",
+            "tax_regime": "Regime Fiscale",
+            "liquidity_term": "Disponibilità Cassa",
+            "action": "Azione Consigliata",
+        }),
+        table_title="Piano di Ottimizzazione della Liquidità",
+        file_prefix="piano_cash_yield",
+        key_suffix="cyo_table",
+    )
+
+    st.write("")
+    # ── RADAR CONFRONTO STRUMENTI DI LIQUIDITÀ ────────────────
+    st.markdown("##### 📊 Radar Confronto Rendimento Netto: Titoli di Stato (BOT) vs Conti Deposito vs XEON")
+    st.caption("Analisi comparativa dell'impatto fiscale: i Titoli di Stato scontano l'aliquota agevolata White List del 12,5%, contro il 26% ordinario dei depositi bancari.")
+
+    bench_data = []
+    for k_b, b in res_cyo["benchmarks"].items():
+        bench_data.append({
+            "Strumento": b["name"],
+            "Rendimento Lordo (%)": b["gross_yield_pct"],
+            "Aliquota Fiscale (%)": b["tax_rate_pct"],
+            "Rendimento Netto (%)": b["net_yield_pct"],
+            "Categoria": b["type"],
+            "Descrizione": b["description"],
+        })
+    df_bench = pd.DataFrame(bench_data).sort_values("Rendimento Netto (%)", ascending=False)
+
+    col_chart, col_sim = st.columns([1.8, 1.2])
+    with col_chart:
+        fig_bench = go.Figure()
+        fig_bench.add_trace(go.Bar(
+            x=df_bench["Strumento"],
+            y=df_bench["Rendimento Netto (%)"],
+            marker=dict(color=["#10b981", "#34d399", "#38bdf8", "#fbbf24", "#64748b", "#f43f5e"]),
+            text=df_bench["Rendimento Netto (%)"].apply(lambda v: f"{v:.2f}% Netto"),
+            textposition="auto",
+        ))
+        fig_bench.update_layout(
+            template="plotly_dark",
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(22,27,34,0.4)",
+            height=340,
+            margin=dict(l=10, r=10, t=20, b=20),
+            yaxis=dict(title="Rendimento Netto Annuo (%)", showgrid=True, gridcolor="rgba(255,255,255,0.06)", ticksuffix="%"),
+            xaxis=dict(tickangle=-15),
+        )
+        st.plotly_chart(fig_bench, use_container_width=True)
+
+    with col_sim:
+        st.markdown("###### 🎛️ Simulatore Switch di Liquidità")
+        st.caption("Calcola quanto guadagni spostando una quota del tuo conto a vista verso un BOT o ETF Monetario.")
+        switch_amount = st.slider("Importo da Spostare (€):", min_value=1000.0, max_value=max(5000.0, tot_cash), value=min(20000.0, tot_cash), step=1000.0, format="€ %.0f", key="slider_cyo_switch")
+        sel_inst = st.selectbox("Strumento Target:", ["BOT 12 Mesi (2.80% Netto)", "ETF Monetario XEON (2.73% Netto)", "BTP Short 2Y (2.71% Netto)", "Conto Deposito 12M (2.32% Netto)"], key="select_cyo_target_inst")
+        
+        target_net_rate = 2.80 if "BOT" in sel_inst else (2.73 if "XEON" in sel_inst else (2.71 if "BTP" in sel_inst else 2.32))
+        extra_net_annual = switch_amount * ((target_net_rate - 0.04) / 100.0)
+        extra_net_monthly = extra_net_annual / 12.0
+
+        st.markdown(
+            f'''
+            <div style="background:rgba(16,185,129,0.12); border:1px solid rgba(16,185,129,0.3); border-radius:10px; padding:14px 18px; margin-top:8px;">
+                <div style="font-size:11px; color:#94a3b8; text-transform:uppercase;">Guadagno Netto Aggiuntivo Annuo</div>
+                <div style="font-size:24px; font-weight:800; color:#34d399;">+{fmt_eur(extra_net_annual)}</div>
+                <div style="font-size:12px; color:#c9d1d9; margin-top:6px;">Pari a: <b style="color:#ffffff;">+{fmt_eur(extra_net_monthly)} / mese</b> netti esentasse</div>
+                <div style="font-size:11px; color:#8b949e; margin-top:4px;">Guadagno a 3 anni: <b style="color:#fbbf24;">+{fmt_eur(extra_net_annual * 3.0)}</b></div>
+            </div>
+            ''',
+            unsafe_allow_html=True,
+        )

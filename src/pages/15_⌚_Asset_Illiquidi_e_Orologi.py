@@ -42,10 +42,14 @@ from core.ui_utils import (
     section,
 )
 from core.wealth import (
+    BULLION_COIN_CATALOG,
     compute_consolidated_net_worth,
     compute_gold_portfolio_historical_trajectory,
+    compute_gold_sale_tax_impact,
     compute_private_equity_deal_metrics,
+    evaluate_bullion_coin,
     evaluate_metal_asset_dynamically,
+    get_bullion_coin_info,
     get_gold_historical_series,
     get_gold_spot_on_date,
     get_live_gold_spot_rates,
@@ -454,6 +458,101 @@ if active_illiquid_tab == "👑 Collezione Orologi & Caveau":
             with gk4:
                 tot_fine_g = sum(parse_precious_metal_specs(r)["fine_gold_grams"] for _, r in df_metals.iterrows())
                 metric_card("Oro Fino 24K Totale", f"{tot_fine_g:.2f}g", delta=f"{tot_fine_g/31.1034768:.3f} oz troy pure", delta_color="normal")
+
+        # ── 1.C TRACKER MONETE BULLION & FISCALITÀ CESSIONE ORO ────
+        st.write("")
+        b_c1, b_c2 = st.columns(2)
+        with b_c1:
+            with st.expander("🪙 Tracker Monete da Investimento & Bullion", expanded=False):
+                st.caption("Quotazione istantanea con peso fino e spread numismatico di mercato rispetto al fixing LBMA spot.")
+                sel_coin_k = st.selectbox(
+                    "Seleziona Moneta o Lingotto:",
+                    options=list(BULLION_COIN_CATALOG.keys()),
+                    format_func=lambda k: f"{BULLION_COIN_CATALOG[k]['icon']} {BULLION_COIN_CATALOG[k]['name']}",
+                    key="select_bullion_coin_p15",
+                )
+                coin_qty = st.number_input("Quantità (Pezzi):", min_value=1, max_value=1000, value=1, step=1, key="num_bullion_coin_qty")
+                eval_coin = evaluate_bullion_coin(sel_coin_k, quantity=coin_qty, live_spot_24k_eur_g=spot_24k)
+
+                c_info1, c_info2 = st.columns(2)
+                with c_info1:
+                    st.markdown(f"**Paese:** {eval_coin['country']}")
+                    st.markdown(f"**Titolo:** {eval_coin['fineness']*1000:.1f}/1000")
+                    st.markdown(f"**Fino Totale:** {eval_coin['fine_gold_total_g']:.3f}g")
+                with c_info2:
+                    st.markdown(f"**Melt Value Unitario:** {fmt_eur(eval_coin['melt_value_unit_eur'])}")
+                    st.markdown(f"**Premio Bullion:** +{eval_coin['premium_pct']:.1f}%")
+                    st.markdown(f"**Prezzo Mercato Unitario:** {fmt_eur(eval_coin['market_price_unit_eur'])}")
+
+                st.markdown(
+                    f'''
+                    <div style="background:rgba(245,158,11,0.12); border:1px solid rgba(245,158,11,0.3); border-radius:8px; padding:10px 14px; margin-top:8px;">
+                        <div style="font-size:11px; color:#94a3b8; text-transform:uppercase;">Valore Totale di Mercato ({coin_qty} pz)</div>
+                        <div style="font-size:22px; font-weight:800; color:#fbbf24;">{fmt_eur(eval_coin['total_market_price_eur'])}</div>
+                    </div>
+                    ''',
+                    unsafe_allow_html=True,
+                )
+
+                if st.button("➕ Aggiungi al Caveau Personale", key="btn_add_bullion_to_caveau", use_container_width=True):
+                    new_asset = {
+                        "portfolio_id": current_pid,
+                        "asset_category": "precious_metals",
+                        "name": f"{eval_coin['coin_name']} ({coin_qty} pz)",
+                        "brand_or_location": f"Oro ({eval_coin['fineness']*1000:.0f}/1000)",
+                        "model_or_specs": f"{eval_coin['gross_weight_total_g']:.2f}g (Fino 24K: {eval_coin['fine_gold_total_g']:.2f}g)",
+                        "purchase_price": eval_coin["total_market_price_eur"],
+                        "current_market_value": eval_coin["total_market_price_eur"],
+                        "condition_grade": "Fior di Conio / Custodito",
+                        "notes": f"Acquisto bullion coin {eval_coin['coin_name']} con premio +{eval_coin['premium_pct']:.1f}%",
+                    }
+                    save_physical_asset(engine, new_asset)
+                    st.toast(f"✅ {eval_coin['coin_name']} aggiunto al Caveau!", icon="🥇")
+                    st.rerun()
+
+        with b_c2:
+            with st.expander("⚖️ Simulatore Fiscale Cessione Oro (L. 7/2000 & L. 213/2023)", expanded=False):
+                st.caption("Calcolo delle imposte sulla vendita di oro da investimento in Italia in base alla presenza di documentazione d'acquisto.")
+                
+                # Selezione asset presente o importo personalizzato
+                gold_names = [r["name"] for _, r in df_metals.iterrows()]
+                sel_gold_tax_src = st.selectbox("Asset di Riferimento:", ["Inserimento Manuale"] + gold_names, key="sel_gold_tax_src")
+                
+                def_sale_val = float(df_metals.iloc[0]["current_market_value"]) if not df_metals.empty else 2000.0
+                def_cost_val = float(df_metals.iloc[0]["purchase_price"]) if not df_metals.empty else 1200.0
+                if sel_gold_tax_src != "Inserimento Manuale":
+                    match_row = df_metals[df_metals["name"] == sel_gold_tax_src].iloc[0]
+                    def_sale_val = float(match_row["current_market_value"])
+                    def_cost_val = float(match_row["purchase_price"])
+
+                tx_sale_px = st.number_input("Prezzo di Vendita Stimato (€):", min_value=0.0, value=def_sale_val, step=100.0, key="inp_gold_tax_sale_px")
+                has_doc = st.toggle("Possiedi Fattura / Documento d'Acquisto?", value=def_cost_val > 0.0, key="tgl_gold_has_doc")
+                tx_cost_px = 0.0
+                if has_doc:
+                    tx_cost_px = st.number_input("Costo Storico d'Acquisto Documentato (€):", min_value=0.0, value=def_cost_val, step=100.0, key="inp_gold_tax_cost_px")
+
+                tax_res = compute_gold_sale_tax_impact(sale_price_eur=tx_sale_px, purchase_price_eur=tx_cost_px, has_purchase_document=has_doc)
+
+                t_c1, t_c2 = st.columns(2)
+                with t_c1:
+                    st.metric("Base Imponibile Fiscale", fmt_eur(tax_res["taxable_base_eur"]))
+                    st.metric("Imposta 26% Dovuta", fmt_eur(tax_res["tax_due_eur"]))
+                with t_c2:
+                    st.metric("Incasso Netto Effettivo", fmt_eur(tax_res["net_proceeds_eur"]))
+                    st.metric("Aliquota Fiscale Effettiva", f"{tax_res['effective_tax_pct']:.1f}%")
+
+                if not has_doc:
+                    st.warning(
+                        f"⚠️ **Riforma Legge di Bilancio 2024 (L. 213/2023):** Senza fattura, l'imposta del 26% si applica "
+                        f"sull'**INTERO incasso** ({fmt_eur(tx_sale_px)}), costandoti **{fmt_eur(tax_res['delta_vs_pre_2024_eur'])} in più** "
+                        f"rispetto alla vecchia legge pre-2024 (che tassava solo il 25% forfettario). "
+                        f"Valuta una perizia giurata di stima per determinare il valore d'acquisto fiscale."
+                    )
+                else:
+                    if tax_res["tax_loss_generated_eur"] > 0:
+                        st.info(f"ℹ️ La vendita genera una **minusvalenza di {fmt_eur(tax_res['tax_loss_generated_eur'])}** compensabile nel Quadro RT entro 4 anni.")
+                    else:
+                        st.success(f"✅ Con fattura l'imposta del 26% si applica unicamente sul capital gain reale ({fmt_eur(tax_res['taxable_base_eur'])}).")
 
 # ── 2. IMMOBILI & ALTRI ASSET FISICI ───────────────────────
 elif active_illiquid_tab == "🏠 Immobili & Altri Asset Fisici":

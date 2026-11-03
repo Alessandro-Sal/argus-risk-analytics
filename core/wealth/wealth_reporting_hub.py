@@ -49,6 +49,12 @@ def _get_cached_quarterly_pdf(_engine, pid: int, client_name: str, quarter: str,
 
 
 @st.cache_data(ttl=300, show_spinner=False)
+def _get_cached_family_office_pitchbook_pdf(_engine, pid: int, prof_name: str, db_key: str = "") -> bytes:
+    from core.reporting.master_pitchbook_pdf import generate_master_family_office_pitchbook_pdf
+    return generate_master_family_office_pitchbook_pdf(_engine, portfolio_id=pid, client_name=prof_name)
+
+
+@st.cache_data(ttl=300, show_spinner=False)
 def _get_cached_pitchbook_pdf(_engine, pid: int, db_key: str = "") -> bytes:
     return generate_advisory_pitchbook_pdf(_engine, portfolio_id=pid)
 
@@ -746,9 +752,35 @@ def render_wealth_reporting_and_exports_hub(
 
         st.markdown("<div style='margin-bottom: 10px;'></div>", unsafe_allow_html=True)
 
-        c_pdf3, c_pdf4 = st.columns(2)
+        c_fo1, c_fo2 = st.columns(2)
+        with c_fo1:
+            st.markdown(
+                """
+            <div style="background: rgba(22, 27, 34, 0.85); border: 1px solid rgba(245, 158, 11, 0.35); border-left: 3px solid #f59e0b; border-radius: 10px; padding: 14px 16px; min-height: 170px; display: flex; flex-direction: column; justify-content: space-between;">
+                <div>
+                    <b style="color: #fbbf24; font-size: 13.5px;">🏛️ Family Office Master Pitchbook (PDF A4 Multipagina)</b>
+                    <p style="color: #cbd5e1; font-size: 12px; margin: 6px 0 12px 0; line-height: 1.5;">
+                        Dossier per commercialista / private banker: copertina istituzionale, Stato Patrimoniale, Conto Economico, Caveau & Metalli, Rischio Quantitativo e Quadro Fiscale.
+                    </p>
+                </div>
+            </div>
+            """,
+                unsafe_allow_html=True,
+            )
+            try:
+                st.download_button(
+                    label="📥 Scarica Master Pitchbook A4 (PDF)",
+                    data=lambda: _get_cached_family_office_pitchbook_pdf(engine, pid=portfolio_id, prof_name=prof_name, db_key=db_key),
+                    file_name=f"argus_family_office_pitchbook_{prof_slug}_{date_slug}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True,
+                    type="primary",
+                    key="dl_fo_pitchbook_pdf_hub",
+                )
+            except Exception as e:
+                st.error(f"Errore Family Office Pitchbook PDF: {e}")
 
-        with c_pdf3:
+        with c_fo2:
             st.markdown(
                 """
             <div style="background: rgba(22, 27, 34, 0.85); border: 1px solid rgba(255,255,255,0.08); border-left: 3px solid #10b981; border-radius: 10px; padding: 14px 16px; min-height: 170px; display: flex; flex-direction: column; justify-content: space-between;">
@@ -774,12 +806,16 @@ def render_wealth_reporting_and_exports_hub(
             except Exception as e:
                 st.error(f"Errore Bilancio Personale PDF: {e}")
 
-        with c_pdf4:
+        st.markdown("<div style='margin-bottom: 10px;'></div>", unsafe_allow_html=True)
+
+        c_pdf3, c_pdf4 = st.columns(2)
+
+        with c_pdf3:
             st.markdown(
                 """
             <div style="background: rgba(22, 27, 34, 0.85); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 14px 16px; min-height: 170px; display: flex; flex-direction: column; justify-content: space-between;">
                 <div>
-                    <b style="color: #fbbf24; font-size: 13.5px;">📑 Tear-Sheet Sintetica &amp; Contabile (PDF/HTML)</b>
+                    <b style="color: #38bdf8; font-size: 13.5px;">📑 Tear-Sheet Sintetica &amp; Contabile (PDF/HTML)</b>
                     <p style="color: #cbd5e1; font-size: 12px; margin: 6px 0 12px 0; line-height: 1.5;">
                         Scheda riassuntiva one-page a colpo d'occhio con Net Worth, indicatori di solvibilità e sintesi grafica degli attivi.
                     </p>
@@ -798,6 +834,9 @@ def render_wealth_reporting_and_exports_hub(
                     key="dl_ts_pdf_hub",
                 )
             except Exception as e:
+                st.error(f"Errore Tear-Sheet: {e}")
+
+        with c_pdf4:
                 st.error(f"Errore Tear-Sheet: {e}")
 
         st.markdown("<div style='margin-bottom: 10px;'></div>", unsafe_allow_html=True)

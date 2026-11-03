@@ -471,6 +471,13 @@ WEALTH_CR_MODELS_CATALOG = {
         "category": "Configurazione & Anagrafica",
         "desc": "Configurazione e censimento dei rapporti di conto corrente, depositi titoli, wallet crypto, carte di credito e definizione dell'albero delle categorie di spesa/entrata.",
     },
+    "📊 Import Universale Broker": {
+        "title": "Importazione Universale Transazioni Broker & Portafoglio Titoli",
+        "badge": "Directa • Fineco • Degiro • Scalable • TR • IBKR",
+        "badge_color": "#f59e0b",
+        "category": "Broker & Trading Ingestion",
+        "desc": "Drag & Drop dei file CSV/XLSX esportati dai 6 principali broker per normalizzazione automatica, risoluzione ISIN/ticker, deduplicazione idempotente e inserimento a libro mastro.",
+    },
     "📑 Hub Reportistica & Esportazioni": {
         "title": "Hub Reportistica Istituzionale, Esportazioni Dati & Audit Log",
         "badge": "PDF Dossier • Excel • CSV Audit",
@@ -571,7 +578,8 @@ if active_cr_tab == "📥 Data Pipeline & Ingestion":
         "💳 Estratto Conto Bancario / CSV Spese (Intesa, Revolut, Fineco, N26, template)",
         "🏦 Saldi & Conti Bancari (CSV / Template)",
         "⌚ Caveau Orologi, Immobili & Metalli Preziosi (CSV / Template)",
-        "🛡️ Piani Previdenziali & Fondi Pensione (CSV / Template)"
+        "🛡️ Piani Previdenziali & Fondi Pensione (CSV / Template)",
+        "📊 Import Universale Broker (Directa, Fineco, Degiro, Scalable, Trade Republic, IBKR)"
     ]
     
     src_selected_label = st.selectbox(
@@ -779,6 +787,16 @@ if active_cr_tab == "📥 Data Pipeline & Ingestion":
             if not df_pen_clean.empty:
                 uploaded_data_df = df_pen_clean
                 is_ready_for_step2 = True
+
+    elif src_selected_label.startswith("📊 Import Universale Broker"):
+        up_brk = st.file_uploader("Carica File Broker (CSV / XLSX / TXT):", type=["csv", "xlsx", "xls", "txt"], key="pipe_up_brk")
+        if up_brk:
+            from core.wealth.universal_broker_importer import parse_universal_broker_file
+            df_brk, meta_brk = parse_universal_broker_file(up_brk.getvalue(), filename=up_brk.name)
+            if meta_brk["success"] and not df_brk.empty:
+                uploaded_data_df = df_brk
+                is_ready_for_step2 = True
+                st.caption(f"⚡ Riconosciuto: **{meta_brk['broker_name']}** ({meta_brk['total_rows']} transazioni, controvalore {fmt_eur(meta_brk['total_volume_eur'])})")
 
     st.divider()
 
@@ -1023,6 +1041,20 @@ if active_cr_tab == "📥 Data Pipeline & Ingestion":
                     save_pension_plan(engine, r_dict)
                 tot_synced_cnt = len(uploaded_data_df)
                 st.write("📸 **Fase 3/4**: Aggiornamento Snapshot...")
+                s_id = save_wealth_snapshot_to_db(
+                    engine,
+                    run_name=run_snap_name,
+                    notes=run_snap_notes,
+                    snapshot_date_val=run_snap_date,
+                    portfolio_id=current_pid
+                )
+
+            elif src_selected_label.startswith("📊 Import Universale Broker"):
+                st.write("📊 **Fase 2/4**: Ingestione transazioni broker con risoluzione anagrafiche e deduplicazione...")
+                from core.wealth.universal_broker_importer import ingest_broker_transactions
+                res_brk = ingest_broker_transactions(engine, uploaded_data_df, portfolio_id=current_pid, dry_run=False)
+                tot_synced_cnt = res_brk["inserted"]
+                st.write(f"🏦 **Fase 3/4**: Registrate {res_brk['inserted']} transazioni ({res_brk['skipped_duplicates']} duplicate ignorate, {res_brk['new_assets']} nuovi asset)...")
                 s_id = save_wealth_snapshot_to_db(
                     engine,
                     run_name=run_snap_name,
@@ -1306,7 +1338,14 @@ elif active_cr_tab == "⚙️ Gestione Conti & Categorie":
             )
 
 # =============================================================
-# TAB 3: HUB DI REPORTISTICA ED ESPORTAZIONI ISTITUZIONALI
+# TAB 3: IMPORT UNIVERSALE BROKER DRAG & DROP
+# =============================================================
+elif active_cr_tab == "📊 Import Universale Broker":
+    from core.wealth.universal_broker_importer import render_universal_broker_importer_tab
+    render_universal_broker_importer_tab(engine=engine, portfolio_id=current_pid, prof_name=prof_title)
+
+# =============================================================
+# TAB 4: HUB DI REPORTISTICA ED ESPORTAZIONI ISTITUZIONALI
 # =============================================================
 else:
     render_wealth_reporting_and_exports_hub(
