@@ -24,13 +24,6 @@ if TYPE_CHECKING:
         BENCHMARKS,
         compute_cash_yield_optimization,
     )
-    from core.wealth.universal_broker_importer import (
-        BROKER_SIGNATURES,
-        detect_broker_and_format,
-        ingest_broker_transactions,
-        parse_universal_broker_file,
-        render_universal_broker_importer_tab,
-    )
     from core.wealth.gold_engine import (
         BASELINE_SPOT_18K_EUR_G,
         BASELINE_SPOT_24K_EUR_G,
@@ -65,6 +58,13 @@ if TYPE_CHECKING:
         compute_stochastic_cash_flow_decumulation,
     )
     from core.wealth.total_wealth_reverse_stress import compute_total_wealth_reverse_stress
+    from core.wealth.universal_broker_importer import (
+        BROKER_SIGNATURES,
+        detect_broker_and_format,
+        ingest_broker_transactions,
+        parse_universal_broker_file,
+        render_universal_broker_importer_tab,
+    )
     from core.wealth.wealth_db import (
         cleanup_empty_wealth_portfolios,
         clear_wealth_accounts,

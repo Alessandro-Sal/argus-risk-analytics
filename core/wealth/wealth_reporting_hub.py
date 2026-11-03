@@ -808,7 +808,7 @@ def render_wealth_reporting_and_exports_hub(
 
         st.markdown("<div style='margin-bottom: 10px;'></div>", unsafe_allow_html=True)
 
-        c_pdf3, c_pdf4 = st.columns(2)
+        c_pdf3, _ = st.columns(2)
 
         with c_pdf3:
             st.markdown(
@@ -834,9 +834,6 @@ def render_wealth_reporting_and_exports_hub(
                     key="dl_ts_pdf_hub",
                 )
             except Exception as e:
-                st.error(f"Errore Tear-Sheet: {e}")
-
-        with c_pdf4:
                 st.error(f"Errore Tear-Sheet: {e}")
 
         st.markdown("<div style='margin-bottom: 10px;'></div>", unsafe_allow_html=True)

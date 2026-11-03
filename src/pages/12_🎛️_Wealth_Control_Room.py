@@ -1342,7 +1342,7 @@ elif active_cr_tab == "⚙️ Gestione Conti & Categorie":
 # =============================================================
 elif active_cr_tab == "📊 Import Universale Broker":
     from core.wealth.universal_broker_importer import render_universal_broker_importer_tab
-    render_universal_broker_importer_tab(engine=engine, portfolio_id=current_pid, prof_name=prof_title)
+    render_universal_broker_importer_tab(engine=engine, portfolio_id=current_pid, prof_name=active_p_name)
 
 # =============================================================
 # TAB 4: HUB DI REPORTISTICA ED ESPORTAZIONI ISTITUZIONALI
