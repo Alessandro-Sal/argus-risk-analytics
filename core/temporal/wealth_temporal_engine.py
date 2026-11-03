@@ -132,50 +132,6 @@ def compute_wealth_temporal_progression(
         except Exception:
             return round(baseline_other + gold_val_now, 2)
 
-    # Identificazione dinamica dei piani previdenziali con cronistoria mensile reale (es. Credemvita)
-    monthly_pension_series = {}
-    try:
-        import json
-
-        from core.wealth.wealth_db import get_pension_plans
-        df_pens_all = get_pension_plans(engine, portfolio_id=portfolio_id)
-        if df_pens_all is not None and not df_pens_all.empty:
-            for _, r_p in df_pens_all.iterrows():
-                yd_raw = r_p.get("yearly_data_json")
-                if yd_raw and pd.notna(yd_raw):
-                    try:
-                        yd_obj = json.loads(yd_raw) if isinstance(yd_raw, str) else yd_raw
-                        m_idx_map = {"gen": 1, "feb": 2, "mar": 3, "apr": 4, "mag": 5, "giu": 6,
-                                     "lug": 7, "ago": 8, "set": 9, "ott": 10, "nov": 11, "dic": 12}
-                        running_cum = 0.0
-                        for yr_int in sorted([int(k) for k in yd_obj.keys() if str(k).isdigit()]):
-                            yr_dict = yd_obj.get(str(yr_int), {})
-                            m_vals = yr_dict.get("months", {})
-                            for m_str in ["gen", "feb", "mar", "apr", "mag", "giu", "lug", "ago", "set", "ott", "nov", "dic"]:
-                                if m_str in m_vals:
-                                    running_cum += float(m_vals[m_str] or 0.0)
-                                m_key_str = f"{yr_int}-{m_idx_map[m_str]:02d}"
-                                monthly_pension_series[m_key_str] = round(running_cum, 2)
-                    except Exception:
-                        pass
-    except Exception as ex_p:
-        logger.debug("Valutazione temporale pensione fallback: %s", ex_p)
-
-    def _calc_pension_at_date(target_d: Any, baseline_val: float) -> float:
-        if not monthly_pension_series:
-            return round(baseline_val, 2)
-        try:
-            t_dt = pd.to_datetime(target_d)
-            m_key = t_dt.strftime("%Y-%m")
-            if m_key in monthly_pension_series:
-                return monthly_pension_series[m_key]
-            past_keys = [k for k in sorted(monthly_pension_series.keys()) if k <= m_key]
-            if past_keys:
-                return monthly_pension_series[past_keys[-1]]
-            return 0.0
-        except Exception:
-            return round(baseline_val, 2)
-
     df_snaps = get_wealth_snapshots_history(engine, portfolio_id=portfolio_id)
     if portfolio_id is not None and df_snaps is not None and not df_snaps.empty and "portfolio_id" in df_snaps.columns:
         df_pid_snaps = df_snaps[df_snaps["portfolio_id"] == portfolio_id]
@@ -380,7 +336,7 @@ def compute_wealth_temporal_progression(
                     fin = a1["financial_investments"]
                     re = a1["real_estate"]
                     phys = _calc_phys_at_date(d, non_gold_phys_base) if gold_holdings else a1["physical_assets"]
-                    pens = _calc_pension_at_date(d, cur_pension) if monthly_pension_series else a1["pension_plans"]
+                    pens = a1["pension_plans"]
                     liab = a1["liabilities"]
                 elif future_anchors.empty:
                     a0 = past_anchors.iloc[-1]
@@ -388,7 +344,7 @@ def compute_wealth_temporal_progression(
                     fin = a0["financial_investments"]
                     re = a0["real_estate"]
                     phys = _calc_phys_at_date(d, non_gold_phys_base) if gold_holdings else a0["physical_assets"]
-                    pens = _calc_pension_at_date(d, cur_pension) if monthly_pension_series else a0["pension_plans"]
+                    pens = a0["pension_plans"]
                     liab = a0["liabilities"]
                 else:
                     a0 = past_anchors.iloc[-1]
@@ -398,7 +354,7 @@ def compute_wealth_temporal_progression(
                         fin = a0["financial_investments"]
                         re = a0["real_estate"]
                         phys = _calc_phys_at_date(d, non_gold_phys_base) if gold_holdings else a0["physical_assets"]
-                        pens = _calc_pension_at_date(d, cur_pension) if monthly_pension_series else a0["pension_plans"]
+                        pens = a0["pension_plans"]
                         liab = a0["liabilities"]
                     else:
                         total_days = max(1, (a1["date"] - a0["date"]).days)
@@ -436,7 +392,7 @@ def compute_wealth_temporal_progression(
                             phys = _calc_phys_at_date(d, other_phys)
                         else:
                             phys = max(0.0, (1.0 - alpha) * a0["physical_assets"] + alpha * a1["physical_assets"])
-                        pens = _calc_pension_at_date(d, cur_pension) if monthly_pension_series else max(0.0, (1.0 - alpha) * a0["pension_plans"] + alpha * a1["pension_plans"])
+                        pens = max(0.0, (1.0 - alpha) * a0["pension_plans"] + alpha * a1["pension_plans"])
                         liab = max(0.0, (1.0 - alpha) * a0["liabilities"] + alpha * a1["liabilities"])
 
                 nw = max(0.0, liq + fin + re + phys + pens - liab)
@@ -466,7 +422,7 @@ def compute_wealth_temporal_progression(
                     p_val = _calc_phys_at_date(m_date, other_base)
                 else:
                     p_val = round(cur_physical * max(0.5, 0.90 + (mult * 0.10)), 2)
-                pe_val = _calc_pension_at_date(m_date, cur_pension) if monthly_pension_series else round(cur_pension * max(0.4, 0.88 + (mult * 0.12)), 2)
+                pe_val = round(cur_pension * max(0.4, 0.88 + (mult * 0.12)), 2)
                 physical_vals.append(p_val)
                 pension_vals.append(pe_val)
                 illiquid_vals.append(round(p_val + pe_val, 2))
