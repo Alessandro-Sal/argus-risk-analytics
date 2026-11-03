@@ -43,9 +43,15 @@ from core.ui_utils import (
 )
 from core.wealth import (
     compute_consolidated_net_worth,
+    compute_gold_portfolio_historical_trajectory,
     compute_private_equity_deal_metrics,
+    evaluate_metal_asset_dynamically,
+    get_gold_historical_series,
+    get_gold_spot_on_date,
+    get_live_gold_spot_rates,
     get_physical_assets,
     get_wealth_portfolios,
+    parse_precious_metal_specs,
     save_physical_asset,
 )
 from core.wealth.wealth_modals import render_illiquids_methodology_modal
@@ -88,16 +94,64 @@ render_standard_hero(
 
 df_assets = get_physical_assets(engine, portfolio_id=current_pid)
 
-# Calcolo metriche aggregate
+# ── LIVE PRECIOUS METALS FIXING RIBBON ───────────────────────
+gold_rates = get_live_gold_spot_rates()
+spot_24k = gold_rates.get("gold_eur_per_gram_24k", 112.30)
+spot_18k = gold_rates.get("gold_eur_per_gram_18k", 84.22)
+spot_ag = gold_rates.get("silver_eur_per_gram", 1.40)
+fx_rate = gold_rates.get("eur_usd_rate", 1.1190)
+chg_24h = gold_rates.get("change_24h_pct", 0.0)
+src_lbl = gold_rates.get("source", "COMEX / LBMA")
+is_live = gold_rates.get("is_live", False)
+dot_icon = "🟢" if is_live else "🟡"
+chg_sign = "+" if chg_24h >= 0 else ""
+chg_color = "#10b981" if chg_24h >= 0 else "#f85149"
+
+st.markdown(
+    f'''
+    <div style="background:linear-gradient(90deg, rgba(245,158,11,0.12) 0%, rgba(22,27,34,0.92) 100%); border:1px solid rgba(245,158,11,0.28); border-radius:10px; padding:10px 18px; margin-bottom:18px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; box-shadow: 0 4px 14px rgba(0,0,0,0.25);">
+        <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:13px; font-weight:800; color:#fbbf24; letter-spacing:0.4px;">🥇 FIXING UFFICIALE METALLI PREZIOSI (COMEX / LBMA SPOT)</span>
+            <span style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); padding:2px 7px; border-radius:4px; font-size:10px; color:#94a3b8;">{dot_icon} {src_lbl}</span>
+        </div>
+        <div style="display:flex; gap:16px; align-items:center; font-size:12px; flex-wrap:wrap;">
+            <div>🥇 Oro 24K: <b style="color:#ffffff;">€ {spot_24k:,.2f}/g</b> <span style="color:{chg_color}; font-weight:700;">({chg_sign}{chg_24h:.2f}%)</span></div>
+            <div style="color:rgba(255,255,255,0.2);">|</div>
+            <div>🥇 Oro 18K (750): <b style="color:#fbbf24;">€ {spot_18k:,.2f}/g</b></div>
+            <div style="color:rgba(255,255,255,0.2);">|</div>
+            <div>🥈 Argento: <b style="color:#e2e8f0;">€ {spot_ag:,.2f}/g</b></div>
+            <div style="color:rgba(255,255,255,0.2);">|</div>
+            <div>💱 EUR/USD: <b style="color:#38bdf8;">{fx_rate:.4f}</b></div>
+        </div>
+    </div>
+    ''',
+    unsafe_allow_html=True,
+)
+
+# Calcolo metriche aggregate (confronto Valore Peritale Statica vs Live Spot)
 total_market_val = float(df_assets["current_market_value"].sum()) if not df_assets.empty else 0.0
+total_dynamic_val = 0.0
+if not df_assets.empty:
+    for _, r in df_assets.iterrows():
+        specs = parse_precious_metal_specs(r)
+        if specs.get("is_precious_metal") and specs.get("weight_grams", 0.0) > 0:
+            eval_res = evaluate_metal_asset_dynamically(r)
+            total_dynamic_val += eval_res["dynamic_market_value"]
+        else:
+            total_dynamic_val += float(r.get("current_market_value", 0.0) or 0.0)
+else:
+    total_dynamic_val = 0.0
+
 total_cost = float(df_assets["purchase_price"].sum()) if not df_assets.empty else 0.0
 unrealized_gain = total_market_val - total_cost
 gain_pct = (unrealized_gain / total_cost * 100.0) if total_cost > 0 else 0.0
+diff_spot = total_dynamic_val - total_market_val
+diff_spot_str = f"Live Spot: {fmt_eur(total_dynamic_val)}" if abs(diff_spot) > 1.0 else "Allineato a Spot Live"
 
 # ── TOP KPI ROW ─────────────────────────────────────────────
 c1, c2, c3, c4 = st.columns(4)
 with c1:
-    metric_card("Valore Caveau & Fisico", fmt_eur(total_market_val), delta="Valutazione di Mercato Attuale", delta_color="normal")
+    metric_card("Valore Caveau & Fisico", fmt_eur(total_market_val), delta=diff_spot_str, delta_color="normal")
 with c2:
     metric_card("Capitale Investito", fmt_eur(total_cost), delta="Costo Storico d'Acquisto", delta_color="normal")
 with c3:
@@ -225,32 +279,40 @@ if active_illiquid_tab == "👑 Collezione Orologi & Caveau":
     df_metals = df_assets[df_assets["asset_category"] == "precious_metals"] if not df_assets.empty else pd.DataFrame()
     if not df_metals.empty:
         st.write("")
-        section("🥇 Caveau Metalli Preziosi & Oro Fisico")
-        st.caption("Lingotti, monete d'oro (Krugerrand, Sterline), gioielli e metalli nobili da investimento custoditi in cassaforte o caveau bancario.")
+        section("🥇 Caveau Metalli Preziosi & Oro Fisico Dinamico")
+        st.caption("Valutazione in tempo reale e allineamento retroattivo dell'oro fisico custodito nel caveau basata sulle quotazioni spot ufficiali COMEX / LBMA.")
 
         for _, m in df_metals.iterrows():
             metal_name = str(m.get("name") or "Metallo Prezioso").strip()
             material = str(m.get("brand_or_location") or "Oro").strip()
-            specs = str(m.get("model_or_specs") or "").strip()
+            specs_text = str(m.get("model_or_specs") or "").strip()
             ref_or_seal = str(m.get("reference_number") or "").strip()
             cond = str(m.get("condition_grade") or "Custodito nel Caveau").strip()
             acq_date = str(m.get("acquisition_date") or "").strip()
             if acq_date in ["None", "NaT", "nan"]:
                 acq_date = ""
 
+            eval_res = evaluate_metal_asset_dynamically(m)
+            specs_info = parse_precious_metal_specs(m)
+            carat_val = specs_info.get("carat", "18K")
+            weight_g = specs_info.get("weight_grams", 0.0)
+            fine_g = specs_info.get("fine_gold_grams", 0.0)
+            spot_eur_g = eval_res.get("spot_price_eur_per_g", spot_18k)
+            dyn_val = eval_res.get("dynamic_market_value", 0.0)
+            static_val = eval_res.get("static_market_value", 0.0)
+            delta_spot = eval_res.get("discrepancy_vs_static", 0.0)
+
             m_cost = float(m.get("purchase_price", 0.0) or 0.0)
-            m_val = float(m.get("current_market_value", 0.0) or 0.0)
-            m_pnl = m_val - m_cost
-            m_pnl_pct = (m_pnl / m_cost * 100.0) if m_cost > 0 else (100.0 if m_val > 0 else 0.0)
+            m_pnl = dyn_val - m_cost
+            m_pnl_pct = (m_pnl / m_cost * 100.0) if m_cost > 0 else (100.0 if dyn_val > 0 else 0.0)
 
             pnl_color = "#10b981" if m_pnl >= 0 else "#f85149"
             pnl_sign = "+" if m_pnl >= 0 else ""
 
-            badges_html = f'<span style="background:rgba(245,158,11,0.15); border:1px solid rgba(245,158,11,0.35); padding:3px 8px; border-radius:4px; font-size:11px; font-weight:700; color:#fbbf24; margin-right:6px;">🥇 {material}</span>'
-            if specs:
-                badges_html += f'<span style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); padding:3px 8px; border-radius:4px; font-size:11px; color:#e2e8f0; margin-right:6px;">⚖️ {specs}</span>'
-            if ref_or_seal and ref_or_seal.lower() not in ["none", "n/d", "nan", ""]:
-                badges_html += f'<span style="background:rgba(56,189,248,0.15); border:1px solid rgba(56,189,248,0.3); padding:3px 8px; border-radius:4px; font-size:11px; color:#38bdf8; margin-right:6px;">🔒 Sigillo/Cert: {ref_or_seal}</span>'
+            badges_html = f'<span style="background:rgba(245,158,11,0.18); border:1px solid rgba(245,158,11,0.4); padding:3px 9px; border-radius:4px; font-size:11px; font-weight:800; color:#fbbf24; margin-right:6px;">🥇 Oro {carat_val} ({specs_info.get("purity_factor", 0.75)*1000:.0f}/1000)</span>'
+            if weight_g > 0:
+                badges_html += f'<span style="background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); padding:3px 9px; border-radius:4px; font-size:11px; font-weight:600; color:#f8fafc; margin-right:6px;">⚖️ Peso: {weight_g:.1f}g (Fino 24K: {fine_g:.2f}g)</span>'
+            badges_html += f'<span style="background:rgba(56,189,248,0.15); border:1px solid rgba(56,189,248,0.3); padding:3px 8px; border-radius:4px; font-size:11px; color:#38bdf8; margin-right:6px;">📈 Spot Live: € {spot_eur_g:,.2f}/g</span>'
             badges_html += f'<span style="background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.3); padding:3px 8px; border-radius:4px; font-size:11px; color:#34d399; margin-right:6px;">🛡️ {cond}</span>'
             if acq_date:
                 badges_html += f'<span style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); padding:3px 8px; border-radius:4px; font-size:11px; color:#8b949e;">📅 {acq_date}</span>'
@@ -259,30 +321,139 @@ if active_illiquid_tab == "👑 Collezione Orologi & Caveau":
             gain_label = f"{pnl_sign}{m_pnl_pct:.1f}%" if m_cost > 0 else "+100.0% (Oro)"
 
             st.markdown(
-                f"""
-            <div style="background:rgba(22,27,34,0.85); border:1px solid rgba(245,158,11,0.25); border-left:4px solid #f59e0b; border-radius:10px; padding:16px 20px; margin-bottom:14px; box-shadow: 0 4px 14px rgba(0,0,0,0.25);">
-                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                f'''
+            <div style="background:rgba(22,27,34,0.88); border:1px solid rgba(245,158,11,0.3); border-left:4px solid #f59e0b; border-radius:10px; padding:18px 22px; margin-bottom:12px; box-shadow: 0 4px 16px rgba(0,0,0,0.3);">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
                     <div>
-                        <div style="font-size:17px; font-weight:700; color:#fbbf24; margin-bottom:6px;">🥇 {metal_name}</div>
+                        <div style="font-size:18px; font-weight:800; color:#fbbf24; margin-bottom:6px;">🥇 {metal_name}</div>
                         <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center;">{badges_html}</div>
                     </div>
-                    <div style="display:flex; gap:24px; align-items:center;">
+                    <div style="display:flex; gap:26px; align-items:center;">
                         <div style="text-align:right;">
-                            <div style="font-size:11px; font-weight:600; color:#8b949e; text-transform:uppercase; letter-spacing:0.5px;">Valutazione di Mercato</div>
-                            <div style="font-size:19px; font-weight:700; color:#ffffff;">{fmt_eur(m_val)}</div>
-                            <div style="font-size:11px; color:#8b949e;">Acquisto: <span style="color:#c9d1d9;">{cost_display}</span></div>
+                            <div style="font-size:11px; font-weight:600; color:#8b949e; text-transform:uppercase; letter-spacing:0.5px;">Valore Live Spot Fixing</div>
+                            <div style="font-size:20px; font-weight:800; color:#ffffff;">{fmt_eur(dyn_val)}</div>
+                            <div style="font-size:11px; color:#8b949e;">Perizia a Bilancio: <span style="color:#fbbf24; font-weight:600;">{fmt_eur(static_val)}</span></div>
                         </div>
-                        <div style="text-align:right; min-width:110px;">
+                        <div style="text-align:right; min-width:115px;">
                             <div style="font-size:11px; font-weight:600; color:#8b949e; text-transform:uppercase; letter-spacing:0.5px;">Plusvalenza Latente</div>
-                            <div style="font-size:19px; font-weight:700; color:{pnl_color};">{pnl_sign}{fmt_eur(m_pnl)}</div>
+                            <div style="font-size:20px; font-weight:800; color:{pnl_color};">{pnl_sign}{fmt_eur(m_pnl)}</div>
                             <div style="font-size:11px; font-weight:600; color:{pnl_color};">{gain_label}</div>
                         </div>
                     </div>
                 </div>
             </div>
-            """,
+            ''',
                 unsafe_allow_html=True,
             )
+
+            # Azione di allineamento del valore di bilancio al fixing live se c'è discrepanza
+            if abs(delta_spot) >= 1.0:
+                align_c1, align_c2 = st.columns([3, 1])
+                with align_c1:
+                    st.caption(f"💡 Il fixing live di mercato differisce dalla perizia registrata di {fmt_eur(delta_spot)} ({dyn_val:,.2f} € vs {static_val:,.2f} €). Puoi sincronizzare il valore di bilancio.")
+                with align_c2:
+                    asset_id_val = m.get("asset_id", m.get("id"))
+                    btn_key = f"btn_align_gold_spot_{asset_id_val}"
+                    if st.button("🔄 Allinea a Spot Live", key=btn_key, use_container_width=True, help="Aggiorna il valore peritale nel database al fixing live odierno"):
+                        asset_dict = m.to_dict() if isinstance(m, pd.Series) else dict(m)
+                        asset_dict["current_market_value"] = dyn_val
+                        asset_dict["portfolio_id"] = current_pid
+                        save_physical_asset(engine, asset_dict)
+                        st.toast(f"✅ Valore di bilancio allineato al fixing live: {fmt_eur(dyn_val)}!", icon="🥇")
+                        st.rerun()
+
+        # ── GRAFICO INTERATTIVO EVOLUZIONE STORICA ORO NEL CAVEAU ───
+        st.write("")
+        st.markdown("##### 📈 Evoluzione & Rivalutazione Storica dell'Oro Fisico nel Tempo")
+        st.caption("Visualizza l'andamento del controvalore del tuo oro nel caveau nel corso degli anni (1Y, 3Y, 5Y, 10Y) basato sulle quotazioni ufficiali spot giornaliere EUR/g.")
+
+        gold_tf_cols = st.columns([2, 2])
+        with gold_tf_cols[0]:
+            sel_gold_tf = st.segmented_control(
+                "Orizzonte Storico:",
+                options=["1 Anno (12M)", "3 Anni (36M)", "5 Anni (60M)", "10 Anni (120M)"],
+                default="3 Anni (36M)",
+                key="gold_hist_tf_select",
+            )
+        tf_month_map = {
+            "1 Anno (12M)": 12,
+            "3 Anni (36M)": 36,
+            "5 Anni (60M)": 60,
+            "10 Anni (120M)": 120,
+        }
+        target_months = tf_month_map.get(sel_gold_tf, 36)
+
+        df_gold_traj = compute_gold_portfolio_historical_trajectory(df_assets, timeframe_months=target_months)
+        if not df_gold_traj.empty:
+            fig_gold = go.Figure()
+            # Area valore portafoglio
+            fig_gold.add_trace(
+                go.Scatter(
+                    x=df_gold_traj.index,
+                    y=df_gold_traj["Total_Gold_Value_EUR"],
+                    mode="lines",
+                    name="Controvalore Oro nel Caveau (€)",
+                    line=dict(color="#f59e0b", width=2.5),
+                    fill="tozeroy",
+                    fillcolor="rgba(245, 158, 11, 0.12)",
+                    hovertemplate="<b>%{x|%d/%m/%Y}</b><br>Controvalore: <b>€ %{y:,.2f}</b><extra></extra>",
+                )
+            )
+            # Linea quotazione spot 18K al grammo (asse secondario)
+            fig_gold.add_trace(
+                go.Scatter(
+                    x=df_gold_traj.index,
+                    y=df_gold_traj["Spot_18K_EUR_g"],
+                    mode="lines",
+                    name="Quotazione Spot 18K (€/g)",
+                    line=dict(color="#38bdf8", width=1.5, dash="dot"),
+                    yaxis="y2",
+                    hovertemplate="Spot 18K: <b>€ %{y:,.2f}/g</b><extra></extra>",
+                )
+            )
+
+            fig_gold.update_layout(
+                template="plotly_dark",
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(22,27,34,0.4)",
+                height=380,
+                margin=dict(l=10, r=10, t=20, b=20),
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                xaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.06)", tickformat="%b %Y"),
+                yaxis=dict(
+                    title="Valore Portafoglio (€)",
+                    showgrid=True,
+                    gridcolor="rgba(255,255,255,0.06)",
+                    tickprefix="€ ",
+                ),
+                yaxis2=dict(
+                    title="Spot 18K (€/g)",
+                    overlaying="y",
+                    side="right",
+                    showgrid=False,
+                    tickprefix="€ ",
+                ),
+            )
+            st.plotly_chart(fig_gold, use_container_width=True)
+
+            # Metriche di performance oro su orizzonte
+            first_val = float(df_gold_traj["Total_Gold_Value_EUR"].iloc[0])
+            last_val = float(df_gold_traj["Total_Gold_Value_EUR"].iloc[-1])
+            growth_val = last_val - first_val
+            growth_pct = ((growth_val / first_val) * 100.0) if first_val > 0 else 0.0
+            min_spot = float(df_gold_traj["Spot_18K_EUR_g"].min())
+            max_spot = float(df_gold_traj["Spot_18K_EUR_g"].max())
+
+            gk1, gk2, gk3, gk4 = st.columns(4)
+            with gk1:
+                metric_card("Rivalutazione Periodo", fmt_eur(growth_val), delta=f"{growth_pct:+.1f}% su {sel_gold_tf}")
+            with gk2:
+                metric_card("Minimo Spot 18K", f"€ {min_spot:,.2f}/g", delta="Nel periodo selezionato", delta_color="normal")
+            with gk3:
+                metric_card("Massimo Spot 18K", f"€ {max_spot:,.2f}/g", delta="Picco storico nel periodo", delta_color="normal")
+            with gk4:
+                tot_fine_g = sum(parse_precious_metal_specs(r)["fine_gold_grams"] for _, r in df_metals.iterrows())
+                metric_card("Oro Fino 24K Totale", f"{tot_fine_g:.2f}g", delta=f"{tot_fine_g/31.1034768:.3f} oz troy pure", delta_color="normal")
 
 # ── 2. IMMOBILI & ALTRI ASSET FISICI ───────────────────────
 elif active_illiquid_tab == "🏠 Immobili & Altri Asset Fisici":

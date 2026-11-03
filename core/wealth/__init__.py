@@ -20,6 +20,18 @@ if TYPE_CHECKING:
         StatutoryShareItem,
         SuccessionSharesResult,
     )
+    from core.wealth.gold_engine import (
+        BASELINE_SPOT_18K_EUR_G,
+        BASELINE_SPOT_24K_EUR_G,
+        CARAT_PURITY_MAP,
+        TROY_OUNCE_TO_GRAMS,
+        compute_gold_portfolio_historical_trajectory,
+        evaluate_metal_asset_dynamically,
+        get_gold_historical_series,
+        get_gold_spot_on_date,
+        get_live_gold_spot_rates,
+        parse_precious_metal_specs,
+    )
     from core.wealth.private_markets_engine import (
         DesmoothingResult,
         EconometricDesmoother,
@@ -177,6 +189,17 @@ _LAZY_EXPORTS: dict[str, str] = {
     "ProtectionVehicleAnalysis": "core.wealth.asset_protection_engine",
     "StatutoryShareItem": "core.wealth.asset_protection_engine",
     "SuccessionSharesResult": "core.wealth.asset_protection_engine",
+    # gold_engine
+    "BASELINE_SPOT_18K_EUR_G": "core.wealth.gold_engine",
+    "BASELINE_SPOT_24K_EUR_G": "core.wealth.gold_engine",
+    "CARAT_PURITY_MAP": "core.wealth.gold_engine",
+    "TROY_OUNCE_TO_GRAMS": "core.wealth.gold_engine",
+    "compute_gold_portfolio_historical_trajectory": "core.wealth.gold_engine",
+    "evaluate_metal_asset_dynamically": "core.wealth.gold_engine",
+    "get_gold_historical_series": "core.wealth.gold_engine",
+    "get_gold_spot_on_date": "core.wealth.gold_engine",
+    "get_live_gold_spot_rates": "core.wealth.gold_engine",
+    "parse_precious_metal_specs": "core.wealth.gold_engine",
     # private_markets_engine
     "DesmoothingResult": "core.wealth.private_markets_engine",
     "EconometricDesmoother": "core.wealth.private_markets_engine",

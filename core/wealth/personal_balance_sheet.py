@@ -41,7 +41,12 @@ from core.wealth.wealth_models import (
 logger = logging.getLogger("personal_balance_sheet")
 
 
-def compute_personal_balance_sheet(engine: Engine, portfolio_id: int = 1, year: Optional[int] = None) -> Dict[str, Any]:
+def compute_personal_balance_sheet(
+    engine: Engine,
+    portfolio_id: int = 1,
+    year: Optional[int] = None,
+    dynamic_gold_valuation: bool = True,
+) -> Dict[str, Any]:
     """
     Costruisce il Bilancio Personale Istituzionale completo:
     1. Stato Patrimoniale a sezioni contrapposte (Attivo vs Passivo + Patrimonio Netto a pareggio)
@@ -134,17 +139,38 @@ def compute_personal_balance_sheet(engine: Engine, portfolio_id: int = 1, year: 
                 scale_ratio = reconstructed_tot_cash / cur_tot_cash
                 df_acc["balance_eur"] = df_acc["balance_eur"] * scale_ratio
 
-    # Normalizzazione Valutaria EUR per Asset Fisici
+    # Normalizzazione Valutaria EUR e Valutazione Dinamica per Asset Fisici (Oro/Metalli e Immobili)
     if not df_phys.empty:
-        if "currency" in df_phys.columns:
-            df_phys["market_val_eur"] = df_phys.apply(
-                lambda r: (
-                    float(r.get("current_market_value", 0.0) or 0.0) * get_fx_rate_to_eur(str(r.get("currency", "EUR")))
-                ),
-                axis=1,
-            )
-        else:
-            df_phys["market_val_eur"] = df_phys["current_market_value"].astype(float)
+        def _calc_phys_val_eur(r):
+            if dynamic_gold_valuation:
+                try:
+                    from core.wealth.gold_engine import evaluate_metal_asset_dynamically, parse_precious_metal_specs
+
+                    specs = parse_precious_metal_specs(r)
+                    if specs.get("is_precious_metal") and specs.get("weight_grams", 0.0) > 0:
+                        # Se esercizio chiuso, valuta al 31/12 di quell'anno, altrimenti a fixing live
+                        target_eval_date = as_of_iso if is_closed_exercise else None
+                        eval_res = evaluate_metal_asset_dynamically(r, as_of_date=target_eval_date)
+                        dyn_val = float(eval_res.get("dynamic_market_value", 0.0) or 0.0)
+
+                        # Verifica data acquisizione per anni storici
+                        acq_d = r.get("acquisition_date")
+                        if acq_d and str(acq_d).strip() not in ["None", "NaT", "nan", ""]:
+                            try:
+                                if pd.to_datetime(acq_d).date() > pd.to_datetime(as_of_iso).date():
+                                    return 0.0
+                            except Exception:
+                                pass
+                        if dyn_val > 0:
+                            return dyn_val
+                except Exception as ex:
+                    logger.debug("Valutazione dinamica oro in balance sheet fallback: %s", ex)
+
+            raw_v = float(r.get("current_market_value", 0.0) or 0.0)
+            curr = str(r.get("currency", "EUR"))
+            return raw_v * get_fx_rate_to_eur(curr)
+
+        df_phys["market_val_eur"] = df_phys.apply(_calc_phys_val_eur, axis=1)
     else:
         df_phys = pd.DataFrame(
             columns=["asset_id", "name", "asset_category", "current_market_value", "market_val_eur", "currency"]
@@ -425,12 +451,30 @@ def compute_personal_balance_sheet(engine: Engine, portfolio_id: int = 1, year: 
         )
         val = round(float(r["market_val_eur"]), 2)
         if val > 0:
+            dettaglio = f"{r.get('location', '')} {r.get('notes', '')}".strip() or "Valutazione Peritale / Stima Mercato"
+            if "metal" in cat or "oro" in cat:
+                try:
+                    from core.wealth.gold_engine import (
+                        get_gold_spot_on_date,
+                        get_live_gold_spot_rates,
+                        parse_precious_metal_specs,
+                    )
+                    specs = parse_precious_metal_specs(r)
+                    if specs.get("weight_grams", 0.0) > 0:
+                        if is_closed_exercise:
+                            spot_then = get_gold_spot_on_date(as_of_iso, carat=specs["carat"])
+                            dettaglio = f"Oro {specs['carat']} ({specs['weight_grams']}g @ € {spot_then:.2f}/g spot al {as_of_str})"
+                        else:
+                            live_r = get_live_gold_spot_rates()
+                            spot_now = live_r.get(f"gold_eur_per_gram_{specs['carat'].lower()}", live_r["gold_eur_per_gram_18k"])
+                            dettaglio = f"Oro {specs['carat']} ({specs['weight_grams']}g @ € {spot_now:.2f}/g fixing live)"
+                except Exception:
+                    pass
             reali_voci.append(
                 {
                     "nome": r.get("name") or "Asset Fisico",
                     "categoria": cat_lbl,
-                    "dettaglio": f"{r.get('location', '')} {r.get('notes', '')}".strip()
-                    or "Valutazione Peritale / Stima Mercato",
+                    "dettaglio": dettaglio,
                     "valore": val,
                 }
             )

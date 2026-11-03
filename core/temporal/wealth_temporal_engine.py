@@ -5,6 +5,7 @@
 # attribuzione crescita (risparmio vs mercato) e benchmark comparativo
 # ============================================================
 
+import logging
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional
 
@@ -14,6 +15,8 @@ from sqlalchemy import Engine
 
 from core.wealth.wealth_db import get_cashflow_records, get_wealth_snapshots_history
 from core.wealth.wealth_engine import compute_consolidated_net_worth
+
+logger = logging.getLogger(__name__)
 
 
 def _generate_synthetic_multipliers(timeframe_months: int) -> List[float]:
@@ -81,6 +84,53 @@ def compute_wealth_temporal_progression(
     cur_pension = float(nw_curr.pension_total)
     cur_illiquid = float(cur_physical + cur_pension)
     cur_liab = float(nw_curr.total_liabilities)
+
+    # Identificazione dinamica delle posizioni in oro e metalli preziosi nel caveau
+    gold_holdings = []
+    non_gold_phys_base = cur_physical
+    gold_val_now = 0.0
+    try:
+        from core.wealth.gold_engine import get_gold_spot_on_date, parse_precious_metal_specs
+        from core.wealth.wealth_db import get_physical_assets
+
+        df_phys_all = get_physical_assets(engine, portfolio_id=portfolio_id)
+        if df_phys_all is not None and not df_phys_all.empty:
+            for _, r in df_phys_all.iterrows():
+                p = parse_precious_metal_specs(r)
+                if p.get("is_precious_metal") and p.get("weight_grams", 0.0) > 0:
+                    acq_d = r.get("acquisition_date")
+                    acq_dt = None
+                    if acq_d and str(acq_d).strip() not in ["None", "NaT", "nan", ""]:
+                        try:
+                            acq_dt = pd.to_datetime(acq_d).date()
+                        except Exception:
+                            pass
+                    gold_holdings.append({
+                        "weight_grams": p["weight_grams"],
+                        "carat": p["carat"],
+                        "acq_date": acq_dt,
+                        "cost": float(r.get("purchase_price", 0.0) or 0.0),
+                    })
+                    gold_val_now += float(r.get("current_market_value", 0.0) or 0.0)
+            non_gold_phys_base = max(0.0, cur_physical - gold_val_now)
+    except Exception as ex:
+        logger.debug("Valutazione temporale oro fallback: %s", ex)
+
+    def _calc_phys_at_date(target_d: Any, baseline_other: float) -> float:
+        if not gold_holdings:
+            return round(baseline_other, 2)
+        try:
+            from core.wealth.gold_engine import get_gold_spot_on_date
+            t_date = pd.to_datetime(target_d).date()
+            tot_gold = 0.0
+            for g in gold_holdings:
+                if g["acq_date"] is not None and t_date < g["acq_date"]:
+                    continue
+                spot = get_gold_spot_on_date(t_date, carat=g["carat"])
+                tot_gold += g["weight_grams"] * spot
+            return round(baseline_other + tot_gold, 2)
+        except Exception:
+            return round(baseline_other + gold_val_now, 2)
 
     df_snaps = get_wealth_snapshots_history(engine, portfolio_id=portfolio_id)
     if portfolio_id is not None and df_snaps is not None and not df_snaps.empty and "portfolio_id" in df_snaps.columns:
@@ -285,7 +335,7 @@ def compute_wealth_temporal_progression(
                     liq = max(0.0, a1["liquid_cash"] - cum_cf)
                     fin = a1["financial_investments"]
                     re = a1["real_estate"]
-                    phys = a1["physical_assets"]
+                    phys = _calc_phys_at_date(d, non_gold_phys_base) if gold_holdings else a1["physical_assets"]
                     pens = a1["pension_plans"]
                     liab = a1["liabilities"]
                 elif future_anchors.empty:
@@ -293,7 +343,7 @@ def compute_wealth_temporal_progression(
                     liq = a0["liquid_cash"]
                     fin = a0["financial_investments"]
                     re = a0["real_estate"]
-                    phys = a0["physical_assets"]
+                    phys = _calc_phys_at_date(d, non_gold_phys_base) if gold_holdings else a0["physical_assets"]
                     pens = a0["pension_plans"]
                     liab = a0["liabilities"]
                 else:
@@ -303,7 +353,7 @@ def compute_wealth_temporal_progression(
                         liq = a0["liquid_cash"]
                         fin = a0["financial_investments"]
                         re = a0["real_estate"]
-                        phys = a0["physical_assets"]
+                        phys = _calc_phys_at_date(d, non_gold_phys_base) if gold_holdings else a0["physical_assets"]
                         pens = a0["pension_plans"]
                         liab = a0["liabilities"]
                     else:
@@ -337,7 +387,11 @@ def compute_wealth_temporal_progression(
 
                         fin = max(0.0, (1.0 - alpha) * a0["financial_investments"] + alpha * a1["financial_investments"])
                         re = max(0.0, (1.0 - alpha) * a0["real_estate"] + alpha * a1["real_estate"])
-                        phys = max(0.0, (1.0 - alpha) * a0["physical_assets"] + alpha * a1["physical_assets"])
+                        if gold_holdings:
+                            other_phys = max(0.0, (1.0 - alpha) * (a0["physical_assets"] - gold_val_now) + alpha * (a1["physical_assets"] - gold_val_now))
+                            phys = _calc_phys_at_date(d, other_phys)
+                        else:
+                            phys = max(0.0, (1.0 - alpha) * a0["physical_assets"] + alpha * a1["physical_assets"])
                         pens = max(0.0, (1.0 - alpha) * a0["pension_plans"] + alpha * a1["pension_plans"])
                         liab = max(0.0, (1.0 - alpha) * a0["liabilities"] + alpha * a1["liabilities"])
 
@@ -363,12 +417,19 @@ def compute_wealth_temporal_progression(
                 liquid_vals.append(round(cur_liquid * max(0.4, 0.85 + (mult * 0.15) + (np.sin(i * 0.8) * 0.02)), 2))
                 invest_vals.append(round(cur_invest * max(0.4, mult * 1.02), 2))
                 re_vals.append(round(cur_re, 2))
-                p_val = round(cur_physical * max(0.5, 0.90 + (mult * 0.10)), 2)
+                if gold_holdings:
+                    other_base = non_gold_phys_base * max(0.5, 0.90 + (mult * 0.10))
+                    p_val = _calc_phys_at_date(m_date, other_base)
+                else:
+                    p_val = round(cur_physical * max(0.5, 0.90 + (mult * 0.10)), 2)
                 pe_val = round(cur_pension * max(0.4, 0.88 + (mult * 0.12)), 2)
                 physical_vals.append(p_val)
                 pension_vals.append(pe_val)
                 illiquid_vals.append(round(p_val + pe_val, 2))
-                liab_vals.append(round(cur_liab * max(0.4, 1.0 + (m_offset * 0.004)), 2))
+                cur_l_val = round(cur_liab * max(0.4, 1.0 + (m_offset * 0.004)), 2)
+                liab_vals.append(cur_l_val)
+                # Ricalibra Net Worth al punto storico
+                nw_vals[-1] = round(max(0.0, liquid_vals[-1] + invest_vals[-1] + cur_re + p_val + pe_val - cur_l_val), 2)
 
             # Punto odierno live consolidato
             dates.append(pd.to_datetime(today))
