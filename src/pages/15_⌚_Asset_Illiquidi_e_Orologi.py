@@ -533,13 +533,15 @@ if active_illiquid_tab == "👑 Collezione Orologi & Caveau":
 
                 tax_res = compute_gold_sale_tax_impact(sale_price_eur=tx_sale_px, purchase_price_eur=tx_cost_px, has_purchase_document=has_doc)
 
-                t_c1, t_c2 = st.columns(2)
+                t_c1, t_c2, t_c3, t_c4 = st.columns(4)
                 with t_c1:
-                    st.metric("Base Imponibile Fiscale", fmt_eur(tax_res["taxable_base_eur"]))
-                    st.metric("Imposta 26% Dovuta", fmt_eur(tax_res["tax_due_eur"]))
+                    metric_card("Base Imponibile Fiscale", fmt_eur(tax_res["taxable_base_eur"]))
                 with t_c2:
-                    st.metric("Incasso Netto Effettivo", fmt_eur(tax_res["net_proceeds_eur"]))
-                    st.metric("Aliquota Fiscale Effettiva", f"{tax_res['effective_tax_pct']:.1f}%")
+                    metric_card("Imposta 26% Dovuta", fmt_eur(tax_res["tax_due_eur"]), delta="Aliquota 26%", delta_color="inverse")
+                with t_c3:
+                    metric_card("Incasso Netto Effettivo", fmt_eur(tax_res["net_proceeds_eur"]))
+                with t_c4:
+                    metric_card("Aliquota Effettiva", f"{tax_res['effective_tax_pct']:.1f}%")
 
                 if not has_doc:
                     st.warning(
