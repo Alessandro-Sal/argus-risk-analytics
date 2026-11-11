@@ -571,18 +571,45 @@ elif active_illiquid_tab == "🏠 Immobili & Altri Asset Fisici":
 
         df_other_disp = df_other.copy()
         df_other_disp["Categoria"] = df_other_disp["asset_category"].map(lambda c: cat_map.get(c, c.replace("_", " ").title()))
-        df_other_disp["Prezzo Acquisto"] = df_other_disp["purchase_price"].apply(lambda v: fmt_eur(v) if float(v or 0.0) > 0 else "€ 0,00 (Donazione / Oro)")
-        df_other_disp["Valore Attuale"] = df_other_disp["current_market_value"].apply(lambda v: fmt_eur(v))
-        df_other_disp["Plusvalenza"] = df_other_disp["unrealized_pnl"].apply(lambda v: f"{'+' if v >= 0 else ''}{fmt_eur(v)}")
-        df_other_disp["Rivalutazione"] = df_other_disp.apply(
-            lambda r: "+100.0% (Oro / Donazione)"
-            if float(r.get("purchase_price", 0.0) or 0.0) == 0.0 and float(r.get("current_market_value", 0.0) or 0.0) > 0
-            else (f"{'+' if r['unrealized_pnl_pct'] >= 0 else ''}{r['unrealized_pnl_pct']:.1f}%" if pd.notna(r.get("unrealized_pnl_pct")) else "N/D"),
-            axis=1,
-        )
+        
+        def _calc_p15_outcome(r):
+            pp = float(r.get("purchase_price", 0.0) or 0.0)
+            mv = float(r.get("current_market_value", 0.0) or 0.0)
+            pnl = float(r.get("unrealized_pnl", 0.0) or 0.0)
+            pct = float(r.get("unrealized_pnl_pct", 0.0) or 0.0)
+            if pp == 0.0 and mv > 0:
+                return "🟡 ORO / DONAZIONE (+100%)"
+            elif pnl > 0.01:
+                return f"🟢 RIVALUTATO (+{pct:.1f}%)"
+            elif pnl < -0.01:
+                return f"🔴 SVALUTATO ({pct:.1f}%)"
+            else:
+                return "⚪ IN PARITÀ (0.0%)"
+
+        df_other_disp["Esito Rivalutazione"] = df_other_disp.apply(_calc_p15_outcome, axis=1)
+        df_other_disp["Prezzo Acquisto (€)"] = pd.to_numeric(df_other_disp["purchase_price"], errors="coerce").fillna(0.0)
+        df_other_disp["Valore Attuale (€)"] = pd.to_numeric(df_other_disp["current_market_value"], errors="coerce").fillna(0.0)
+        df_other_disp["Plusvalenza (€)"] = pd.to_numeric(df_other_disp["unrealized_pnl"], errors="coerce").fillna(0.0)
+        df_other_disp["Rendimento (%)"] = pd.to_numeric(df_other_disp["unrealized_pnl_pct"], errors="coerce").fillna(0.0)
+
+        phys_col_cfg = {
+            "Nome Asset": st.column_config.TextColumn("Nome Asset", width="medium"),
+            "Esito Rivalutazione": st.column_config.TextColumn("Esito Rivalutazione", width="medium"),
+            "Categoria": st.column_config.TextColumn("Categoria", width="medium"),
+            "Materiale / Maison": st.column_config.TextColumn("Materiale / Maison", width="medium"),
+            "Dettagli / Specifiche": st.column_config.TextColumn("Dettagli / Specifiche", width="medium"),
+            "Prezzo Acquisto (€)": st.column_config.NumberColumn("Prezzo Acquisto (€)", format="€ %,.2f"),
+            "Valore Attuale (€)": st.column_config.NumberColumn("Valore Attuale (€)", format="€ %,.2f"),
+            "Plusvalenza (€)": st.column_config.NumberColumn("Plusvalenza (€)", format="€ %,.2f"),
+            "Rendimento (%)": st.column_config.NumberColumn("Rendimento (%)", format="%+,.1f%%"),
+        }
 
         render_table_with_export(
-            df_other_disp[["name", "Categoria", "brand_or_location", "model_or_specs", "Prezzo Acquisto", "Valore Attuale", "Plusvalenza", "Rivalutazione"]].rename(columns={
+            df_other_disp[[
+                "name", "Esito Rivalutazione", "Categoria", "brand_or_location",
+                "model_or_specs", "Prezzo Acquisto (€)", "Valore Attuale (€)",
+                "Plusvalenza (€)", "Rendimento (%)"
+            ]].rename(columns={
                 "name": "Nome Asset",
                 "brand_or_location": "Materiale / Maison",
                 "model_or_specs": "Dettagli / Specifiche",
@@ -590,6 +617,8 @@ elif active_illiquid_tab == "🏠 Immobili & Altri Asset Fisici":
             table_title="Asset Fisici, Orologi & Metalli Preziosi",
             file_prefix="asset_fisici_caveau",
             key_suffix="p15_physical_assets",
+            column_config=phys_col_cfg,
+            height=320,
         )
     else:
         st.caption("Nessun immobile o metallo prezioso registrato.")
@@ -663,21 +692,35 @@ elif active_illiquid_tab == "💼 Private Equity, VC & J-Curve":
 
     c_pe_left, c_pe_right = st.columns([3, 2])
     with c_pe_left:
+        pe_deals_disp = pe_res["deals_df"][["name", "asset_class", "vintage_year", "called_capital_eur", "distributions_received_eur", "current_nav_estimated_eur", "moic_multiple", "irr_net_pct", "status"]].rename(columns={
+            "name": "Nome Deal / Fondo",
+            "asset_class": "Tipologia",
+            "vintage_year": "Vintage",
+            "called_capital_eur": "Versato (€)",
+            "distributions_received_eur": "Distribuzioni (€)",
+            "current_nav_estimated_eur": "NAV Stimato (€)",
+            "moic_multiple": "MOIC (x)",
+            "irr_net_pct": "XIRR (%)",
+            "status": "Stato",
+        })
+        pe_col_cfg = {
+            "Nome Deal / Fondo": st.column_config.TextColumn("Nome Deal / Fondo", width="medium"),
+            "Tipologia": st.column_config.TextColumn("Tipologia", width="small"),
+            "Vintage": st.column_config.NumberColumn("Vintage", format="%d", width="small"),
+            "Versato (€)": st.column_config.NumberColumn("Versato (€)", format="€ %,.2f"),
+            "Distribuzioni (€)": st.column_config.NumberColumn("Distribuzioni (€)", format="€ %,.2f"),
+            "NAV Stimato (€)": st.column_config.NumberColumn("NAV Stimato (€)", format="€ %,.2f"),
+            "MOIC (x)": st.column_config.NumberColumn("MOIC (x)", format="%.2fx"),
+            "XIRR (%)": st.column_config.NumberColumn("XIRR (%)", format="%+,.1f%%"),
+            "Stato": st.column_config.TextColumn("Stato", width="small"),
+        }
         render_table_with_export(
-            pe_res["deals_df"][["name", "asset_class", "vintage_year", "called_capital_eur", "distributions_received_eur", "current_nav_estimated_eur", "moic_multiple", "irr_net_pct", "status"]].rename(columns={
-                "name": "Nome Deal / Fondo",
-                "asset_class": "Tipologia",
-                "vintage_year": "Vintage",
-                "called_capital_eur": "Versato (€)",
-                "distributions_received_eur": "Distribuzioni (€)",
-                "current_nav_estimated_eur": "NAV Stimato (€)",
-                "moic_multiple": "MOIC (x)",
-                "irr_net_pct": "XIRR (%)",
-                "status": "Stato",
-            }),
+            pe_deals_disp,
             table_title="Registro Partecipazioni & Club Deal",
             file_prefix="pe_club_deals",
             key_suffix="p15_pe_deals",
+            column_config=pe_col_cfg,
+            height=300,
         )
 
     with c_pe_right:
@@ -742,20 +785,33 @@ elif active_illiquid_tab == "🏛️ Private Debt & Direct Lending":
 
     col_pd_l, col_pd_r = st.columns([3, 2])
     with col_pd_l:
+        pd_tranches_disp = pd_analysis["tranches_df"][["tranche_name", "seniority", "notional_eur", "cash_coupon_pct", "pik_coupon_pct", "all_in_yield_pct", "attachment_leverage", "detachment_leverage"]].rename(columns={
+            "tranche_name": "Tranche di Debito",
+            "seniority": "Seniority",
+            "notional_eur": "Notionale (€)",
+            "cash_coupon_pct": "Cedola Cash (%)",
+            "pik_coupon_pct": "Cedola PIK (%)",
+            "all_in_yield_pct": "Rendimento Totale (%)",
+            "attachment_leverage": "Attach Leverage",
+            "detachment_leverage": "Detach Leverage",
+        })
+        pd_col_cfg = {
+            "Tranche di Debito": st.column_config.TextColumn("Tranche di Debito", width="medium"),
+            "Seniority": st.column_config.TextColumn("Seniority", width="small"),
+            "Notionale (€)": st.column_config.NumberColumn("Notionale (€)", format="€ %,.2f"),
+            "Cedola Cash (%)": st.column_config.NumberColumn("Cedola Cash (%)", format="%.2f%%"),
+            "Cedola PIK (%)": st.column_config.NumberColumn("Cedola PIK (%)", format="%.2f%%"),
+            "Rendimento Totale (%)": st.column_config.NumberColumn("Rendimento Totale (%)", format="%.2f%%"),
+            "Attach Leverage": st.column_config.NumberColumn("Attach Leverage", format="%.2fx"),
+            "Detach Leverage": st.column_config.NumberColumn("Detach Leverage", format="%.2fx"),
+        }
         render_table_with_export(
-            pd_analysis["tranches_df"][["tranche_name", "seniority", "notional_eur", "cash_coupon_pct", "pik_coupon_pct", "all_in_yield_pct", "attachment_leverage", "detachment_leverage"]].rename(columns={
-                "tranche_name": "Tranche di Debito",
-                "seniority": "Seniority",
-                "notional_eur": "Notionale (€)",
-                "cash_coupon_pct": "Cedola Cash (%)",
-                "pik_coupon_pct": "Cedola PIK (%)",
-                "all_in_yield_pct": "Rendimento Totale (%)",
-                "attachment_leverage": "Attach Leverage",
-                "detachment_leverage": "Detach Leverage",
-            }),
+            pd_tranches_disp,
             table_title="Scomposizione Tranche & Struttura del Capitale",
             file_prefix="private_debt_tranches",
             key_suffix="p15_pd_tranches",
+            column_config=pd_col_cfg,
+            height=300,
         )
 
     with col_pd_r:

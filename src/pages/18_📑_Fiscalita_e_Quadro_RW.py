@@ -515,18 +515,32 @@ def _render_tab_quadro_rw():
         metric_card("Patrimonio Base", fmt_eur(cb_res["simulated_wealth_eur"]), delta="Asset Base Simulati", delta_color="normal")
 
     st.write("")
-    st.dataframe(
-        cb_res["comparison_df"][["name", "annual_cgt_eur", "annual_income_tax_eur", "annual_wealth_tax_eur", "total_annual_tax_eur", "effective_annual_tax_rate_pct", "estimated_estate_succession_tax_eur"]].rename(columns={
-            "name": "Giurisdizione Fiscale",
-            "annual_cgt_eur": "CGT (€)",
-            "annual_income_tax_eur": "Dividendi (€)",
-            "annual_wealth_tax_eur": "Patrimoniale (€)",
-            "total_annual_tax_eur": "Totale Annue (€)",
-            "effective_annual_tax_rate_pct": "Aliquota Effettiva (%)",
-            "estimated_estate_succession_tax_eur": "Successione (€)"
-        }),
-        use_container_width=True,
-        hide_index=True
+    cb_disp = cb_res["comparison_df"][["name", "annual_cgt_eur", "annual_income_tax_eur", "annual_wealth_tax_eur", "total_annual_tax_eur", "effective_annual_tax_rate_pct", "estimated_estate_succession_tax_eur"]].rename(columns={
+        "name": "Giurisdizione Fiscale",
+        "annual_cgt_eur": "CGT (€)",
+        "annual_income_tax_eur": "Dividendi (€)",
+        "annual_wealth_tax_eur": "Patrimoniale (€)",
+        "total_annual_tax_eur": "Totale Annue (€)",
+        "effective_annual_tax_rate_pct": "Aliquota Effettiva (%)",
+        "estimated_estate_succession_tax_eur": "Successione (€)"
+    })
+    cb_col_cfg = {
+        "Giurisdizione Fiscale": st.column_config.TextColumn("Giurisdizione Fiscale", width="medium"),
+        "CGT (€)": st.column_config.NumberColumn("CGT (€)", format="€ %,.2f"),
+        "Dividendi (€)": st.column_config.NumberColumn("Dividendi (€)", format="€ %,.2f"),
+        "Patrimoniale (€)": st.column_config.NumberColumn("Patrimoniale (€)", format="€ %,.2f"),
+        "Totale Annue (€)": st.column_config.NumberColumn("Totale Annue (€)", format="€ %,.2f"),
+        "Aliquota Effettiva (%)": st.column_config.ProgressColumn("Aliquota Effettiva (%)", format="%.2f%%", min_value=0.0, max_value=50.0),
+        "Successione (€)": st.column_config.NumberColumn("Successione (€)", format="€ %,.2f"),
+    }
+    render_table_with_export(
+        cb_disp,
+        table_title="Benchmark Comparativo delle Giurisdizioni Fiscali",
+        file_prefix="benchmark_giurisdizioni_fiscali",
+        key_suffix="p18_cb_jurisdictions",
+        column_config=cb_col_cfg,
+        height=280,
+        hide_index=True,
     )
 
 
@@ -581,17 +595,29 @@ def _render_tab_crypto():
     # Tabelle RT ed RW
     col_crt1, col_crt2 = st.columns(2)
     with col_crt1:
-        st.markdown("##### 📋 Quadro RW — Monitoraggio Cripto & Cold Storage (Cod. 21)")
         df_rw_cr = pd.DataFrame(crypto_data_legacy.get("quadro_rw_rows", []))
         if not df_rw_cr.empty:
-            st.dataframe(df_rw_cr, hide_index=True, use_container_width=True)
+            render_table_with_export(
+                df_rw_cr,
+                table_title="Quadro RW — Cripto & Cold Storage (Cod. 21)",
+                file_prefix="quadro_rw_crypto",
+                key_suffix="p18_rw_crypto_tbl",
+                height=220,
+                hide_index=True,
+            )
         else:
             st.info("Nessuna riga RW cripto registrata.")
     with col_crt2:
-        st.markdown("##### 📈 Quadro RT Sez. II-B — Plusvalenze / Minusvalenze")
         df_rt_cr = pd.DataFrame(crypto_data_legacy.get("quadro_rt_rows", []))
         if not df_rt_cr.empty:
-            st.dataframe(df_rt_cr, hide_index=True, use_container_width=True)
+            render_table_with_export(
+                df_rt_cr,
+                table_title="Quadro RT Sez. II-B — Plus / Minus Cripto",
+                file_prefix="quadro_rt_crypto",
+                key_suffix="p18_rt_crypto_tbl",
+                height=220,
+                hide_index=True,
+            )
         else:
             st.info("Nessuna riga RT cripto registrata.")
 

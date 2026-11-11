@@ -30,6 +30,7 @@ from core.ui_utils import (
     render_segmented_tabs,
     render_sr117_audit_drawer,
     render_standard_hero,
+    render_table_with_export,
     render_wealth_executive_badges,
     render_wealth_telemetry_ribbon,
     section,
@@ -272,41 +273,69 @@ if active_pension_tab == "📋 Piani Attivi & Scudo Fiscale":
                 try:
                     yd = json.loads(yearly_json) if isinstance(yearly_json, str) else yearly_json
                     hist_rows = []
+                    current_yr_str = str(datetime.now().year)
                     for yr_k, yr_info in sorted(yd.items()):
-                        tot_y = yr_info.get("tot_year", 0.0) or 0.0
-                        if tot_y > 0 or yr_k in ["2023", "2024", "2025", "2026"]:
-                            tot_cum = yr_info.get("tot_cumulato", 0.0) or 0.0
+                        tot_y = float(yr_info.get("tot_year", 0.0) or 0.0)
+                        if tot_y > 0 or yr_k in ["2023", "2024", "2025", "2026", current_yr_str]:
+                            tot_cum = float(yr_info.get("tot_cumulato", 0.0) or 0.0)
                             tax_ded = min(tot_y, MAX_TAX_DEDUCTION)
                             tax_sav = tax_ded * 0.43
                             plaf_res = max(0.0, MAX_TAX_DEDUCTION - tax_ded)
+                            sat_pct = min(1.0, tax_ded / MAX_TAX_DEDUCTION) if MAX_TAX_DEDUCTION > 0 else 0.0
+                            is_curr = (yr_k == current_yr_str)
+                            status_label = (
+                                "🟢 Saturato 100%"
+                                if sat_pct >= 0.999
+                                else (
+                                    f"🟡 In Corso (Plafond €{plaf_res:,.0f} res.)"
+                                    if is_curr
+                                    else f"⚪ Parziale ({sat_pct * 100:.1f}%)"
+                                )
+                            )
                             hist_rows.append({
-                                "Esercizio": yr_k,
-                                "Versamenti Annui (€)": fmt_eur(tot_y),
-                                "Cumulato Versato (€)": fmt_eur(tot_cum),
-                                "Deducibilità Fiscale (€)": fmt_eur(tax_ded),
-                                "Risparmio IRPEF 43% (€)": fmt_eur(tax_sav),
-                                "Plafond Residuo (€)": fmt_eur(plaf_res),
+                                "Esercizio": f"📌 {yr_k} (In Corso)" if is_curr else f"📅 {yr_k}",
+                                "Stato Fiscale": status_label,
+                                "Versamenti Annui (€)": tot_y,
+                                "Cumulato Versato (€)": tot_cum,
+                                "Deducibilità Fiscale (€)": tax_ded,
+                                "Saturazione Plafond": sat_pct,
+                                "Risparmio IRPEF 43% (€)": tax_sav,
+                                "Plafond Residuo (€)": plaf_res,
                                 "_raw_y": tot_y,
                                 "_raw_cum": tot_cum,
                                 "_year": yr_k,
                             })
 
                     if hist_rows:
-                        st.markdown(
-                            f"###### 📊 Cronistoria Versamenti & Ottimizzazione Fiscale ({hist_rows[0]['_year']} - {hist_rows[-1]['_year']})"
-                        )
                         df_h = pd.DataFrame(hist_rows)
-                        st.dataframe(
+                        pension_col_cfg = {
+                            "Esercizio": st.column_config.TextColumn("Esercizio", width="medium"),
+                            "Stato Fiscale": st.column_config.TextColumn("Stato Fiscale", width="medium"),
+                            "Versamenti Annui (€)": st.column_config.NumberColumn("Versamenti Annui (€)", format="€ %,.2f"),
+                            "Cumulato Versato (€)": st.column_config.NumberColumn("Cumulato Versato (€)", format="€ %,.2f"),
+                            "Deducibilità Fiscale (€)": st.column_config.NumberColumn("Deducibilità Fiscale (€)", format="€ %,.2f"),
+                            "Saturazione Plafond": st.column_config.ProgressColumn(
+                                "Saturazione Plafond", format="%.1f%%", min_value=0.0, max_value=1.0
+                            ),
+                            "Risparmio IRPEF 43% (€)": st.column_config.NumberColumn("Risparmio IRPEF 43% (€)", format="€ %,.2f"),
+                            "Plafond Residuo (€)": st.column_config.NumberColumn("Plafond Residuo (€)", format="€ %,.2f"),
+                        }
+                        render_table_with_export(
                             df_h[[
                                 "Esercizio",
+                                "Stato Fiscale",
                                 "Versamenti Annui (€)",
                                 "Cumulato Versato (€)",
                                 "Deducibilità Fiscale (€)",
+                                "Saturazione Plafond",
                                 "Risparmio IRPEF 43% (€)",
                                 "Plafond Residuo (€)",
                             ]],
-                            use_container_width=True,
-                            hide_index=True,
+                            table_title=f"📊 Cronistoria Versamenti & Ottimizzazione Fiscale ({hist_rows[0]['_year']} - {hist_rows[-1]['_year']})",
+                            file_prefix=f"cronistoria_previdenza_{p.get('plan_id', 'plan')}",
+                            key_suffix=f"p16_hist_tbl_{p.get('plan_id', 'plan')}",
+                            column_config=pension_col_cfg,
+                            height=240,
                         )
 
                         fig_prev = go.Figure()

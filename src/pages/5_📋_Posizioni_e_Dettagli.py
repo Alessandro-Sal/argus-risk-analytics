@@ -259,25 +259,40 @@ if active_pos_tab == "📋 Posizioni Attive & Costi FIFO":
         )
 
     with hh2:
-        st.markdown("**Top 10 Posizioni**")
+        st.markdown("**Top 10 Posizioni per Controvalore**")
         if not pos.empty and "current_value" in pos.columns and "weight_pct" in pos.columns:
             pos_active = pos[pos["qty_net"] > 0] if "qty_net" in pos.columns else (pos[pos["current_value"] > 0] if "current_value" in pos.columns else pos)
-            pos_sorted = pos_active.sort_values("current_value", ascending=False).head(10)
-            df_top10 = pos_sorted[["ticker", "current_value", "weight_pct"]].rename(columns={
+            pos_sorted = pos_active.sort_values("current_value", ascending=False).head(10).copy()
+            
+            top10_cols = ["ticker", "current_value", "weight_pct"]
+            if "pnl_unrealized" in pos_sorted.columns:
+                top10_cols.append("pnl_unrealized")
+            
+            df_top10 = pos_sorted[top10_cols].rename(columns={
                 "ticker": "Ticker",
-                "current_value": "Valore",
-                "weight_pct": "Peso %"
+                "current_value": "Valore (€)",
+                "weight_pct": "Peso (%)",
+                "pnl_unrealized": "PnL Latente (€)"
             })
             top10_col_config = {
-                "Valore": st.column_config.NumberColumn("Valore", format="€ %.2f"),
-                "Peso %": st.column_config.ProgressColumn(
-                    "Peso %",
+                "Valore (€)": st.column_config.NumberColumn("Valore (€)", format="€ %,.2f"),
+                "PnL Latente (€)": st.column_config.NumberColumn("PnL Latente (€)", format="€ %,.2f"),
+                "Peso (%)": st.column_config.ProgressColumn(
+                    "Peso (%)",
                     format="%.2f%%",
-                    min_value=0,
-                    max_value=float(df_top10["Peso %"].max()) if not df_top10.empty else 100,
+                    min_value=0.0,
+                    max_value=float(df_top10["Peso (%)"].max()) if not df_top10.empty else 100.0,
                 )
             }
-            st.dataframe(df_top10, use_container_width=True, hide_index=True, column_config=top10_col_config)
+            render_table_with_export(
+                df_top10,
+                table_title="Top 10 Holdings",
+                file_prefix="top10_holdings",
+                key_suffix="top10_grid",
+                column_config=top10_col_config,
+                height=260,
+                hide_index=True
+            )
 
     st.divider()
     section("Dettaglio Posizioni & Rischio Liquidità ADV")
@@ -311,6 +326,32 @@ if active_pos_tab == "📋 Posizioni Attive & Costi FIFO":
         if "asset_class" in df_l.columns:
             df_disp["Regime TUIR"] = df_l.apply(_classify_tax_regime, axis=1)
         
+        # Generazione badge dinamico Esito Posizione (🟢 GUADAGNA / 🔴 PERDE)
+        def _calc_outcome_badge(row):
+            pnl_u = float(row.get("pnl_unrealized", 0.0) or 0.0)
+            cost_basis = float(row.get("wacp", 0.0) or 0.0) * float(row.get("qty_net", 0.0) or 0.0)
+            pnl_pct = (pnl_u / cost_basis * 100.0) if cost_basis > 0 else 0.0
+            if pnl_u > 0.01:
+                return f"🟢 GUADAGNA (+{pnl_pct:.1f}%)"
+            elif pnl_u < -0.01:
+                return f"🔴 PERDE ({pnl_pct:.1f}%)"
+            else:
+                return "⚪ PAREGGIO (0.0%)"
+
+        df_disp["Esito Posizione"] = df_disp.apply(_calc_outcome_badge, axis=1)
+
+        # Generazione badge semantico Liquidità ADV
+        def _calc_liq_badge(row):
+            d = float(row.get("days_to_liquidate", 0.5) or 0.5)
+            if d <= 1.0:
+                return "🟢 Immediata (<1g)"
+            elif d <= 5.0:
+                return "🟡 Moderata (1-5g)"
+            else:
+                return "🔴 Illiquido (>5g)"
+
+        df_disp["Classe Liquidità"] = df_disp.apply(_calc_liq_badge, axis=1)
+
         col_renames = {
             "ticker": "Ticker", "asset_class": "Asset Class", "sector": "Settore",
             "country": "Paese", "qty_net": "Quantità", "wacp": "Prezzo Carico (€)",
@@ -322,12 +363,48 @@ if active_pos_tab == "📋 Posizioni Attive & Costi FIFO":
         }
         df_disp.rename(columns=col_renames, inplace=True)
 
-        col_pos_f1, col_pos_f2 = st.columns([1.8, 1.2])
+        # Telemetria PnL e Win-Ratio aggregati
+        tot_pos_cnt = len(df_disp)
+        gains_mask = df_disp["PnL Latente (€)"] > 0
+        loss_mask = df_disp["PnL Latente (€)"] < 0
+        n_gain = int(gains_mask.sum())
+        n_loss = int(loss_mask.sum())
+        sum_gain = float(df_disp.loc[gains_mask, "PnL Latente (€)"].sum()) if n_gain > 0 else 0.0
+        sum_loss = float(df_disp.loc[loss_mask, "PnL Latente (€)"].sum()) if n_loss > 0 else 0.0
+        win_ratio = (n_gain / tot_pos_cnt * 100.0) if tot_pos_cnt > 0 else 0.0
+
+        st.markdown(f"""
+        <div style="background: rgba(13, 17, 23, 0.85); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 9px 16px; margin: 6px 0 14px 0; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+            <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                <span style="font-size: 0.78rem; font-weight: 700; color: #8b949e; text-transform: uppercase; letter-spacing: 0.5px;">📊 Monitor Titoli:</span>
+                <span style="font-size: 0.80rem; font-weight: 700; color: #3fb950; background: rgba(63, 185, 80, 0.12); padding: 2px 9px; border-radius: 4px; border: 1px solid rgba(63, 185, 80, 0.25);">
+                    🟢 {n_gain} in Guadagno (+€ {sum_gain:,.2f})
+                </span>
+                <span style="font-size: 0.80rem; font-weight: 700; color: #f85149; background: rgba(248, 81, 73, 0.12); padding: 2px 9px; border-radius: 4px; border: 1px solid rgba(248, 81, 73, 0.25);">
+                    🔴 {n_loss} in Perdita (-€ {abs(sum_loss):,.2f})
+                </span>
+                <span style="font-size: 0.80rem; font-weight: 700; color: #58a6ff; background: rgba(88, 166, 255, 0.12); padding: 2px 9px; border-radius: 4px; border: 1px solid rgba(88, 166, 255, 0.25);">
+                    Win-Ratio: {win_ratio:.1f}%
+                </span>
+            </div>
+            <div style="font-size: 0.74rem; color: #8b949e;">
+                💡 Clicca sulle intestazioni per ordinare
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        col_pos_f1, col_pos_f2, col_pos_f3 = st.columns([1.5, 1.0, 1.0])
         with col_pos_f1:
             search_pos = st.text_input("🔍 Cerca Posizione:", placeholder="Filtra per Ticker o Settore...", key="search_main_pos")
         with col_pos_f2:
             classes_available = ["Tutte le Classi"] + sorted(list(df_disp["Asset Class"].dropna().unique())) if "Asset Class" in df_disp.columns else ["Tutte"]
             filter_ac = st.selectbox("🏷️ Asset Class:", classes_available, key="filter_main_pos_ac")
+        with col_pos_f3:
+            pnl_filter_mode = st.selectbox(
+                "🎯 Filtro Esito:",
+                ["Tutte le Posizioni", "🟢 Solo Guadagni", "🔴 Solo Perdite", "⚡ Illiquide (>5g)"],
+                key="filter_main_pos_outcome"
+            )
 
         df_disp_filt = df_disp.copy()
         if search_pos:
@@ -337,14 +414,32 @@ if active_pos_tab == "📋 Posizioni Attive & Costi FIFO":
             df_disp_filt = df_disp_filt[mask]
         if filter_ac != "Tutte le Classi" and "Asset Class" in df_disp_filt.columns:
             df_disp_filt = df_disp_filt[df_disp_filt["Asset Class"] == filter_ac]
+        if pnl_filter_mode == "🟢 Solo Guadagni":
+            df_disp_filt = df_disp_filt[df_disp_filt["PnL Latente (€)"] > 0]
+        elif pnl_filter_mode == "🔴 Solo Perdite":
+            df_disp_filt = df_disp_filt[df_disp_filt["PnL Latente (€)"] < 0]
+        elif pnl_filter_mode == "⚡ Illiquide (>5g)":
+            df_disp_filt = df_disp_filt[df_disp_filt["Giorni Liq. (ADV 15%)"] > 5.0]
+
+        # Prioritizzazione logica colonne per visibilità istantanea delle metriche decisionali
+        ordered_cols = [
+            "Ticker", "Esito Posizione", "Controvalore (€)", "Peso (%)",
+            "PnL Latente (€)", "PnL Realizz. (€)", "Prezzo Mkt (€)", "Prezzo Carico (€)",
+            "Quantità", "Asset Class", "Settore", "Classe Liquidità",
+            "Giorni Liq. (ADV 15%)", "Beta (vs SPY)", "Regime TUIR"
+        ]
+        final_cols = [c for c in ordered_cols if c in df_disp_filt.columns]
 
         column_config = {
+            "Ticker": st.column_config.TextColumn("Ticker", width="small"),
+            "Esito Posizione": st.column_config.TextColumn("Esito Posizione", width="medium"),
+            "Classe Liquidità": st.column_config.TextColumn("Classe Liquidità", width="small"),
             "Regime TUIR": st.column_config.TextColumn("Regime TUIR", width="small", help="Classificazione fiscale TUIR: Art. 44 (OICR) / Art. 67 (Capital Gain) / White List"),
-            "Prezzo Carico (€)": st.column_config.NumberColumn("Prezzo Carico (€)", format="€ %.2f"),
-            "Prezzo Mkt (€)": st.column_config.NumberColumn("Prezzo Mkt (€)", format="€ %.2f"),
-            "Controvalore (€)": st.column_config.NumberColumn("Controvalore (€)", format="€ %.2f"),
-            "PnL Realizz. (€)": st.column_config.NumberColumn("PnL Realizz. (€)", format="€ %.2f"),
-            "PnL Latente (€)": st.column_config.NumberColumn("PnL Latente (€)", format="€ %.2f"),
+            "Prezzo Carico (€)": st.column_config.NumberColumn("Prezzo Carico (€)", format="€ %,.2f"),
+            "Prezzo Mkt (€)": st.column_config.NumberColumn("Prezzo Mkt (€)", format="€ %,.2f"),
+            "Controvalore (€)": st.column_config.NumberColumn("Controvalore (€)", format="€ %,.2f"),
+            "PnL Realizz. (€)": st.column_config.NumberColumn("PnL Realizz. (€)", format="€ %,.2f"),
+            "PnL Latente (€)": st.column_config.NumberColumn("PnL Latente (€)", format="€ %,.2f"),
             "Beta (vs SPY)": st.column_config.NumberColumn("Beta (vs SPY)", format="%.2f", help="Sensibilità sistematica dell'asset rispetto al Benchmark SPY"),
             "Peso (%)": st.column_config.ProgressColumn("Peso (%)", format="%.2f%%", min_value=0.0, max_value=100.0),
             "Giorni Liq. (ADV 15%)": st.column_config.NumberColumn("Giorni Liq. (ADV 15%)", format="%.2f gg"),
@@ -352,12 +447,12 @@ if active_pos_tab == "📋 Posizioni Attive & Costi FIFO":
         }
 
         render_table_with_export(
-            df_disp_filt,
+            df_disp_filt[final_cols],
             table_title="Mappa Analitica delle Posizioni Attive & PnL",
             file_prefix="posizioni_attive",
             key_suffix="main_pos_grid",
             column_config=column_config,
-            height=420
+            height=430
         )
 
         # ── QUICK ACTION DRAWER TRIGGERS: LOT INSPECTOR, RISK DECOMPOSITION & BLOTTER ──
@@ -441,7 +536,14 @@ if active_pos_tab == "📋 Posizioni Attive & Costi FIFO":
             "shares_after": "Quote Post-Split"
         }
         df_ca_disp = df_ca[[c for c in col_ca_map.keys() if c in df_ca.columns]].rename(columns=col_ca_map)
-        st.dataframe(df_ca_disp, use_container_width=True, hide_index=True)
+        render_table_with_export(
+            df_ca_disp,
+            table_title="Corporate Actions & Stock Split Engine",
+            file_prefix="corporate_actions",
+            key_suffix="p5_corp_actions",
+            height=260,
+            hide_index=True,
+        )
     else:
         st.info("ℹ️ Nessuno split azionario o operazione straordinaria rilevata sui lotti storici di questo portafoglio (le transazioni sono già sincronizzate con i prezzi correnti).")
 
@@ -2880,19 +2982,29 @@ elif active_pos_tab == "🤖 Implementation Shortfall & Execution":
         metric_card("Risparmio Algoritmico Max", fmt_eur(is_res["max_potential_savings_eur"]), delta=f"con {is_res['best_strategy'][:18]}...", delta_color="normal")
 
     st.write("")
-    st.markdown("##### 📊 Benchmark Comparativo delle Strategie di Esecuzione")
-    st.dataframe(
-        is_res["strategies_df"][["strategy", "avg_exec_price_eur", "slippage_bps", "total_execution_cost_eur", "savings_vs_market_eur", "execution_speed", "risk_profile"]].rename(columns={
-            "strategy": "Strategia di Esecuzione",
-            "avg_exec_price_eur": "Prezzo Medio Eseguito (€)",
-            "slippage_bps": "Slippage (bps)",
-            "total_execution_cost_eur": "Costo Totale (€)",
-            "savings_vs_market_eur": "Risparmio vs Market (€)",
-            "execution_speed": "Velocità Esecuzione",
-            "risk_profile": "Profilo di Rischio"
-        }),
-        use_container_width=True,
-        hide_index=True
+    strat_df = is_res["strategies_df"][["strategy", "avg_exec_price_eur", "slippage_bps", "total_execution_cost_eur", "savings_vs_market_eur", "execution_speed", "risk_profile"]].rename(columns={
+        "strategy": "Strategia di Esecuzione",
+        "avg_exec_price_eur": "Prezzo Medio Eseguito (€)",
+        "slippage_bps": "Slippage (bps)",
+        "total_execution_cost_eur": "Costo Totale (€)",
+        "savings_vs_market_eur": "Risparmio vs Market (€)",
+        "execution_speed": "Velocità Esecuzione",
+        "risk_profile": "Profilo di Rischio"
+    })
+    strat_col_cfg = {
+        "Prezzo Medio Eseguito (€)": st.column_config.NumberColumn("Prezzo Medio Eseguito (€)", format="€ %,.2f"),
+        "Slippage (bps)": st.column_config.NumberColumn("Slippage (bps)", format="%.1f bps"),
+        "Costo Totale (€)": st.column_config.NumberColumn("Costo Totale (€)", format="€ %,.2f"),
+        "Risparmio vs Market (€)": st.column_config.NumberColumn("Risparmio vs Market (€)", format="€ %,.2f"),
+    }
+    render_table_with_export(
+        strat_df,
+        table_title="Benchmark Comparativo delle Strategie di Esecuzione",
+        file_prefix="benchmark_strategie_esec",
+        key_suffix="p5_strat_bench",
+        column_config=strat_col_cfg,
+        height=240,
+        hide_index=True,
     )
 
     st.write("")
@@ -2935,23 +3047,38 @@ elif active_pos_tab == "🤖 Implementation Shortfall & Execution":
     st.write("")
     with st.expander("🔍 Dettaglio Tranche Slicing Almgren-Chriss (16 Intervalli)"):
         if not sched_df.empty:
-            st.dataframe(
-                sched_df[["tranche_idx", "timestamp", "ticker", "action", "slice_qty", "cum_qty", "cum_progress_pct", "order_notional_eur", "benchmark_price_eur", "est_exec_price_eur", "est_slippage_bps", "remaining_shares"]].rename(columns={
-                    "tranche_idx": "Tranche #",
-                    "timestamp": "Orario",
-                    "ticker": "Ticker",
-                    "action": "Azione",
-                    "slice_qty": "Quote Tranche",
-                    "cum_qty": "Quote Cumulate",
-                    "cum_progress_pct": "% Progresso",
-                    "order_notional_eur": "Controvalore (€)",
-                    "benchmark_price_eur": "Prezzo Base (€)",
-                    "est_exec_price_eur": "Prezzo Stimato (€)",
-                    "est_slippage_bps": "Slippage (bps)",
-                    "remaining_shares": "Quote Residue"
-                }),
-                use_container_width=True,
-                hide_index=True
+            sched_view = sched_df[["tranche_idx", "timestamp", "ticker", "action", "slice_qty", "cum_qty", "cum_progress_pct", "order_notional_eur", "benchmark_price_eur", "est_exec_price_eur", "est_slippage_bps", "remaining_shares"]].copy()
+            sched_view["action"] = sched_view["action"].apply(lambda a: f"🟢 {a.upper()}" if str(a).upper() in ["BUY", "ACQUISTO"] else f"🔴 {a.upper()}")
+            sched_disp = sched_view.rename(columns={
+                "tranche_idx": "Tranche #",
+                "timestamp": "Orario",
+                "ticker": "Ticker",
+                "action": "Azione",
+                "slice_qty": "Quote Tranche",
+                "cum_qty": "Quote Cumulate",
+                "cum_progress_pct": "% Progresso",
+                "order_notional_eur": "Controvalore (€)",
+                "benchmark_price_eur": "Prezzo Base (€)",
+                "est_exec_price_eur": "Prezzo Stimato (€)",
+                "est_slippage_bps": "Slippage (bps)",
+                "remaining_shares": "Quote Residue"
+            })
+            sched_col_cfg = {
+                "Azione": st.column_config.TextColumn("Azione", width="small"),
+                "% Progresso": st.column_config.ProgressColumn("% Progresso", format="%.1f%%", min_value=0.0, max_value=100.0),
+                "Controvalore (€)": st.column_config.NumberColumn("Controvalore (€)", format="€ %,.2f"),
+                "Prezzo Base (€)": st.column_config.NumberColumn("Prezzo Base (€)", format="€ %,.2f"),
+                "Prezzo Stimato (€)": st.column_config.NumberColumn("Prezzo Stimato (€)", format="€ %,.2f"),
+                "Slippage (bps)": st.column_config.NumberColumn("Slippage (bps)", format="%.1f bps"),
+            }
+            render_table_with_export(
+                sched_disp,
+                table_title="Schedulazione Tranche Esecutive Almgren-Chriss",
+                file_prefix="slicing_schedule",
+                key_suffix="p5_sched_tranches",
+                column_config=sched_col_cfg,
+                height=320,
+                hide_index=True,
             )
 
     with st.expander("🧪 Simulatore Post-Trade TCA (Ex-Post Execution Quality)"):

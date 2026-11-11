@@ -910,14 +910,7 @@ else:
     }
     
     st.dataframe(
-        sc_disp_df.style.map(highlight_alpha_sc, subset=["Alpha (Δ Rendimento %)"]).format({
-            "Rendimento Tot %": "{:+,.2f}%",
-            "CAGR Annuo %": "{:+,.2f}%",
-            "Volatilità Annua %": "{:.2f}%",
-            "Sharpe Ratio": "{:.2f}",
-            "Max Drawdown %": "{:.2f}%",
-            "Alpha (Δ Rendimento %)": "{:+,.2f}%"
-        }),
+        sc_disp_df.style.map(highlight_alpha_sc, subset=["Alpha (Δ Rendimento %)"]),
         column_config=sc_cfg,
         use_container_width=True,
         hide_index=True
@@ -1168,7 +1161,12 @@ with col_t1:
             "Periodo attivo portafoglio"
         ]
     }
-    st.dataframe(pd.DataFrame(data_ret), use_container_width=True, hide_index=True)
+    ret_col_cfg = {
+        "Metrica Quantitativa": st.column_config.TextColumn("Metrica Quantitativa", width="medium"),
+        "Valore Rilevato": st.column_config.TextColumn("Valore Rilevato", width="small"),
+        "Target / Benchmark Istituzionale": st.column_config.TextColumn("Target / Benchmark Istituzionale", width="medium"),
+    }
+    st.dataframe(pd.DataFrame(data_ret), column_config=ret_col_cfg, use_container_width=True, hide_index=True)
     
 with col_t2:
     # Mini Barometro Visivo Plotly delle Metriche di Efficienza

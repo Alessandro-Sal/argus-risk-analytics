@@ -509,8 +509,24 @@ def render_export_toolbar(
         )
 
 
+def _color_pnl_cell(val: Any) -> str:
+    """Styling CSS ad alto contrasto per colonne di rendimento, delta e PnL."""
+    if val is None or pd.isna(val):
+        return ""
+    try:
+        fval = float(val)
+        if fval > 0.00001:
+            return "color: #3fb950; font-weight: 600;"
+        elif fval < -0.00001:
+            return "color: #f85149; font-weight: 600;"
+        else:
+            return "color: #8b949e;"
+    except (ValueError, TypeError):
+        return ""
+
+
 def render_table_with_export(
-    df: pd.DataFrame,
+    df: Any,
     table_title: Optional[str] = None,
     file_prefix: str = "tabella",
     key_suffix: str = "tbl",
@@ -521,19 +537,23 @@ def render_table_with_export(
     hide_index: bool = True,
     height: Optional[int] = 380,
     sheet_name: str = "Dati",
+    auto_style: bool = True,
 ) -> None:
     """
     Wrapper universale All-in-One per visualizzare un DataFrame con design
     istituzionale ARGUS e toolbar di esportazione integrata.
 
-    Layout:
-    ┌───────────────────────────────────────────────────────────┐
-    │ 📋 Titolo Tabella   [ 42 righe • 8 col ]      [📥 Esporta]│
-    ├───────────────────────────────────────────────────────────┤
-    │ (st.dataframe con formattazione e progress columns)      │
-    └───────────────────────────────────────────────────────────┘
+    Supporta:
+    - Auto-styling cromatico PnL/Delta/Rendimento (Verde Smeraldo #3fb950 / Rosso Crimson #f85149)
+    - Auto-configurazione ProgressColumn per pesi/allocazioni/saturazioni
+    - Auto-formattazione valute e percentuali con ordinamento nativo
+    - Esportazione istantanea Excel / CSV / JSON
     """
-    if df is None or df.empty:
+    # Gestione compatibilità sia per pd.DataFrame che per pd.io.formats.style.Styler
+    is_styler = hasattr(df, "data") and isinstance(df.data, pd.DataFrame)
+    raw_df = df.data if is_styler else df
+
+    if raw_df is None or not isinstance(raw_df, pd.DataFrame) or raw_df.empty:
         if table_title:
             st.markdown(f"##### {table_title}")
         st.info("Nessun record disponibile nella tabella.")
@@ -551,7 +571,7 @@ def render_table_with_export(
                         {table_title}
                     </span>
                     <span style="font-family: 'JetBrains Mono', monospace; font-size: 0.74rem; color: #8b949e; background: rgba(255,255,255,0.06); padding: 1px 7px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.08);">
-                        {len(df):,} righe
+                        {len(raw_df):,} righe
                     </span>
                 </div>
                 """,
@@ -561,7 +581,7 @@ def render_table_with_export(
             st.markdown(
                 f"""
                 <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: #8b949e;">
-                    {len(df):,} record disponibili
+                    {len(raw_df):,} record disponibili
                 </div>
                 """,
                 unsafe_allow_html=True,
@@ -569,7 +589,7 @@ def render_table_with_export(
 
     with col_export:
         render_export_toolbar(
-            df=df,
+            df=raw_df,
             file_prefix=file_prefix,
             key_suffix=key_suffix,
             table_title=table_title,
@@ -585,19 +605,19 @@ def render_table_with_export(
 
     if currency_cols:
         for c in currency_cols:
-            if c in df.columns and c not in cfg:
+            if c in raw_df.columns and c not in cfg:
                 cfg[c] = st.column_config.NumberColumn(
-                    c, format=f"{curr_symbol} %.2f", help=f"Importo espresso in {base_curr}"
+                    c, format=f"{curr_symbol} %,.2f", help=f"Importo espresso in {base_curr}"
                 )
 
     if pct_cols:
         for c in pct_cols:
-            if c in df.columns and c not in cfg:
+            if c in raw_df.columns and c not in cfg:
                 cfg[c] = st.column_config.NumberColumn(c, format="%.2f%%", help="Valore percentuale")
 
     if progress_cols:
         for c, (min_v, max_v) in progress_cols.items():
-            if c in df.columns and c not in cfg:
+            if c in raw_df.columns and c not in cfg:
                 cfg[c] = st.column_config.ProgressColumn(
                     c,
                     min_value=min_v,
@@ -606,8 +626,70 @@ def render_table_with_export(
                     help=f"Allocazione / Intensità per {c}",
                 )
 
+    # Auto-detection avanzata se auto_style è attivo
+    styled_df_or_styler = df
+    if auto_style and not is_styler:
+        pnl_delta_keywords = (
+            "pnl", "gain", "loss", "profit", "rendimento", "var", "delta", "alpha",
+            "ritorno", "risparmio", "plusvalenz", "minusvalenz", "sovraperformance", "diff"
+        )
+        weight_keywords = ("peso", "weight", "allocazione", "saturazione", "quota", "ltv", "avanzamento")
+        currency_keywords = (
+            "€", "eur", "prezzo", "valore", "controvalore", "costo", "ricavo",
+            "versamento", "montante", "plafond", "saldo", "notionale", "debito",
+            "equity", "nav", "cgt", "dividendo", "imposta"
+        )
+        pct_keywords = ("%", "pct", "percentuale", "tasso", "aliquota", "yield", "cagr", "xirr", "irr")
+
+        pnl_cols_to_style = []
+        for c in raw_df.columns:
+            c_str = str(c).strip().lower()
+            is_num = pd.api.types.is_numeric_dtype(raw_df[c])
+
+            # 1. Rileva PnL / Delta per colorazione semantica
+            if is_num and any(k in c_str for k in pnl_delta_keywords):
+                pnl_cols_to_style.append(c)
+
+            # 2. Rileva barre di progresso se non già configurate
+            if c not in cfg and is_num and any(k in c_str for k in weight_keywords):
+                max_v = float(raw_df[c].dropna().max()) if not raw_df[c].dropna().empty else 1.0
+                min_v = float(raw_df[c].dropna().min()) if not raw_df[c].dropna().empty else 0.0
+                if 0.0 <= min_v and max_v <= 1.05:
+                    cfg[c] = st.column_config.ProgressColumn(
+                        str(c), min_value=0.0, max_value=1.0, format="%.1f%%", help=f"Quota / Peso {c}"
+                    )
+                elif 0.0 <= min_v and max_v <= 100.5:
+                    cfg[c] = st.column_config.ProgressColumn(
+                        str(c), min_value=0.0, max_value=100.0, format="%.1f%%", help=f"Quota / Peso {c}"
+                    )
+
+            # 3. Rileva colonne valuta
+            if c not in cfg and is_num and any(k in c_str for k in currency_keywords):
+                cfg[c] = st.column_config.NumberColumn(
+                    str(c), format=f"{curr_symbol} %,.2f", help=f"Valore espresso in {base_curr}"
+                )
+
+            # 4. Rileva colonne percentuali
+            if c not in cfg and is_num and any(k in c_str for k in pct_keywords):
+                cfg[c] = st.column_config.NumberColumn(str(c), format="%.2f%%", help="Valore percentuale")
+
+        if pnl_cols_to_style:
+            try:
+                styler = raw_df.style
+                for pcol in pnl_cols_to_style:
+                    styler = styler.map(_color_pnl_cell, subset=[pcol])
+                styled_df_or_styler = styler
+            except Exception:
+                styled_df_or_styler = raw_df
+
     # Render data grid
-    st.dataframe(df, column_config=cfg if cfg else None, hide_index=hide_index, height=height, use_container_width=True)
+    st.dataframe(
+        styled_df_or_styler,
+        column_config=cfg if cfg else None,
+        hide_index=hide_index,
+        height=height,
+        use_container_width=True,
+    )
 
 
 def render_institutional_datagrid(

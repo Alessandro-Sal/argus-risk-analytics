@@ -220,7 +220,7 @@ if active_re_tab == "🏡 Home Equity & LTV Reale":
                 "market_value": st.column_config.NumberColumn("Valore Mercato", format="€ %,.2f"),
                 "allocated_debt": st.column_config.NumberColumn("Debito Allocato", format="€ %,.2f"),
                 "net_equity": st.column_config.NumberColumn("Home Equity Netto", format="€ %,.2f"),
-                "ltv_pct": st.column_config.NumberColumn("LTV %", format="%.1f%%"),
+                "ltv_pct": st.column_config.ProgressColumn("LTV %", format="%.1f%%", min_value=0.0, max_value=100.0),
                 "location": "Ubicazione",
                 "notes": "Note"
             }
@@ -449,30 +449,46 @@ elif active_re_tab == "📈 Redditività da Locazione, DSCR & Cedolare":
     tax_10 = gross_annual * 0.10
     tax_irpef = gross_annual * 0.95 * 0.35  # Deduzione forfettaria 5% su IRPEF 35%
 
-    df_tax_comp = pd.DataFrame([
+    tax_comp_rows = [
         {
-            "Regime Fiscale": "Cedolare Secca 21% (Canone Libero 4+4)",
-            "Imposta Annua (€)": fmt_eur(tax_21),
-            "IMU Agevolata": "No (Aliquota Ordinaria)",
-            "Net Yield Stimato": f"{((gross_annual - tax_21 - p_imu - condo_mo*12 - p_val*maint_pct/100)/p_val*100):.2f}%",
-            "Risparmio vs 21%": "€ 0,00"
+            "Regime Fiscale": "🟢 Cedolare Secca 10% (Canone Concordato 3+2)",
+            "Imposta Annua (€)": float(tax_10),
+            "IMU Agevolata": "Sì (-25% Legge Statale)",
+            "Net Yield Stimato (%)": float((gross_annual - tax_10 - p_imu * 0.75 - condo_mo * 12 - p_val * maint_pct / 100) / p_val * 100) if p_val > 0 else 0.0,
+            "Risparmio vs 21% (€)": float(tax_21 - tax_10 + p_imu * 0.25),
         },
         {
-            "Regime Fiscale": "Cedolare Secca 10% (Canone Concordato 3+2)",
-            "Imposta Annua (€)": fmt_eur(tax_10),
-            "IMU Agevolata": "Sì (-25% IMU per legge statale)",
-            "Net Yield Stimato": f"{((gross_annual - tax_10 - p_imu*0.75 - condo_mo*12 - p_val*maint_pct/100)/p_val*100):.2f}%",
-            "Risparmio vs 21%": f"+{fmt_eur(tax_21 - tax_10 + p_imu*0.25)}/anno"
+            "Regime Fiscale": "🟡 Cedolare Secca 21% (Canone Libero 4+4)",
+            "Imposta Annua (€)": float(tax_21),
+            "IMU Agevolata": "No (Aliquota Ordinaria)",
+            "Net Yield Stimato (%)": float((gross_annual - tax_21 - p_imu - condo_mo * 12 - p_val * maint_pct / 100) / p_val * 100) if p_val > 0 else 0.0,
+            "Risparmio vs 21% (€)": 0.0,
         },
         {
-            "Regime Fiscale": "IRPEF Ordinaria (Aliquota Marginale ~35%)",
-            "Imposta Annua (€)": fmt_eur(tax_irpef),
+            "Regime Fiscale": "🔴 IRPEF Ordinaria (Aliquota Marginale ~35%)",
+            "Imposta Annua (€)": float(tax_irpef),
             "IMU Agevolata": "No (Aliquota Ordinaria)",
-            "Net Yield Stimato": f"{((gross_annual - tax_irpef - p_imu - condo_mo*12 - p_val*maint_pct/100)/p_val*100):.2f}%",
-            "Risparmio vs 21%": f"-{fmt_eur(tax_irpef - tax_21)}/anno"
+            "Net Yield Stimato (%)": float((gross_annual - tax_irpef - p_imu - condo_mo * 12 - p_val * maint_pct / 100) / p_val * 100) if p_val > 0 else 0.0,
+            "Risparmio vs 21% (€)": float(-(tax_irpef - tax_21)),
         }
-    ])
-    st.dataframe(df_tax_comp, hide_index=True, use_container_width=True)
+    ]
+    df_tax_comp = pd.DataFrame(tax_comp_rows)
+    tax_comp_col_cfg = {
+        "Regime Fiscale": st.column_config.TextColumn("Regime Fiscale", width="medium"),
+        "Imposta Annua (€)": st.column_config.NumberColumn("Imposta Annua (€)", format="€ %,.2f"),
+        "IMU Agevolata": st.column_config.TextColumn("IMU Agevolata", width="small"),
+        "Net Yield Stimato (%)": st.column_config.NumberColumn("Net Yield Stimato (%)", format="%.2f%%"),
+        "Risparmio vs 21% (€)": st.column_config.NumberColumn("Risparmio vs 21% (€)", format="%+,.2f €"),
+    }
+    render_table_with_export(
+        df_tax_comp,
+        table_title="Confronto Fiscale tra Regimi di Locazione Immobiliare",
+        file_prefix="confronto_fiscale_locazioni",
+        key_suffix="p19_tax_loc_comp",
+        column_config=tax_comp_col_cfg,
+        height=220,
+        hide_index=True,
+    )
 
 # ============================================================
 # TAB 4: BUY VS RENT

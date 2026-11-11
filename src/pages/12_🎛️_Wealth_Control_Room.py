@@ -32,6 +32,7 @@ from core.ui_utils import (
     render_kpi_card,
     render_omni_command_bar,
     render_segmented_tabs,
+    render_table_with_export,
     render_wealth_command_bar,
     render_wealth_control_room_hero,
     render_wealth_executive_badges,
@@ -375,18 +376,27 @@ with st.expander("📚 Storico Snapshot & Recall Analisi Patrimoniale", expanded
                 snap_options[label] = sid
 
             df_disp = pd.DataFrame(disp_rows)
-            st.dataframe(
-                df_disp.style.format({
-                    "Net Worth (€)": "€ {:,.2f}",
-                    "Liquidità (€)": "€ {:,.2f}",
-                    "Investimenti (€)": "€ {:,.2f}",
-                    "Asset Caveau (€)": "€ {:,.2f}",
-                    "Previdenza (€)": "€ {:,.2f}",
-                    "Passività (€)": "€ {:,.2f}"
-                }),
-                use_container_width=True,
-                height=160,
-                hide_index=True
+            snap_col_cfg = {
+                "Data Snapshot": st.column_config.TextColumn("Data Snapshot", width="medium"),
+                "Profilo": st.column_config.TextColumn("Profilo", width="small"),
+                "Etichetta": st.column_config.TextColumn("Etichetta", width="medium"),
+                "Net Worth (€)": st.column_config.NumberColumn("Net Worth (€)", format="€ %,.2f"),
+                "Liquidità (€)": st.column_config.NumberColumn("Liquidità (€)", format="€ %,.2f"),
+                "Investimenti (€)": st.column_config.NumberColumn("Investimenti (€)", format="€ %,.2f"),
+                "Asset Caveau (€)": st.column_config.NumberColumn("Asset Caveau (€)", format="€ %,.2f"),
+                "Previdenza (€)": st.column_config.NumberColumn("Previdenza (€)", format="€ %,.2f"),
+                "Passività (€)": st.column_config.NumberColumn("Passività (€)", format="€ %,.2f"),
+                "Health Score": st.column_config.NumberColumn("Health Score", format="%.0f/100"),
+                "Run ID": st.column_config.TextColumn("Run ID", width="small"),
+            }
+            render_table_with_export(
+                df_disp,
+                table_title="Registro Storico degli Snapshot Patrimoniali",
+                file_prefix="snapshots_patrimoniali",
+                key_suffix="wcr_snapshots_tbl",
+                column_config=snap_col_cfg,
+                height=180,
+                hide_index=True,
             )
 
             selected_snap_label = st.selectbox(
@@ -876,17 +886,30 @@ if active_cr_tab == "📥 Data Pipeline & Ingestion":
             </div>
             """, unsafe_allow_html=True)
             
-            st.dataframe(
-                df_disp_live[["portfolio_id", "name", "base_currency", "last_calc_date", "latest_value", "Peso (%)"]].rename(columns={
-                    "portfolio_id": "ID Portafoglio",
-                    "name": "Nome Portafoglio",
-                    "base_currency": "Valuta",
-                    "last_calc_date": "Ultimo Snapshot",
-                    "latest_value": "Valore (€)",
-                    "Peso (%)": "Peso (%)"
-                }),
-                use_container_width=True,
-                hide_index=True
+            df_risk_disp = df_disp_live[["portfolio_id", "name", "base_currency", "last_calc_date", "latest_value", "Peso (%)"]].rename(columns={
+                "portfolio_id": "ID Portafoglio",
+                "name": "Nome Portafoglio",
+                "base_currency": "Valuta",
+                "last_calc_date": "Ultimo Snapshot",
+                "latest_value": "Valore (€)",
+                "Peso (%)": "Peso (%)"
+            })
+            risk_link_col_cfg = {
+                "ID Portafoglio": st.column_config.NumberColumn("ID Portafoglio", width="small"),
+                "Nome Portafoglio": st.column_config.TextColumn("Nome Portafoglio", width="medium"),
+                "Valuta": st.column_config.TextColumn("Valuta", width="small"),
+                "Ultimo Snapshot": st.column_config.TextColumn("Ultimo Snapshot", width="medium"),
+                "Valore (€)": st.column_config.NumberColumn("Valore (€)", format="€ %,.2f"),
+                "Peso (%)": st.column_config.ProgressColumn("Peso (%)", format="%.1f%%", min_value=0.0, max_value=100.0),
+            }
+            render_table_with_export(
+                df_risk_disp,
+                table_title="Portafogli Titoli & Risk Collegati",
+                file_prefix="portafogli_risk_collegati",
+                key_suffix="wcr_risk_linked_tbl",
+                column_config=risk_link_col_cfg,
+                height=220,
+                hide_index=True,
             )
         else:
             st.caption("💳 Nessun portafoglio Risk collegato: Profilo impostato come 'Solo Transazionale' (Investimenti = € 0,00).")
@@ -1149,19 +1172,44 @@ elif active_cr_tab == "⚙️ Gestione Conti & Categorie":
 
         df_accs_view = get_wealth_accounts(engine, portfolio_id=current_pid)
         if not df_accs_view.empty:
-            st.dataframe(
-                df_accs_view[["account_id", "name", "institution", "account_type", "currency", "balance", "iban", "is_active"]].rename(columns={
-                    "account_id": "ID",
-                    "name": "Nome Conto",
-                    "institution": "Banca / Istituto",
-                    "account_type": "Tipo",
-                    "currency": "Valuta",
-                    "balance": "Saldo Attuale (€)",
-                    "iban": "IBAN",
-                    "is_active": "Attivo"
-                }),
-                use_container_width=True,
-                hide_index=True
+            type_labels = {
+                "checking": "💳 Conto Corrente",
+                "savings": "🏦 Conto Deposito",
+                "investment": "📈 Broker / Titoli",
+                "crypto": "₿ Wallet Crypto",
+                "cash": "💵 Contante / Cassa",
+                "credit": "💳 Carta di Credito"
+            }
+            df_accs_fmt = df_accs_view.copy()
+            df_accs_fmt["Tipo"] = df_accs_fmt["account_type"].map(lambda t: type_labels.get(str(t).lower(), str(t).title()))
+            df_accs_fmt["Stato"] = df_accs_fmt["is_active"].apply(lambda a: "🟢 Attivo" if bool(a) else "⏸️ Sospeso")
+            
+            accs_disp = df_accs_fmt[["account_id", "name", "institution", "Tipo", "currency", "balance", "iban", "Stato"]].rename(columns={
+                "account_id": "ID",
+                "name": "Nome Conto",
+                "institution": "Banca / Istituto",
+                "currency": "Valuta",
+                "balance": "Saldo Attuale (€)",
+                "iban": "IBAN",
+            })
+            accs_col_cfg = {
+                "ID": st.column_config.NumberColumn("ID", width="small"),
+                "Nome Conto": st.column_config.TextColumn("Nome Conto", width="medium"),
+                "Banca / Istituto": st.column_config.TextColumn("Banca / Istituto", width="medium"),
+                "Tipo": st.column_config.TextColumn("Tipo", width="small"),
+                "Valuta": st.column_config.TextColumn("Valuta", width="small"),
+                "Saldo Attuale (€)": st.column_config.NumberColumn("Saldo Attuale (€)", format="€ %,.2f"),
+                "IBAN": st.column_config.TextColumn("IBAN", width="medium"),
+                "Stato": st.column_config.TextColumn("Stato", width="small"),
+            }
+            render_table_with_export(
+                accs_disp,
+                table_title="Conti Bancari & Depositi di Liquidità",
+                file_prefix="conti_bancari_liquidita",
+                key_suffix="wcr_accs_tbl",
+                column_config=accs_col_cfg,
+                height=260,
+                hide_index=True,
             )
 
             with st.expander("✏️ Gestisci / Elimina / Disattiva Singolo Conto"):
@@ -1279,17 +1327,32 @@ elif active_cr_tab == "⚙️ Gestione Conti & Categorie":
                 if not df_linked_summary.empty:
                     df_disp_link = df_linked_summary.copy()
                     df_disp_link["Peso (%)"] = (df_disp_link["latest_value"] / tot_risk_val * 100.0) if tot_risk_val > 0 else 0.0
-                    st.dataframe(
-                        df_disp_link[["portfolio_id", "name", "base_currency", "last_calc_date", "latest_value", "Peso (%)"]].rename(columns={
-                            "portfolio_id": "ID Portafoglio Risk",
-                            "name": "Nome Portafoglio",
-                            "base_currency": "Valuta",
-                            "last_calc_date": "Ultimo Snapshot Calcolato",
-                            "latest_value": "Controvalore (€)",
-                            "Peso (%)": "Peso su Investimenti (%)"
-                        }),
-                        use_container_width=True,
-                        hide_index=True
+                    df_link_renamed = df_disp_link[["portfolio_id", "name", "base_currency", "last_calc_date", "latest_value", "Peso (%)"]].rename(columns={
+                        "portfolio_id": "ID Portafoglio Risk",
+                        "name": "Nome Portafoglio",
+                        "base_currency": "Valuta",
+                        "last_calc_date": "Ultimo Snapshot Calcolato",
+                        "latest_value": "Controvalore (€)",
+                        "Peso (%)": "Peso su Investimenti (%)"
+                    })
+                    link_col_cfg = {
+                        "ID Portafoglio Risk": st.column_config.NumberColumn("ID Portafoglio Risk", width="small"),
+                        "Nome Portafoglio": st.column_config.TextColumn("Nome Portafoglio", width="medium"),
+                        "Valuta": st.column_config.TextColumn("Valuta", width="small"),
+                        "Ultimo Snapshot Calcolato": st.column_config.TextColumn("Ultimo Snapshot Calcolato", width="medium"),
+                        "Controvalore (€)": st.column_config.NumberColumn("Controvalore (€)", format="€ %,.2f"),
+                        "Peso su Investimenti (%)": st.column_config.ProgressColumn(
+                            "Peso su Investimenti (%)", format="%.1f%%", min_value=0.0, max_value=100.0
+                        ),
+                    }
+                    render_table_with_export(
+                        df_link_renamed,
+                        table_title="Composizione Investimenti Multi-Portafoglio",
+                        file_prefix="composizione_investimenti",
+                        key_suffix="wcr_invest_comp_tbl",
+                        column_config=link_col_cfg,
+                        height=240,
+                        hide_index=True,
                     )
 
     # ── SUBTAB C: CATEGORIE 50/30/20 ─────────────────────────
@@ -1323,18 +1386,45 @@ elif active_cr_tab == "⚙️ Gestione Conti & Categorie":
         st.markdown("<br>", unsafe_allow_html=True)
         df_cats = get_wealth_categories(engine)
         if not df_cats.empty:
-            st.dataframe(
-                df_cats[["category_id", "icon", "name", "flow_type", "nature", "color", "is_system"]].rename(columns={
-                    "category_id": "ID",
-                    "icon": "Icona",
-                    "name": "Nome Categoria",
-                    "flow_type": "Flusso (Entrata/Uscita)",
-                    "nature": "Natura 50/30/20",
-                    "color": "Colore",
-                    "is_system": "Sistema"
-                }),
-                use_container_width=True,
-                hide_index=True
+            nature_map = {
+                "need": "🔴 50% Bisogni Primari (Needs)",
+                "want": "🟡 30% Desideri (Wants)",
+                "saving": "🟢 20% Risparmio & Investimenti (Savings)",
+                "income": "💵 Entrata / Reddito",
+            }
+            df_cats_fmt = df_cats.copy()
+            df_cats_fmt["nature"] = df_cats_fmt["nature"].map(lambda n: nature_map.get(str(n).lower(), str(n).title()))
+            df_cats_fmt["flow_type"] = df_cats_fmt["flow_type"].map(
+                lambda f: "📈 Entrata" if str(f).lower() in ["income", "entrata"] else "📉 Uscita / Spesa"
+            )
+            df_cats_fmt["is_system"] = df_cats_fmt["is_system"].apply(lambda s: "🔒 Standard" if bool(s) else "✏️ Personalizzata")
+            
+            cats_disp = df_cats_fmt[["category_id", "icon", "name", "flow_type", "nature", "color", "is_system"]].rename(columns={
+                "category_id": "ID",
+                "icon": "Icona",
+                "name": "Nome Categoria",
+                "flow_type": "Flusso",
+                "nature": "Natura 50/30/20",
+                "color": "Colore Hex",
+                "is_system": "Tipologia"
+            })
+            cats_col_cfg = {
+                "ID": st.column_config.NumberColumn("ID", width="small"),
+                "Icona": st.column_config.TextColumn("Icona", width="small"),
+                "Nome Categoria": st.column_config.TextColumn("Nome Categoria", width="medium"),
+                "Flusso": st.column_config.TextColumn("Flusso", width="small"),
+                "Natura 50/30/20": st.column_config.TextColumn("Natura 50/30/20", width="medium"),
+                "Colore Hex": st.column_config.TextColumn("Colore Hex", width="small"),
+                "Tipologia": st.column_config.TextColumn("Tipologia", width="small"),
+            }
+            render_table_with_export(
+                cats_disp,
+                table_title="Mappatura Categorie di Bilancio & Regola 50/30/20",
+                file_prefix="categorie_50_30_20",
+                key_suffix="wcr_cats_503020_tbl",
+                column_config=cats_col_cfg,
+                height=320,
+                hide_index=True,
             )
 
 # =============================================================
