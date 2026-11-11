@@ -764,44 +764,44 @@ if sel_live_tab == "💼 Prezzi Live & PnL Attribution":
                 display_rows.append({
                     "Ticker": x["Ticker"],
                     "Esito Posizione": esito_str,
-                    "Trend 1D": trend_1d_str,
-                    "Prezzo Spot (Valuta Orig.)": x["Prezzo_Spot"],
-                    "Prezzo Live (€)": x["Prezzo_EUR"],
-                    "Var. 1D (%)": x["Var_1D_Pct"],
-                    "Var. Day 1D (€)": x["Var_Day_EUR"],
-                    "Effetto Prezzo (€)": x["Effetto_Prezzo"],
-                    "Effetto FX (€)": x["Effetto_FX"],
-                    "Carico FIFO WACP (€)": x["WACP_EUR"],
-                    "Quantità": x["Quantita"],
-                    "Peso %": peso_pct,
                     "Controvalore Live (€)": x["Controvalore_EUR"],
                     "PnL Latente (€)": x["PnL_EUR"],
                     "Rendimento (%)": x["PnL_Pct"],
-                    "Day Range (L - H)": x["Day_Range"],
-                    "Stato Feed": x["Feed"]
+                    "Peso %": peso_pct,
+                    "Prezzo Live (€)": x["Prezzo_EUR"],
+                    "Var. 1D (%)": x["Var_1D_Pct"],
+                    "Var. Day 1D (€)": x["Var_Day_EUR"],
+                    "Trend 1D": trend_1d_str,
+                    "Carico WACP (€)": x["WACP_EUR"],
+                    "Qtà": x["Quantita"],
+                    "Effetto Prezzo (€)": x["Effetto_Prezzo"],
+                    "Effetto FX (€)": x["Effetto_FX"],
+                    "Prezzo Spot": x["Prezzo_Spot"],
+                    "Day Range": x["Day_Range"],
+                    "Feed": x["Feed"]
                 })
 
             df_port_display = pd.DataFrame(display_rows)
 
-            # Funzioni di styling dinamico condizionale (Verde Guadagno / Rosso Perdita)
-            def _style_pnl_val(val):
+            # Styling cromatico istituzionale ad alta leggibilità
+            def _style_num_pnl(val):
                 try:
                     v = float(val)
                     if v > 0.0001:
-                        return "color: #3fb950; font-weight: 700; background-color: rgba(63, 185, 80, 0.12);"
+                        return "color: #3fb950; font-weight: 700;"
                     elif v < -0.0001:
-                        return "color: #f85149; font-weight: 700; background-color: rgba(248, 81, 73, 0.12);"
+                        return "color: #f85149; font-weight: 700;"
                     return "color: #8b949e;"
                 except (ValueError, TypeError):
                     return ""
 
-            def _style_pnl_total(val):
+            def _style_pill_pnl(val):
                 try:
                     v = float(val)
                     if v > 0.0001:
-                        return "color: #3fb950; font-weight: 800; background-color: rgba(63, 185, 80, 0.20);"
+                        return "color: #3fb950; font-weight: 800; background-color: rgba(63, 185, 80, 0.16); border-radius: 4px;"
                     elif v < -0.0001:
-                        return "color: #f85149; font-weight: 800; background-color: rgba(248, 81, 73, 0.20);"
+                        return "color: #f85149; font-weight: 800; background-color: rgba(248, 81, 73, 0.16); border-radius: 4px;"
                     return "color: #8b949e;"
                 except (ValueError, TypeError):
                     return ""
@@ -809,16 +809,16 @@ if sel_live_tab == "💼 Prezzi Live & PnL Attribution":
             def _style_badge_text(val):
                 s = str(val).upper()
                 if "GUADAGNA" in s or "▲" in s:
-                    return "color: #3fb950; font-weight: 800; background-color: rgba(63, 185, 80, 0.16);"
+                    return "color: #3fb950; font-weight: 800; background-color: rgba(63, 185, 80, 0.18); border-radius: 4px;"
                 elif "PERDE" in s or "▼" in s:
-                    return "color: #f85149; font-weight: 800; background-color: rgba(248, 81, 73, 0.16);"
+                    return "color: #f85149; font-weight: 800; background-color: rgba(248, 81, 73, 0.18); border-radius: 4px;"
                 return "color: #8b949e;"
 
             styled_port_df = (
                 df_port_display.style
                 .map(_style_badge_text, subset=["Esito Posizione", "Trend 1D"])
-                .map(_style_pnl_val, subset=["Var. 1D (%)", "Var. Day 1D (€)", "Effetto Prezzo (€)", "Effetto FX (€)"])
-                .map(_style_pnl_total, subset=["PnL Latente (€)", "Rendimento (%)"])
+                .map(_style_pill_pnl, subset=["PnL Latente (€)", "Rendimento (%)"])
+                .map(_style_num_pnl, subset=["Var. 1D (%)", "Var. Day 1D (€)", "Effetto Prezzo (€)", "Effetto FX (€)"])
             )
 
             max_w = float(df_port_display["Peso %"].max()) if not df_port_display.empty and "Peso %" in df_port_display.columns else 100.0
@@ -831,21 +831,21 @@ if sel_live_tab == "💼 Prezzi Live & PnL Attribution":
                 column_config={
                     "Ticker": st.column_config.TextColumn("Ticker", width="small", pinned=True),
                     "Esito Posizione": st.column_config.TextColumn("Esito Posizione", width="medium", help="Stato PnL rispetto al prezzo medio di carico WACP FIFO"),
-                    "Trend 1D": st.column_config.TextColumn("Trend 1D", width="small", help="Variazione giornaliera rispetto alla chiusura precedente"),
-                    "Prezzo Spot (Valuta Orig.)": st.column_config.TextColumn("Prezzo Spot (Valuta Orig.)"),
-                    "Prezzo Live (€)": st.column_config.NumberColumn("Prezzo Live (€)", format="€ %.2f"),
-                    "Var. 1D (%)": st.column_config.NumberColumn("Var. 1D (%)", format="%+,.2f%%"),
-                    "Var. Day 1D (€)": st.column_config.NumberColumn("Var. Day 1D (€)", format="€ %+,.2f"),
-                    "Effetto Prezzo (€)": st.column_config.NumberColumn("Effetto Prezzo (€)", format="€ %+,.2f"),
-                    "Effetto FX (€)": st.column_config.NumberColumn("Effetto FX (€)", format="€ %+,.2f"),
-                    "Carico FIFO WACP (€)": st.column_config.NumberColumn("Carico FIFO WACP (€)", format="€ %.2f"),
-                    "Quantità": st.column_config.NumberColumn("Quantità", format="%.2f"),
-                    "Peso %": st.column_config.ProgressColumn("Peso %", format="%.2f%%", min_value=0.0, max_value=max_w_bound, help="Incidenza percentuale sul controvalore complessivo del portafoglio"),
                     "Controvalore Live (€)": st.column_config.NumberColumn("Controvalore Live (€)", format="€ %.2f"),
                     "PnL Latente (€)": st.column_config.NumberColumn("PnL Latente (€)", format="€ %+,.2f"),
                     "Rendimento (%)": st.column_config.NumberColumn("Rendimento (%)", format="%+,.2f%%"),
-                    "Day Range (L - H)": st.column_config.TextColumn("Day Range (L - H)"),
-                    "Stato Feed": st.column_config.TextColumn("Stato Feed"),
+                    "Peso %": st.column_config.ProgressColumn("Peso %", format="%.2f%%", min_value=0.0, max_value=max_w_bound, help="Incidenza percentuale sul controvalore complessivo del portafoglio"),
+                    "Prezzo Live (€)": st.column_config.NumberColumn("Prezzo Live (€)", format="€ %.2f"),
+                    "Var. 1D (%)": st.column_config.NumberColumn("Var. 1D (%)", format="%+,.2f%%"),
+                    "Var. Day 1D (€)": st.column_config.NumberColumn("Var. Day 1D (€)", format="€ %+,.2f"),
+                    "Trend 1D": st.column_config.TextColumn("Trend 1D", width="small", help="Variazione giornaliera rispetto alla chiusura precedente"),
+                    "Carico WACP (€)": st.column_config.NumberColumn("Carico WACP (€)", format="€ %.2f"),
+                    "Qtà": st.column_config.NumberColumn("Qtà", format="%.2f"),
+                    "Effetto Prezzo (€)": st.column_config.NumberColumn("Effetto Prezzo (€)", format="€ %+,.2f"),
+                    "Effetto FX (€)": st.column_config.NumberColumn("Effetto FX (€)", format="€ %+,.2f"),
+                    "Prezzo Spot": st.column_config.TextColumn("Prezzo Spot"),
+                    "Day Range": st.column_config.TextColumn("Day Range"),
+                    "Feed": st.column_config.TextColumn("Feed"),
                 }
             )
 
