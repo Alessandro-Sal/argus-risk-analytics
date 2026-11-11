@@ -5,6 +5,7 @@
 # ============================================================
 
 import json
+import logging
 import threading
 import time
 from datetime import date, datetime
@@ -25,6 +26,8 @@ from core.wealth.wealth_models import (
     WealthCashflowItem,
     WealthCategory,
 )
+
+logger = logging.getLogger(__name__)
 
 # Categorie predefinite di sistema con icone e classificazione per natura
 DEFAULT_SYSTEM_CATEGORIES = [
@@ -2263,6 +2266,78 @@ def save_pension_plan(engine: Engine, plan: Dict[str, Any]) -> int:
                 params,
             )
             return _get_last_insert_id(conn, engine)
+
+
+def delete_pension_plan(engine: Engine, plan_id: int) -> bool:
+    """Elimina definitivamente un fondo pensione dal database."""
+    init_wealth_db(engine)
+    try:
+        with engine.begin() as conn:
+            res = conn.execute(
+                sqlt("DELETE FROM wealth_pension_plans WHERE plan_id = :pid"),
+                {"pid": int(plan_id)}
+            )
+            return bool(res.rowcount > 0) if hasattr(res, "rowcount") else True
+    except Exception as e:
+        logger.error(f"Errore eliminazione fondo pensione {plan_id}: {e}")
+        return False
+
+
+def deduplicate_pension_plans(engine: Engine, portfolio_id: Optional[int] = None) -> Dict[str, Any]:
+    """
+    Rileva e unisce eventuali piani previdenziali duplicati per lo stesso profilo/portafoglio.
+    Se esistono piu' piani per lo stesso fondo (es. 'Credemvita Previdenza' e 'Fondo Pensione Integrativo (GSheets)'),
+    mantiene il piano con i dati piu' completi/aggiornati (o montante piu' alto), imposta la denominazione
+    canonica ed elimina i duplicati obsoleti per evitare doppi conteggi nel Net Worth.
+    """
+    init_wealth_db(engine)
+    df_plans = get_pension_plans(engine, portfolio_id=portfolio_id)
+    if df_plans.empty or len(df_plans) <= 1:
+        return {"deduplicated": False, "deleted_ids": [], "retained_id": None}
+
+    deleted_ids = []
+    retained_id = None
+
+    pids = [int(p) for p in df_plans["portfolio_id"].unique()] if "portfolio_id" in df_plans.columns else [1]
+    for pid in pids:
+        sub = df_plans[df_plans["portfolio_id"] == pid] if "portfolio_id" in df_plans.columns else df_plans
+        if len(sub) <= 1:
+            continue
+
+        # Criterio di similarita': piani che appartengono alla sincronizzazione previdenziale personale
+        credem_gsheets = sub[sub["plan_name"].str.contains(r"Credem|Fondo Pensione|GSheets|Previdenza", case=False, na=False)]
+        if len(credem_gsheets) > 1:
+            # Ordina per accumulated_value decrescente
+            sorted_candidates = credem_gsheets.sort_values(by="accumulated_value", ascending=False)
+            best = sorted_candidates.iloc[0]
+            retained_id = int(best["plan_id"])
+            to_remove = sorted_candidates.iloc[1:]
+
+            # Nome canonico preferito: se uno conteneva 'Credemvita', mantieni 'Credemvita Previdenza'
+            has_credem_name = any("credem" in str(n).lower() for n in sorted_candidates["plan_name"].tolist())
+            canonical_name = "Credemvita Previdenza" if has_credem_name else str(best["plan_name"])
+            canonical_provider = "Credemvita S.p.A." if has_credem_name else str(best.get("provider", "Fondo Pensione"))
+            canonical_line = "Credemvita Azionario / Crescita" if has_credem_name else str(best.get("investment_line", "Azionario / Crescita"))
+
+            with engine.begin() as conn:
+                conn.execute(
+                    sqlt("""
+                    UPDATE wealth_pension_plans 
+                    SET plan_name = :pname, provider = :provider, investment_line = :line
+                    WHERE plan_id = :pid
+                    """),
+                    {"pname": canonical_name, "provider": canonical_provider, "line": canonical_line, "pid": retained_id}
+                )
+                for _, r_del in to_remove.iterrows():
+                    del_id = int(r_del["plan_id"])
+                    conn.execute(sqlt("DELETE FROM wealth_pension_plans WHERE plan_id = :pid"), {"pid": del_id})
+                    deleted_ids.append(del_id)
+
+    return {
+        "deduplicated": bool(deleted_ids),
+        "deleted_ids": deleted_ids,
+        "retained_id": retained_id,
+    }
 
 
 # ── NET WORTH SNAPSHOTS CRUD & RECALL ──────────────────────

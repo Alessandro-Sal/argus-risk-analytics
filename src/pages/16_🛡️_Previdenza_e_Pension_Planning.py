@@ -85,6 +85,15 @@ render_standard_hero(
 
 df_plans = get_pension_plans(engine, portfolio_id=current_pid)
 
+# Auto-deduplicazione trasparente: se nel profilo personale sono presenti piani duplicati dello stesso fondo (es. Credemvita + GSheets)
+if not df_plans.empty and len(df_plans) > 1:
+    credem_dups = df_plans[df_plans["plan_name"].str.contains(r"Credem|Fondo Pensione|GSheets", case=False, na=False)]
+    if len(credem_dups) > 1:
+        from core.wealth.wealth_db import deduplicate_pension_plans
+        dedup_res = deduplicate_pension_plans(engine, portfolio_id=current_pid)
+        if dedup_res.get("deduplicated"):
+            df_plans = get_pension_plans(engine, portfolio_id=current_pid)
+
 # Calcoli aggregati
 tot_pension_val = float(df_plans["accumulated_value"].sum()) if not df_plans.empty else 0.0
 tot_monthly_contrib = (
@@ -248,6 +257,15 @@ if active_pension_tab == "📋 Piani Attivi & Scudo Fiscale":
             """,
                 unsafe_allow_html=True,
             )
+
+            # Azioni rapide piano
+            c_card_info, c_card_act = st.columns([4, 1])
+            with c_card_act:
+                if st.button("🗑️ Rimuovi Piano", key=f"btn_del_card_{p.get('plan_id')}", use_container_width=True, help="Elimina questo piano per rimuovere duplicati e riallineare il Net Worth"):
+                    from core.wealth.wealth_db import delete_pension_plan
+                    if delete_pension_plan(engine, int(p.get("plan_id"))):
+                        st.success(f"Piano '{p_name}' rimosso!")
+                        st.rerun()
 
             yearly_json = p.get("yearly_data_json")
             if yearly_json:
@@ -786,6 +804,43 @@ elif active_pension_tab == "🎲 Simulatore Monte Carlo & Cono Evolutivo":
 
 # ── 7. CENSIMENTO & GESTIONE FONDI ─────────────────────────
 elif active_pension_tab == "➕ Censimento & Gestione Fondi":
+    section("📋 Piani Pensionistici Censiti nel Profilo")
+    df_p_edit = get_pension_plans(engine, portfolio_id=current_pid)
+    if not df_p_edit.empty:
+        col_hdr1, col_hdr2 = st.columns([3, 1.2])
+        with col_hdr1:
+            st.caption(f"Trovati **{len(df_p_edit)}** piani previdenziali associati a **{prof_title}**.")
+        with col_hdr2:
+            if len(df_p_edit) > 1:
+                if st.button("✨ Unisci Duplicati", key="btn_dedup_pension_tab", use_container_width=True, help="Rileva piani duplicati dello stesso fondo, mantiene quello aggiornato ed elimina i duplicati"):
+                    from core.wealth.wealth_db import deduplicate_pension_plans
+                    res_d = deduplicate_pension_plans(engine, portfolio_id=current_pid)
+                    if res_d.get("deduplicated"):
+                        st.success("Duplicati uniti con successo!")
+                        st.rerun()
+                    else:
+                        st.info("Nessun duplicato evidente rilevato.")
+
+        for _, row_p in df_p_edit.iterrows():
+            plan_id = int(row_p["plan_id"])
+            p_val_num = float(row_p.get("accumulated_value", 0.0) or 0.0)
+            m_contrib_num = float(row_p.get("monthly_employee_contrib", 0.0) or 0.0) + float(row_p.get("monthly_employer_contrib", 0.0) or 0.0)
+            
+            c_info, c_act = st.columns([4, 1])
+            with c_info:
+                st.markdown(
+                    f"🛡️ **{row_p.get('plan_name')}** (`{row_p.get('provider', 'Provider')}`) — Montante: **{fmt_eur(p_val_num)}** | Versamento: **{fmt_eur(m_contrib_num)}/m**"
+                )
+            with c_act:
+                if st.button("🗑️ Elimina", key=f"btn_del_plan_mgmt_{plan_id}", use_container_width=True):
+                    from core.wealth.wealth_db import delete_pension_plan
+                    if delete_pension_plan(engine, plan_id):
+                        st.success(f"Piano ID {plan_id} eliminato con successo!")
+                        st.rerun()
+        st.divider()
+    else:
+        st.info("Nessun piano censito per questo profilo.")
+
     section("➕ Censimento & Registrazione Nuovo Fondo Pensione / PIP / TFR")
     st.caption("Aggiungi o aggiorna i piani previdenziali integrativi associati al profilo patrimoniale attivo.")
 

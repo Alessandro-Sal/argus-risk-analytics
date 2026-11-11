@@ -769,18 +769,40 @@ def _sync_pension_sheet(engine: Engine, spreadsheet: Any, portfolio_id: int = 1)
 
     df_curr_pens = get_pension_plans(engine, portfolio_id=portfolio_id)
     existing_plan_id = None
+    existing_name = None
+    existing_provider = None
+    existing_line = None
     if not df_curr_pens.empty:
-        matches = df_curr_pens[df_curr_pens["plan_name"].str.contains("Fondo Pensione", case=False, na=False)]
+        matches = df_curr_pens[df_curr_pens["plan_name"].str.contains(r"Fondo Pensione|Credem|Previdenza|GSheets", case=False, na=False)]
         if not matches.empty:
-            existing_plan_id = int(matches.iloc[0]["plan_id"])
+            sorted_m = matches.sort_values(by="accumulated_value", ascending=False)
+            existing_plan_id = int(sorted_m.iloc[0]["plan_id"])
+            existing_name = str(sorted_m.iloc[0]["plan_name"])
+            existing_provider = str(sorted_m.iloc[0].get("provider", ""))
+            existing_line = str(sorted_m.iloc[0].get("investment_line", ""))
+            # Elimina duplicati obsoleti dello stesso fondo per evitare doppi conteggi nel Net Worth
+            if len(sorted_m) > 1:
+                with engine.begin() as conn:
+                    for _, extra_row in sorted_m.iloc[1:].iterrows():
+                        conn.execute(sqlt("DELETE FROM wealth_pension_plans WHERE plan_id = :pid"), {"pid": int(extra_row["plan_id"])})
+        elif len(df_curr_pens) == 1:
+            existing_plan_id = int(df_curr_pens.iloc[0]["plan_id"])
+            existing_name = str(df_curr_pens.iloc[0]["plan_name"])
+            existing_provider = str(df_curr_pens.iloc[0].get("provider", ""))
+            existing_line = str(df_curr_pens.iloc[0].get("investment_line", ""))
+
+    has_credem = any("credem" in str(x).lower() for x in [existing_name, existing_provider])
+    chosen_name = existing_name or ("Credemvita Previdenza" if has_credem else "Credemvita Previdenza")
+    chosen_provider = existing_provider or ("Credemvita S.p.A." if has_credem else "Credemvita S.p.A.")
+    chosen_line = existing_line or ("Credemvita Azionario / Crescita" if has_credem else "Azionario / Crescita")
 
     save_pension_plan(
         engine,
         {
             "plan_id": existing_plan_id,
             "portfolio_id": portfolio_id,
-            "plan_name": "Fondo Pensione Integrativo (GSheets)",
-            "provider": "Fondo Aperto / PIP",
+            "plan_name": chosen_name,
+            "provider": chosen_provider,
             "plan_type": "fondo_pensione_aperto",
             "accumulated_value": accumulated_val,
             "monthly_employee_contrib": round(avg_monthly, 2),
@@ -788,7 +810,7 @@ def _sync_pension_sheet(engine: Engine, spreadsheet: Any, portfolio_id: int = 1)
             "tax_deductible_annual": round(tot_annual_contrib, 2),
             "expected_retirement_age": 67,
             "currency": "EUR",
-            "investment_line": "Azionario / Crescita",
+            "investment_line": chosen_line,
             "notes": f"Sincronizzato da foglio Pension (Anni: {history_str})",
             "yearly_data_json": json.dumps(yearly_data),
         },
@@ -1044,18 +1066,28 @@ def _sync_net_worth_oggi_tab(engine: Engine, spreadsheet: Any, portfolio_id: int
 
                 df_curr_pens = get_pension_plans(engine, portfolio_id=portfolio_id)
                 existing_plan_id = None
+                existing_name = None
+                existing_provider = None
                 if not df_curr_pens.empty:
-                    matches = df_curr_pens[df_curr_pens["plan_name"] == "Fondo Pensione Integrativo (GSheets)"]
+                    matches = df_curr_pens[df_curr_pens["plan_name"].str.contains(r"Fondo Pensione|Credem|Previdenza|GSheets", case=False, na=False)]
                     if not matches.empty:
                         existing_plan_id = int(matches.iloc[0]["plan_id"])
+                        existing_name = str(matches.iloc[0]["plan_name"])
+                        existing_provider = str(matches.iloc[0].get("provider", ""))
+                    elif len(df_curr_pens) == 1:
+                        existing_plan_id = int(df_curr_pens.iloc[0]["plan_id"])
+                        existing_name = str(df_curr_pens.iloc[0]["plan_name"])
+                        existing_provider = str(df_curr_pens.iloc[0].get("provider", ""))
 
+                chosen_name = existing_name or "Credemvita Previdenza"
+                chosen_provider = existing_provider or ("Credemvita S.p.A." if "credem" in chosen_name.lower() else "Fondo Aperto / PIP")
                 save_pension_plan(
                     engine,
                     {
                         "plan_id": existing_plan_id,
                         "portfolio_id": portfolio_id,
-                        "plan_name": "Fondo Pensione Integrativo (GSheets)",
-                        "provider": "Fondo Aperto / PIP",
+                        "plan_name": chosen_name,
+                        "provider": chosen_provider,
                         "plan_type": "fondo_pensione_aperto",
                         "accumulated_value": pension_val,
                         "currency": "EUR",
