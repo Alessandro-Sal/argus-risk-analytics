@@ -679,50 +679,175 @@ if sel_live_tab == "💼 Prezzi Live & PnL Attribution":
         """
         st.markdown(kpi_cards_html, unsafe_allow_html=True)
 
-        col_spc, col_tbl_search = st.columns([3.5, 1.2], vertical_alignment="center")
+        # ── Micro-Banner & Contatori Dinamici PnL ─────────────────────────
+        n_tot = len(port_live_raw_items)
+        n_gain = sum(1 for x in port_live_raw_items if x["PnL_EUR"] > 0)
+        n_loss = sum(1 for x in port_live_raw_items if x["PnL_EUR"] < 0)
+        gain_ratio = (n_gain / n_tot * 100.0) if n_tot > 0 else 0.0
+        tot_gain_eur = sum(x["PnL_EUR"] for x in port_live_raw_items if x["PnL_EUR"] > 0)
+        tot_loss_eur = sum(x["PnL_EUR"] for x in port_live_raw_items if x["PnL_EUR"] < 0)
+
+        pnl_stats_html = f"""
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; background: rgba(22, 27, 34, 0.7); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 8px 14px; margin-bottom: 12px; font-size: 12px;">
+            <div style="display: flex; gap: 14px; align-items: center; flex-wrap: wrap;">
+                <span style="color: #8b949e; font-weight: 700; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px;">📊 Monitor Dinamico:</span>
+                <span style="color: #3fb950; font-weight: 700; background: rgba(63,185,80,0.12); padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(63,185,80,0.3);">🟢 {n_gain} in Guadagno (+€ {tot_gain_eur:,.2f})</span>
+                <span style="color: #f85149; font-weight: 700; background: rgba(248,81,73,0.12); padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(248,81,73,0.3);">🔴 {n_loss} in Perdita (€ {tot_loss_eur:,.2f})</span>
+                <span style="color: #58a6ff; font-weight: 600; background: rgba(88,166,255,0.12); padding: 2px 8px; border-radius: 4px;">Win-Ratio: <b>{gain_ratio:.1f}%</b></span>
+            </div>
+            <div style="color: #8b949e; font-size: 11px;">
+                💡 <i>Colorazione automatica PnL / Day • Clicca sulle colonne per ordinare</i>
+            </div>
+        </div>
+        """
+        st.markdown(pnl_stats_html, unsafe_allow_html=True)
+
+        col_flt, col_tbl_search = st.columns([3.4, 1.4], vertical_alignment="center")
+        with col_flt:
+            filter_options = [
+                f"🌐 Tutte ({n_tot})",
+                f"🟢 Solo Guadagni ({n_gain})",
+                f"🔴 Solo Perdite ({n_loss})",
+                "🚀 Top Gainer 1D",
+                "🔻 Top Loser 1D",
+            ]
+            sel_pnl_filter = st.segmented_control(
+                "Filtro Dinamico Posizioni",
+                options=filter_options,
+                default=filter_options[0],
+                key="sel_filter_pnl_live_p2",
+                label_visibility="collapsed",
+            ) or filter_options[0]
         with col_tbl_search:
             port_search_q = st.text_input("🔍 Filtra Ticker:", placeholder="Es. AAPL, ENI...", key="inp_port_table_search", label_visibility="collapsed").strip().upper()
 
-        # Filtraggio in memoria per ricerca testo (senza ricaricare quote)
-        filtered_items = [x for x in port_live_raw_items if port_search_q in x["Ticker"]] if port_search_q else port_live_raw_items
+        # Filtraggio in memoria per ricerca testo e stato PnL
+        filtered_items = port_live_raw_items
+        if "Solo Guadagni" in sel_pnl_filter:
+            filtered_items = [x for x in filtered_items if x["PnL_EUR"] > 0]
+        elif "Solo Perdite" in sel_pnl_filter:
+            filtered_items = [x for x in filtered_items if x["PnL_EUR"] < 0]
+        elif "Top Gainer" in sel_pnl_filter:
+            filtered_items = sorted(filtered_items, key=lambda x: x["Var_1D_Pct"], reverse=True)[:5]
+        elif "Top Loser" in sel_pnl_filter:
+            filtered_items = sorted(filtered_items, key=lambda x: x["Var_1D_Pct"])[:5]
 
-        df_port_display = pd.DataFrame([
-            {
-                "Ticker": x["Ticker"],
-                "Prezzo Spot (Valuta Orig.)": x["Prezzo_Spot"],
-                "Prezzo Live (€)": x["Prezzo_EUR"],
-                "Var. 1D (%)": x["Var_1D_Pct"],
-                "Var. Day 1D (€)": x["Var_Day_EUR"],
-                "Effetto Prezzo (€)": x["Effetto_Prezzo"],
-                "Effetto FX (€)": x["Effetto_FX"],
-                "Carico FIFO WACP (€)": x["WACP_EUR"],
-                "Quantità": x["Quantita"],
-                "Controvalore Live (€)": x["Controvalore_EUR"],
-                "PnL Latente (€)": x["PnL_EUR"],
-                "Rendimento (%)": x["PnL_Pct"],
-                "Day Range (L - H)": x["Day_Range"],
-                "Stato Feed": x["Feed"]
-            }
-            for x in filtered_items
-        ])
+        if port_search_q:
+            filtered_items = [x for x in filtered_items if port_search_q in x["Ticker"]]
 
-        st.dataframe(
-            df_port_display,
-            use_container_width=True,
-            hide_index=True,
-            column_config={
-                "Prezzo Live (€)": st.column_config.NumberColumn("Prezzo Live (€)", format="€ %.2f"),
-                "Var. 1D (%)": st.column_config.NumberColumn("Var. 1D (%)", format="%.2f%%"),
-                "Var. Day 1D (€)": st.column_config.NumberColumn("Var. Day 1D (€)", format="€ %.2f"),
-                "Effetto Prezzo (€)": st.column_config.NumberColumn("Effetto Prezzo (€)", format="€ %.2f"),
-                "Effetto FX (€)": st.column_config.NumberColumn("Effetto FX (€)", format="€ %.2f"),
-                "Carico FIFO WACP (€)": st.column_config.NumberColumn("Carico FIFO WACP (€)", format="€ %.2f"),
-                "Quantità": st.column_config.NumberColumn("Quantità", format="%.2f"),
-                "Controvalore Live (€)": st.column_config.NumberColumn("Controvalore Live (€)", format="€ %.2f"),
-                "PnL Latente (€)": st.column_config.NumberColumn("PnL Latente (€)", format="€ %.2f"),
-                "Rendimento (%)": st.column_config.NumberColumn("Rendimento (%)", format="%.2f%%"),
-            }
-        )
+        if not filtered_items:
+            st.info("Nessuna posizione trovata corrispondente ai filtri selezionati.")
+        else:
+            display_rows = []
+            for x in filtered_items:
+                peso_pct = round((x["Controvalore_EUR"] / tot_live_notional * 100.0), 2) if tot_live_notional > 0 else 0.0
+                pnl_v = x["PnL_EUR"]
+                pnl_p = x["PnL_Pct"]
+                chg_1d = x["Var_1D_Pct"]
+
+                # Badge Esito Posizione (Guadagna / Perde vs FIFO WACP)
+                if pnl_v > 0.0001:
+                    esito_str = f"🟢 GUADAGNA (+{pnl_p:.1f}%)"
+                elif pnl_v < -0.0001:
+                    esito_str = f"🔴 PERDE ({pnl_p:.1f}%)"
+                else:
+                    esito_str = "⚪ IN PARITÀ"
+
+                # Badge Trend 1D (Variazione di giornata)
+                if chg_1d > 0.0001:
+                    trend_1d_str = f"▲ +{chg_1d:.2f}%"
+                elif chg_1d < -0.0001:
+                    trend_1d_str = f"▼ {chg_1d:.2f}%"
+                else:
+                    trend_1d_str = "➖ 0.00%"
+
+                display_rows.append({
+                    "Ticker": x["Ticker"],
+                    "Esito Posizione": esito_str,
+                    "Trend 1D": trend_1d_str,
+                    "Prezzo Spot (Valuta Orig.)": x["Prezzo_Spot"],
+                    "Prezzo Live (€)": x["Prezzo_EUR"],
+                    "Var. 1D (%)": x["Var_1D_Pct"],
+                    "Var. Day 1D (€)": x["Var_Day_EUR"],
+                    "Effetto Prezzo (€)": x["Effetto_Prezzo"],
+                    "Effetto FX (€)": x["Effetto_FX"],
+                    "Carico FIFO WACP (€)": x["WACP_EUR"],
+                    "Quantità": x["Quantita"],
+                    "Peso %": peso_pct,
+                    "Controvalore Live (€)": x["Controvalore_EUR"],
+                    "PnL Latente (€)": x["PnL_EUR"],
+                    "Rendimento (%)": x["PnL_Pct"],
+                    "Day Range (L - H)": x["Day_Range"],
+                    "Stato Feed": x["Feed"]
+                })
+
+            df_port_display = pd.DataFrame(display_rows)
+
+            # Funzioni di styling dinamico condizionale (Verde Guadagno / Rosso Perdita)
+            def _style_pnl_val(val):
+                try:
+                    v = float(val)
+                    if v > 0.0001:
+                        return "color: #3fb950; font-weight: 700; background-color: rgba(63, 185, 80, 0.12);"
+                    elif v < -0.0001:
+                        return "color: #f85149; font-weight: 700; background-color: rgba(248, 81, 73, 0.12);"
+                    return "color: #8b949e;"
+                except (ValueError, TypeError):
+                    return ""
+
+            def _style_pnl_total(val):
+                try:
+                    v = float(val)
+                    if v > 0.0001:
+                        return "color: #3fb950; font-weight: 800; background-color: rgba(63, 185, 80, 0.20);"
+                    elif v < -0.0001:
+                        return "color: #f85149; font-weight: 800; background-color: rgba(248, 81, 73, 0.20);"
+                    return "color: #8b949e;"
+                except (ValueError, TypeError):
+                    return ""
+
+            def _style_badge_text(val):
+                s = str(val).upper()
+                if "GUADAGNA" in s or "▲" in s:
+                    return "color: #3fb950; font-weight: 800; background-color: rgba(63, 185, 80, 0.16);"
+                elif "PERDE" in s or "▼" in s:
+                    return "color: #f85149; font-weight: 800; background-color: rgba(248, 81, 73, 0.16);"
+                return "color: #8b949e;"
+
+            styled_port_df = (
+                df_port_display.style
+                .map(_style_badge_text, subset=["Esito Posizione", "Trend 1D"])
+                .map(_style_pnl_val, subset=["Var. 1D (%)", "Var. Day 1D (€)", "Effetto Prezzo (€)", "Effetto FX (€)"])
+                .map(_style_pnl_total, subset=["PnL Latente (€)", "Rendimento (%)"])
+            )
+
+            max_w = float(df_port_display["Peso %"].max()) if not df_port_display.empty and "Peso %" in df_port_display.columns else 100.0
+            max_w_bound = max(10.0, max_w * 1.15)
+
+            st.dataframe(
+                styled_port_df,
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "Ticker": st.column_config.TextColumn("Ticker", width="small", pinned=True),
+                    "Esito Posizione": st.column_config.TextColumn("Esito Posizione", width="medium", help="Stato PnL rispetto al prezzo medio di carico WACP FIFO"),
+                    "Trend 1D": st.column_config.TextColumn("Trend 1D", width="small", help="Variazione giornaliera rispetto alla chiusura precedente"),
+                    "Prezzo Spot (Valuta Orig.)": st.column_config.TextColumn("Prezzo Spot (Valuta Orig.)"),
+                    "Prezzo Live (€)": st.column_config.NumberColumn("Prezzo Live (€)", format="€ %.2f"),
+                    "Var. 1D (%)": st.column_config.NumberColumn("Var. 1D (%)", format="%+,.2f%%"),
+                    "Var. Day 1D (€)": st.column_config.NumberColumn("Var. Day 1D (€)", format="€ %+,.2f"),
+                    "Effetto Prezzo (€)": st.column_config.NumberColumn("Effetto Prezzo (€)", format="€ %+,.2f"),
+                    "Effetto FX (€)": st.column_config.NumberColumn("Effetto FX (€)", format="€ %+,.2f"),
+                    "Carico FIFO WACP (€)": st.column_config.NumberColumn("Carico FIFO WACP (€)", format="€ %.2f"),
+                    "Quantità": st.column_config.NumberColumn("Quantità", format="%.2f"),
+                    "Peso %": st.column_config.ProgressColumn("Peso %", format="%.2f%%", min_value=0.0, max_value=max_w_bound, help="Incidenza percentuale sul controvalore complessivo del portafoglio"),
+                    "Controvalore Live (€)": st.column_config.NumberColumn("Controvalore Live (€)", format="€ %.2f"),
+                    "PnL Latente (€)": st.column_config.NumberColumn("PnL Latente (€)", format="€ %+,.2f"),
+                    "Rendimento (%)": st.column_config.NumberColumn("Rendimento (%)", format="%+,.2f%%"),
+                    "Day Range (L - H)": st.column_config.TextColumn("Day Range (L - H)"),
+                    "Stato Feed": st.column_config.TextColumn("Stato Feed"),
+                }
+            )
 
 elif sel_live_tab == "🗺️ Heatmap Portafoglio 1D":
     if not port_live_raw_items:
