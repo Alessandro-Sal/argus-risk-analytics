@@ -260,10 +260,20 @@ if active_pos_tab == "📋 Posizioni Attive & Costi FIFO":
 
     with hh2:
         st.markdown("**Top 10 Posizioni per Controvalore**")
-        if not pos.empty and "current_value" in pos.columns and "weight_pct" in pos.columns:
+        if not pos.empty and "current_value" in pos.columns:
             pos_active = pos[pos["qty_net"] > 0] if "qty_net" in pos.columns else (pos[pos["current_value"] > 0] if "current_value" in pos.columns else pos)
             pos_sorted = pos_active.sort_values("current_value", ascending=False).head(10).copy()
             
+            if "weight_pct" not in pos_sorted.columns:
+                if "weight" in pos_sorted.columns:
+                    pos_sorted["weight_pct"] = pos_sorted["weight"] * 100.0 if pos_sorted["weight"].max() <= 1.05 else pos_sorted["weight"]
+                else:
+                    tot_cv_top = float(pos_sorted["current_value"].sum())
+                    pos_sorted["weight_pct"] = (pos_sorted["current_value"] / tot_cv_top * 100.0) if tot_cv_top > 0 else 0.0
+
+            if "pnl_unrealized" not in pos_sorted.columns and "unrealized_pnl" in pos_sorted.columns:
+                pos_sorted["pnl_unrealized"] = pos_sorted["unrealized_pnl"]
+
             top10_cols = ["ticker", "current_value", "weight_pct"]
             if "pnl_unrealized" in pos_sorted.columns:
                 top10_cols.append("pnl_unrealized")
@@ -299,10 +309,29 @@ if active_pos_tab == "📋 Posizioni Attive & Costi FIFO":
 
     if not pos.empty:
         df_l = pos[pos["qty_net"] > 0].copy() if "qty_net" in pos.columns else pos.copy()
+
+        # Normalizzazione preventiva e robusta degli alias colonne
         if "days_to_liquidate" not in df_l.columns:
             df_l["days_to_liquidate"] = 0.5
         if "current_value" not in df_l.columns:
             df_l["current_value"] = 0.0
+        if "wacp" not in df_l.columns:
+            df_l["wacp"] = df_l["avg_cost"] if "avg_cost" in df_l.columns else 0.0
+        if "pnl_unrealized" not in df_l.columns:
+            if "unrealized_pnl" in df_l.columns:
+                df_l["pnl_unrealized"] = df_l["unrealized_pnl"]
+            elif "current_value" in df_l.columns and "qty_net" in df_l.columns and "wacp" in df_l.columns:
+                df_l["pnl_unrealized"] = df_l["current_value"] - (df_l["wacp"] * df_l["qty_net"])
+            else:
+                df_l["pnl_unrealized"] = 0.0
+        if "pnl_realized" not in df_l.columns:
+            df_l["pnl_realized"] = df_l["realized_pnl"] if "realized_pnl" in df_l.columns else 0.0
+        if "weight_pct" not in df_l.columns:
+            if "weight" in df_l.columns:
+                df_l["weight_pct"] = df_l["weight"] * 100.0 if df_l["weight"].max() <= 1.05 else df_l["weight"]
+            else:
+                tot_cv = float(df_l["current_value"].sum()) if "current_value" in df_l.columns else 0.0
+                df_l["weight_pct"] = (df_l["current_value"] / tot_cv * 100.0) if tot_cv > 0 else 0.0
         
         display_cols = [
             "ticker", "asset_class", "sector", "country", "qty_net",
@@ -362,6 +391,13 @@ if active_pos_tab == "📋 Posizioni Attive & Costi FIFO":
             "yield_on_cost_pct": "Yield on Cost (%)"
         }
         df_disp.rename(columns=col_renames, inplace=True)
+
+        # Garanzia assoluta presenza e tipo numerico colonne chiave
+        for col_name in ["PnL Latente (€)", "PnL Realizz. (€)", "Controvalore (€)", "Peso (%)", "Prezzo Carico (€)", "Prezzo Mkt (€)"]:
+            if col_name not in df_disp.columns:
+                df_disp[col_name] = 0.0
+            else:
+                df_disp[col_name] = pd.to_numeric(df_disp[col_name], errors="coerce").fillna(0.0)
 
         # Telemetria PnL e Win-Ratio aggregati
         tot_pos_cnt = len(df_disp)
