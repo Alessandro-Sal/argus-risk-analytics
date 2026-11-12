@@ -553,6 +553,8 @@ with st.expander(f"📚 Storico Snapshot & Recall Analisi ({st.session_state.get
                         if results is not None:
                             st.session_state["pipeline_done"]  = True
                             st.session_state["portfolio_id"]   = target_pid
+                            st.session_state["active_portfolio_id"] = str(target_pid)
+                            st.session_state["sb_unified_portfolio_selector"] = target_pid
                             st.session_state["portfolio_name"] = sel_row.port_name
                             st.session_state["engine"]         = engine_sidebar
                             st.session_state["results"]        = results
@@ -896,9 +898,33 @@ with tab_ingest:
                         success, res_sync, run_id_sync, p_name_sync, f_rep = res_tuple[0:5]
                         dual_info = res_tuple[5] if len(res_tuple) > 5 else None
 
+                        sync_pid = None
+                        if isinstance(res_sync, dict) and res_sync.get("portfolio_id"):
+                            sync_pid = res_sync.get("portfolio_id")
+                        elif dual_info and isinstance(dual_info, dict):
+                            if isinstance(dual_info.get("stocks"), dict) and dual_info["stocks"].get("portfolio_id"):
+                                sync_pid = dual_info["stocks"]["portfolio_id"]
+
+                        if sync_pid is None:
+                            try:
+                                from core.db_exporter import get_or_create_portfolio_id
+                                if engine_sidebar is not None:
+                                    with engine_sidebar.connect() as conn:
+                                        sync_pid = get_or_create_portfolio_id(
+                                            conn,
+                                            name=p_name_sync or "Google Sheets Portfolio",
+                                            owner=st.session_state.get("argus_auth_user", "gsheets_cron"),
+                                            base_currency=st.session_state.get("base_currency", "EUR")
+                                        )
+                            except Exception:
+                                sync_pid = 1
+
                         st.session_state["results"] = res_sync
                         st.session_state["pipeline_done"] = True
                         st.session_state["portfolio_name"] = p_name_sync or "Google Sheets Portfolio"
+                        st.session_state["portfolio_id"] = sync_pid
+                        st.session_state["active_portfolio_id"] = str(sync_pid)
+                        st.session_state["sb_unified_portfolio_selector"] = sync_pid
                         st.session_state["run_id"] = run_id_sync
                         st.session_state["fetch_report"] = f_rep
                         st.session_state.pop("session_cleared", None)
@@ -908,6 +934,7 @@ with tab_ingest:
                             from core.workspace_context import WorkspaceContext
                             ws_ctx = WorkspaceContext.get_current()
                             ws_ctx.risk.results = res_sync
+                            ws_ctx.risk.portfolio_id = sync_pid
                             ws_ctx.risk.portfolio_name = p_name_sync or "Google Sheets Portfolio"
                             ws_ctx.risk.run_id = run_id_sync
                             ws_ctx.risk.pipeline_done = True
@@ -1298,6 +1325,8 @@ with tab_ingest:
 
                     st.session_state["pipeline_done"]  = True
                     st.session_state["portfolio_id"]   = portfolio_id
+                    st.session_state["active_portfolio_id"] = str(portfolio_id)
+                    st.session_state["sb_unified_portfolio_selector"] = portfolio_id
                     st.session_state["portfolio_name"] = p_name_final
                     st.session_state["engine"]         = engine
                     st.session_state["fetch_report"]   = fetch_report
@@ -1565,10 +1594,35 @@ with tab_wealth:
                         prof_data = load_portfolio_profile(p["name"])
                         if prof_data:
                             loaded_res = prof_data.get("results_full") or prof_data
+                            p_id = prof_data.get("portfolio_id") or p.get("portfolio_id")
+                            if not p_id and engine_sidebar is not None:
+                                try:
+                                    from core.db_exporter import get_or_create_portfolio_id
+                                    with engine_sidebar.connect() as conn:
+                                        p_id = get_or_create_portfolio_id(conn, name=p["name"], owner=st.session_state.get("argus_auth_user", "user"), base_currency="EUR")
+                                except Exception:
+                                    p_id = None
                             st.session_state["results"] = loaded_res
                             st.session_state["pipeline_done"] = True
                             st.session_state["portfolio_name"] = p["name"]
                             st.session_state["run_id"] = f"LOAD-{p['name'][:10]}"
+                            if p_id is not None:
+                                st.session_state["portfolio_id"] = p_id
+                                st.session_state["active_portfolio_id"] = str(p_id)
+                                st.session_state["sb_unified_portfolio_selector"] = p_id
+                            try:
+                                from core.workspace_context import WorkspaceContext
+                                ws_ctx = WorkspaceContext.get_current()
+                                ws_ctx.risk.results = loaded_res
+                                ws_ctx.risk.portfolio_name = p["name"]
+                                if p_id is not None:
+                                    ws_ctx.risk.portfolio_id = p_id
+                                ws_ctx.risk.run_id = f"LOAD-{p['name'][:10]}"
+                                ws_ctx.risk.pipeline_done = True
+                                ws_ctx.risk.is_live_active = True
+                                ws_ctx.version += 1
+                            except Exception:
+                                pass
                             from core.workspace_manager import save_session_snapshot_to_cache
                             save_session_snapshot_to_cache()
                             st.success(f"Portafoglio '{p['name']}' caricato con successo!")
@@ -1597,10 +1651,40 @@ with tab_wealth:
                 with st.spinner("Consolidamento delle posizioni e ricalcolo quantitativo del Master Portfolio..."):
                     merged_res = consolidate_multi_portfolios(selected_for_merge)
                     if merged_res:
+                        p_id = merged_res.get("portfolio_id")
+                        if not p_id and engine_sidebar is not None:
+                            try:
+                                from core.db_exporter import get_or_create_portfolio_id
+                                with engine_sidebar.connect() as conn:
+                                    p_id = get_or_create_portfolio_id(
+                                        conn,
+                                        name=merged_res["portfolio_name"],
+                                        owner=st.session_state.get("argus_auth_user", "user"),
+                                        base_currency="EUR",
+                                    )
+                            except Exception:
+                                p_id = None
                         st.session_state["results"] = merged_res
                         st.session_state["pipeline_done"] = True
                         st.session_state["portfolio_name"] = merged_res["portfolio_name"]
                         st.session_state["run_id"] = merged_res["run_id"]
+                        if p_id is not None:
+                            st.session_state["portfolio_id"] = p_id
+                            st.session_state["active_portfolio_id"] = str(p_id)
+                            st.session_state["sb_unified_portfolio_selector"] = p_id
+                        try:
+                            from core.workspace_context import WorkspaceContext
+                            ws_ctx = WorkspaceContext.get_current()
+                            ws_ctx.risk.results = merged_res
+                            ws_ctx.risk.portfolio_name = merged_res["portfolio_name"]
+                            if p_id is not None:
+                                ws_ctx.risk.portfolio_id = p_id
+                            ws_ctx.risk.run_id = merged_res["run_id"]
+                            ws_ctx.risk.pipeline_done = True
+                            ws_ctx.risk.is_live_active = True
+                            ws_ctx.version += 1
+                        except Exception:
+                            pass
                         from core.workspace_manager import save_session_snapshot_to_cache
                         save_session_snapshot_to_cache()
                         st.success("Master Portfolio consolidato con successo! Reindirizzamento...")

@@ -467,6 +467,11 @@ class WorkspaceContext:
 
             st_state["wealth_active_portfolio_id"] = self.wealth.profile_id
             st_state["wealth_active_profile_name"] = self.wealth.profile_name
+            if self.risk.portfolio_id is not None:
+                st_state["sb_unified_portfolio_selector"] = self.risk.portfolio_id
+                st_state["global_active_portfolio_selector"] = self.risk.portfolio_id
+            if self.wealth.profile_id is not None:
+                st_state["sb_wealth_profile_selector"] = self.wealth.profile_id
 
     # ── DOMAIN FLUSHING & GHOST STATE ELIMINATION ──────────────
 
@@ -508,6 +513,8 @@ class WorkspaceContext:
                     "active_quant_tab",
                     "is_sandbox",
                     "is_demo",
+                    "sb_unified_portfolio_selector",
+                    "global_active_portfolio_selector",
                 ]:
                     if key in st_state:
                         del st_state[key]
@@ -1429,6 +1436,8 @@ def set_active_portfolio(portfolio_id: Union[str, int], engine: Optional[Any] = 
         st.session_state["pipeline_done"] = True
         st.session_state["session_cleared"] = False
         st.session_state["base_currency"] = base_curr
+        st.session_state["sb_unified_portfolio_selector"] = target_pid
+        st.session_state["global_active_portfolio_selector"] = target_pid
 
         try:
             from core.session_manager import ArgusSessionManager
@@ -1519,7 +1528,9 @@ def render_portfolio_selector(
     except ImportError:
         return None
 
-    # Recupera l'elenco dei portafogli appartenenti all'utente
+    from components.ui_core.ui_utils import format_display_portfolio_name
+
+    # 1. Recupera l'elenco dei portafogli appartenenti all'utente
     engine = st.session_state.get("engine")
     if engine is None:
         try:
@@ -1549,20 +1560,69 @@ def render_portfolio_selector(
         except Exception as e_fetch:
             logger.debug("Fetch portfolio list in selector notice: %s", e_fetch)
 
-    # Se nessun portafoglio presente nel database ma presente in session_state
-    if not portfolios_list:
-        current_pid = st.session_state.get("active_portfolio_id") or st.session_state.get("portfolio_id")
-        current_name = st.session_state.get("portfolio_name", "Nessun portafoglio")
-        if current_pid:
-            portfolios_list = [
-                {
-                    "portfolio_id": current_pid,
-                    "name": current_name,
-                    "base_currency": st.session_state.get("base_currency", "EUR"),
-                }
-            ]
+    # 2. Risoluzione deterministica del portafoglio attivo corrente in sessione
+    current_pid = st.session_state.get("active_portfolio_id") or st.session_state.get("portfolio_id")
+    current_name = st.session_state.get("portfolio_name")
+    has_active_data = bool(st.session_state.get("pipeline_done") or st.session_state.get("results"))
 
-    # Nessun portafoglio disponibile: non renderizzare sporcizia a schermo a meno che esplicitamente richiesto
+    # Fallback su WorkspaceContext se session_state non ha ID
+    if current_pid is None:
+        try:
+            ws = WorkspaceContext.get_current()
+            if ws and ws.risk and ws.risk.portfolio_id is not None:
+                current_pid = ws.risk.portfolio_id
+            if not current_name and ws and ws.risk and ws.risk.portfolio_name:
+                current_name = ws.risk.portfolio_name
+        except Exception:
+            pass
+
+    # Se l'ID è ancora None ma c'è un nome attivo, cerchiamo corrispondenza nella lista DB
+    if current_pid is None and current_name and portfolios_list:
+        clean_cur = format_display_portfolio_name(current_name).strip().lower()
+        for p in portfolios_list:
+            p_clean = format_display_portfolio_name(p.get("name", "")).strip().lower()
+            if p_clean and (p_clean == clean_cur or p_clean in clean_cur or clean_cur in p_clean):
+                current_pid = p["portfolio_id"]
+                st.session_state["portfolio_id"] = current_pid
+                st.session_state["active_portfolio_id"] = str(current_pid)
+                break
+
+    # 3. Verifica se il portafoglio attivo è presente in portfolios_list
+    matched_entry = None
+    if current_pid is not None:
+        matched_entry = next(
+            (p for p in portfolios_list if p.get("portfolio_id") == current_pid or str(p.get("portfolio_id")) == str(current_pid)),
+            None
+        )
+
+    if matched_entry is None and current_name and has_active_data:
+        clean_cur = format_display_portfolio_name(current_name).strip().lower()
+        matched_entry = next(
+            (p for p in portfolios_list if format_display_portfolio_name(p.get("name", "")).strip().lower() == clean_cur),
+            None
+        )
+        if matched_entry is not None:
+            current_pid = matched_entry["portfolio_id"]
+            st.session_state["portfolio_id"] = current_pid
+            st.session_state["active_portfolio_id"] = str(current_pid)
+
+    # Se c'è un'analisi attiva in sessione ma non figura tra i portafogli recuperati da DB,
+    # aggiungiamola dinamicamente come prima opzione per garantire visibilità e allineamento perfetto.
+    if matched_entry is None and has_active_data and current_name:
+        session_entry_id = current_pid if current_pid is not None else 1
+        if any(str(p.get("portfolio_id")) == str(session_entry_id) for p in portfolios_list):
+            session_entry_id = "active_session"
+        new_entry = {
+            "portfolio_id": session_entry_id,
+            "name": current_name,
+            "base_currency": st.session_state.get("base_currency", "EUR"),
+        }
+        portfolios_list.insert(0, new_entry)
+        current_pid = session_entry_id
+        st.session_state["portfolio_id"] = session_entry_id
+        st.session_state["active_portfolio_id"] = str(session_entry_id)
+
+    # Se nessun portafoglio presente nel database né in session_state
     if not portfolios_list:
         if show_fallback:
             st.markdown(
@@ -1575,27 +1635,55 @@ def render_portfolio_selector(
             )
         return None
 
-    # Se richiesto solo per multi-portafoglio e ce n'è al più uno, non renderizzare widget ridondanti
+    # Se richiesto solo per multi-portafoglio e ce n'è al più uno, sincronizza e termina
     if only_if_multiple and len(portfolios_list) <= 1:
-        return portfolios_list[0]["portfolio_id"]
+        single_pid = portfolios_list[0]["portfolio_id"] if portfolios_list else None
+        if single_pid is not None and st.session_state.get(key) != single_pid:
+            st.session_state[key] = single_pid
+        return single_pid
 
-    # Mappatura e selezione (include placeholder None per evitare cambi forzati all'avvio)
+    # 4. Mappatura opzioni e formattazione
     p_options = [None] + [p["portfolio_id"] for p in portfolios_list]
-    p_format = {p["portfolio_id"]: f"💼 {p['name']} (#{p['portfolio_id']})" for p in portfolios_list}
+    p_format = {}
+    for p in portfolios_list:
+        pid = p["portfolio_id"]
+        clean_nm = format_display_portfolio_name(p.get("name"))
+        if pid == "active_session":
+            p_format[pid] = f"💼 {clean_nm} (Attivo in Sessione)"
+        else:
+            pid_str = f"#{pid}" if str(pid).isdigit() else str(pid)
+            p_format[pid] = f"💼 {clean_nm} ({pid_str})"
     p_format[None] = "-- Seleziona Portafoglio --"
 
-    active_id = st.session_state.get("active_portfolio_id") or st.session_state.get("portfolio_id")
-    cur_idx = 0
-    if active_id is not None:
-        for idx, pid in enumerate(p_options):
-            if pid is not None and str(pid) == str(active_id):
-                cur_idx = idx
+    # 5. Sincronizzazione bi-direzionale garantita con la chiave Streamlit
+    target_option = None
+    if current_pid is not None:
+        for opt in p_options:
+            if opt is not None and (opt == current_pid or str(opt) == str(current_pid)):
+                target_option = opt
                 break
+
+    if target_option is not None:
+        cur_idx = p_options.index(target_option)
+        if st.session_state.get(key) != target_option:
+            st.session_state[key] = target_option
+    else:
+        cur_idx = 0
+        if st.session_state.get(key) not in p_options:
+            st.session_state[key] = None
 
     def _on_port_selector_change():
         sel_val = st.session_state.get(key)
-        if sel_val is not None and str(sel_val) != str(st.session_state.get("active_portfolio_id")):
-            set_active_portfolio(sel_val, engine=engine)
+        if sel_val is not None:
+            if sel_val == "active_session":
+                return
+            if str(sel_val) != str(st.session_state.get("active_portfolio_id")):
+                set_active_portfolio(sel_val, engine=engine)
+                st.session_state[key] = sel_val
+        else:
+            st.session_state["active_portfolio_id"] = None
+            st.session_state["portfolio_id"] = None
+            st.session_state[key] = None
 
     selected_pid = st.selectbox(
         label,

@@ -155,7 +155,16 @@ def get_display_portfolio_name():
     has_data = bool(st.session_state.get("pipeline_done") or st.session_state.get("results"))
     if not has_data:
         return "Nessun Portafoglio", False
-    name = format_display_portfolio_name(st.session_state.get("portfolio_name"))
+    raw_name = st.session_state.get("portfolio_name")
+    if not raw_name or str(raw_name).strip() in ("N/A", "None", ""):
+        try:
+            from core.workspace_context import WorkspaceContext
+            ws = WorkspaceContext.get_current()
+            if ws and ws.risk and ws.risk.portfolio_name:
+                raw_name = ws.risk.portfolio_name
+        except Exception:
+            pass
+    name = format_display_portfolio_name(raw_name)
     if name == "N/A":
         name = "Master Wealth"
     return name, True

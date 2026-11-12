@@ -114,10 +114,29 @@ if has_real:
             if saved_profile_names and st.button("⚡ Attiva Portafoglio", key="btn_sw_port_p7", use_container_width=True):
                 prof_data = load_portfolio_profile(sel_switch_name)
                 if prof_data:
-                    st.session_state["results"] = prof_data.get("results_full") or prof_data
+                    loaded_res = prof_data.get("results_full") or prof_data
+                    p_id = prof_data.get("portfolio_id")
+                    st.session_state["results"] = loaded_res
                     st.session_state["pipeline_done"] = True
                     st.session_state["portfolio_name"] = sel_switch_name
                     st.session_state["run_id"] = f"LOAD-{sel_switch_name[:10]}"
+                    if p_id is not None:
+                        st.session_state["portfolio_id"] = p_id
+                        st.session_state["active_portfolio_id"] = str(p_id)
+                        st.session_state["sb_unified_portfolio_selector"] = p_id
+                    try:
+                        from core.workspace_context import WorkspaceContext
+                        ws_ctx = WorkspaceContext.get_current()
+                        ws_ctx.risk.results = loaded_res
+                        ws_ctx.risk.portfolio_name = sel_switch_name
+                        if p_id is not None:
+                            ws_ctx.risk.portfolio_id = p_id
+                        ws_ctx.risk.run_id = f"LOAD-{sel_switch_name[:10]}"
+                        ws_ctx.risk.pipeline_done = True
+                        ws_ctx.risk.is_live_active = True
+                        ws_ctx.version += 1
+                    except Exception:
+                        pass
                     try:
                         from core.workspace_manager import save_session_snapshot_to_cache
                         save_session_snapshot_to_cache()
@@ -150,10 +169,29 @@ else:
             if st.button("⚡ Carica Questo Portafoglio", key="btn_load_wh_sb_p7", type="primary", use_container_width=True):
                 prof_data = load_portfolio_profile(sel_load_wh)
                 if prof_data:
-                    st.session_state["results"] = prof_data.get("results_full") or prof_data
+                    loaded_res = prof_data.get("results_full") or prof_data
+                    p_id = prof_data.get("portfolio_id")
+                    st.session_state["results"] = loaded_res
                     st.session_state["pipeline_done"] = True
                     st.session_state["portfolio_name"] = sel_load_wh
                     st.session_state["run_id"] = f"LOAD-{sel_load_wh[:10]}"
+                    if p_id is not None:
+                        st.session_state["portfolio_id"] = p_id
+                        st.session_state["active_portfolio_id"] = str(p_id)
+                        st.session_state["sb_unified_portfolio_selector"] = p_id
+                    try:
+                        from core.workspace_context import WorkspaceContext
+                        ws_ctx = WorkspaceContext.get_current()
+                        ws_ctx.risk.results = loaded_res
+                        ws_ctx.risk.portfolio_name = sel_load_wh
+                        if p_id is not None:
+                            ws_ctx.risk.portfolio_id = p_id
+                        ws_ctx.risk.run_id = f"LOAD-{sel_load_wh[:10]}"
+                        ws_ctx.risk.pipeline_done = True
+                        ws_ctx.risk.is_live_active = True
+                        ws_ctx.version += 1
+                    except Exception:
+                        pass
                     try:
                         from core.workspace_manager import save_session_snapshot_to_cache
                         save_session_snapshot_to_cache()
