@@ -225,7 +225,6 @@ def ensure_portfolio_loaded(
                 if ws.risk.portfolio_id:
                     st.session_state["portfolio_id"] = ws.risk.portfolio_id
                     st.session_state["active_portfolio_id"] = str(ws.risk.portfolio_id)
-                    st.session_state["sb_unified_portfolio_selector"] = ws.risk.portfolio_id
                 if ws.risk.portfolio_name:
                     st.session_state["portfolio_name"] = ws.risk.portfolio_name
                 if ws.risk.run_id:

@@ -214,7 +214,6 @@ def seed_unified_demo_scenario(target_portfolio_name: str = "DEMO_FAMILY_OFFICE"
             st.session_state["portfolio_name"] = target_portfolio_name
             st.session_state["portfolio_id"] = ctx.risk.portfolio_id
             st.session_state["active_portfolio_id"] = str(ctx.risk.portfolio_id)
-            st.session_state["sb_unified_portfolio_selector"] = ctx.risk.portfolio_id
             st.session_state["run_id"] = ctx.risk.run_id
             st.session_state["base_currency"] = "EUR"
             st.session_state["selected_bitemp_port"] = target_portfolio_name

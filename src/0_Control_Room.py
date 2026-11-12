@@ -554,7 +554,6 @@ with st.expander(f"📚 Storico Snapshot & Recall Analisi ({st.session_state.get
                             st.session_state["pipeline_done"]  = True
                             st.session_state["portfolio_id"]   = target_pid
                             st.session_state["active_portfolio_id"] = str(target_pid)
-                            st.session_state["sb_unified_portfolio_selector"] = target_pid
                             st.session_state["portfolio_name"] = sel_row.port_name
                             st.session_state["engine"]         = engine_sidebar
                             st.session_state["results"]        = results
@@ -924,7 +923,6 @@ with tab_ingest:
                         st.session_state["portfolio_name"] = p_name_sync or "Google Sheets Portfolio"
                         st.session_state["portfolio_id"] = sync_pid
                         st.session_state["active_portfolio_id"] = str(sync_pid)
-                        st.session_state["sb_unified_portfolio_selector"] = sync_pid
                         st.session_state["run_id"] = run_id_sync
                         st.session_state["fetch_report"] = f_rep
                         st.session_state.pop("session_cleared", None)
@@ -1326,7 +1324,6 @@ with tab_ingest:
                     st.session_state["pipeline_done"]  = True
                     st.session_state["portfolio_id"]   = portfolio_id
                     st.session_state["active_portfolio_id"] = str(portfolio_id)
-                    st.session_state["sb_unified_portfolio_selector"] = portfolio_id
                     st.session_state["portfolio_name"] = p_name_final
                     st.session_state["engine"]         = engine
                     st.session_state["fetch_report"]   = fetch_report
@@ -1609,7 +1606,6 @@ with tab_wealth:
                             if p_id is not None:
                                 st.session_state["portfolio_id"] = p_id
                                 st.session_state["active_portfolio_id"] = str(p_id)
-                                st.session_state["sb_unified_portfolio_selector"] = p_id
                             try:
                                 from core.workspace_context import WorkspaceContext
                                 ws_ctx = WorkspaceContext.get_current()
@@ -1671,7 +1667,6 @@ with tab_wealth:
                         if p_id is not None:
                             st.session_state["portfolio_id"] = p_id
                             st.session_state["active_portfolio_id"] = str(p_id)
-                            st.session_state["sb_unified_portfolio_selector"] = p_id
                         try:
                             from core.workspace_context import WorkspaceContext
                             ws_ctx = WorkspaceContext.get_current()

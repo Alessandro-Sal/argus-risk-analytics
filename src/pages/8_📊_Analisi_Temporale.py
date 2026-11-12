@@ -123,7 +123,6 @@ if has_real:
                     if p_id is not None:
                         st.session_state["portfolio_id"] = p_id
                         st.session_state["active_portfolio_id"] = str(p_id)
-                        st.session_state["sb_unified_portfolio_selector"] = p_id
                     try:
                         from core.workspace_context import WorkspaceContext
                         ws_ctx = WorkspaceContext.get_current()
@@ -178,7 +177,6 @@ else:
                     if p_id is not None:
                         st.session_state["portfolio_id"] = p_id
                         st.session_state["active_portfolio_id"] = str(p_id)
-                        st.session_state["sb_unified_portfolio_selector"] = p_id
                     try:
                         from core.workspace_context import WorkspaceContext
                         ws_ctx = WorkspaceContext.get_current()

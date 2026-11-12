@@ -160,3 +160,47 @@ def test_portfolio_selector_injects_active_session_portfolio_if_missing_from_db(
     assert captured_kwargs["index"] == captured_kwargs["options"].index(active_opt)
     fmt = captured_kwargs["format_func"](active_opt)
     assert "Consolidato Custom Foobar" in fmt
+
+
+def test_locked_widget_key_resilience(monkeypatch, mock_streamlit):
+    """
+    Verifica che se Streamlit solleva StreamlitAPIException quando una chiave widget
+    viene modificata dopo l'istanziazione, l'errore venga assorbito difensivamente
+    senza bloccare né la pipeline né la sincronizzazione SSOT.
+    """
+    st_mock, fake_state = mock_streamlit
+    monkeypatch.setattr("streamlit.session_state", fake_state)
+
+    import core.workspace.context as ctx_mod
+    from core.workspace.context import render_portfolio_selector, set_active_portfolio
+
+    # Simula widget bloccato dopo l'istanziazione
+    class LockedSessionState(MockStreamlitSessionState):
+        def __setitem__(self, key, value):
+            if key in ("sb_unified_portfolio_selector", "global_active_portfolio_selector"):
+                raise RuntimeError(f"st.session_state.{key} cannot be modified after widget is instantiated.")
+            super().__setitem__(key, value)
+
+    locked_state = LockedSessionState()
+    locked_state["active_portfolio_id"] = "1"
+    locked_state["portfolio_id"] = 1
+    locked_state["portfolio_name"] = "Master Wealth"
+    locked_state["pipeline_done"] = True
+    monkeypatch.setattr(ctx_mod.st, "session_state", locked_state)
+
+    mock_portfolios = [
+        {"portfolio_id": 1, "name": "Master Wealth", "base_currency": "EUR"},
+        {"portfolio_id": 2, "name": "Crypto", "base_currency": "EUR"},
+    ]
+    monkeypatch.setattr(ctx_mod, "_fetch_user_portfolios_cached", lambda *args, **kwargs: mock_portfolios)
+
+    def fake_selectbox(label, options, index=0, format_func=None, key=None, help=None, on_change=None):
+        return options[index]
+
+    monkeypatch.setattr(ctx_mod.st, "selectbox", fake_selectbox)
+
+    # Non deve sollevare eccezioni anche se il widget è bloccato
+    render_portfolio_selector(key="sb_unified_portfolio_selector")
+    assert locked_state["portfolio_id"] == 1
+    assert locked_state["active_portfolio_id"] == "1"
+

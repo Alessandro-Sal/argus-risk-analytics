@@ -468,10 +468,16 @@ class WorkspaceContext:
             st_state["wealth_active_portfolio_id"] = self.wealth.profile_id
             st_state["wealth_active_profile_name"] = self.wealth.profile_name
             if self.risk.portfolio_id is not None:
-                st_state["sb_unified_portfolio_selector"] = self.risk.portfolio_id
-                st_state["global_active_portfolio_selector"] = self.risk.portfolio_id
+                try:
+                    st_state["sb_unified_portfolio_selector"] = self.risk.portfolio_id
+                    st_state["global_active_portfolio_selector"] = self.risk.portfolio_id
+                except Exception:
+                    pass
             if self.wealth.profile_id is not None:
-                st_state["sb_wealth_profile_selector"] = self.wealth.profile_id
+                try:
+                    st_state["sb_wealth_profile_selector"] = self.wealth.profile_id
+                except Exception:
+                    pass
 
     # ── DOMAIN FLUSHING & GHOST STATE ELIMINATION ──────────────
 
@@ -517,7 +523,10 @@ class WorkspaceContext:
                     "global_active_portfolio_selector",
                 ]:
                     if key in st_state:
-                        del st_state[key]
+                        try:
+                            del st_state[key]
+                        except Exception:
+                            pass
                 st_state["session_cleared"] = True
 
                 # 2. Scansione ed eliminazione deterministica dei widget analitici orfani
@@ -1436,8 +1445,11 @@ def set_active_portfolio(portfolio_id: Union[str, int], engine: Optional[Any] = 
         st.session_state["pipeline_done"] = True
         st.session_state["session_cleared"] = False
         st.session_state["base_currency"] = base_curr
-        st.session_state["sb_unified_portfolio_selector"] = target_pid
-        st.session_state["global_active_portfolio_selector"] = target_pid
+        try:
+            st.session_state["sb_unified_portfolio_selector"] = target_pid
+            st.session_state["global_active_portfolio_selector"] = target_pid
+        except Exception:
+            pass
 
         try:
             from core.session_manager import ArgusSessionManager
@@ -1666,11 +1678,17 @@ def render_portfolio_selector(
     if target_option is not None:
         cur_idx = p_options.index(target_option)
         if st.session_state.get(key) != target_option:
-            st.session_state[key] = target_option
+            try:
+                st.session_state[key] = target_option
+            except Exception:
+                pass
     else:
         cur_idx = 0
         if st.session_state.get(key) not in p_options:
-            st.session_state[key] = None
+            try:
+                st.session_state[key] = None
+            except Exception:
+                pass
 
     def _on_port_selector_change():
         sel_val = st.session_state.get(key)
@@ -1679,11 +1697,9 @@ def render_portfolio_selector(
                 return
             if str(sel_val) != str(st.session_state.get("active_portfolio_id")):
                 set_active_portfolio(sel_val, engine=engine)
-                st.session_state[key] = sel_val
         else:
             st.session_state["active_portfolio_id"] = None
             st.session_state["portfolio_id"] = None
-            st.session_state[key] = None
 
     selected_pid = st.selectbox(
         label,
